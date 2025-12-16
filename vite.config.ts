@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ['lucide-react', 'tesseract.js'],
-    include: ['pdfjs-dist']
+    exclude: ['lucide-react'],
+    include: ['pdfjs-dist', 'tesseract.js']
   },
     server: {
       host: '0.0.0.0', // گوش دادن به همه آدرس‌ها (IPv4 و IPv6)

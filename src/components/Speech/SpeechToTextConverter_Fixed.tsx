@@ -676,16 +676,17 @@ ${existingTranscript.trim()}`;
     }
   };
 
-  const processImageFileWithOCR = async (file: File) => {
-    setIsProcessingOCR(true);
-    setError('');
-    
-    try {
-      // Create worker with Persian and English support
-      const worker = await createWorker(['fas', 'eng']);
+    const processImageFileWithOCR = async (file: File) => {
+      setIsProcessingOCR(true);
+      setError('');
       
-      // Process image
-      const { data } = await worker.recognize(file);
+      try {
+        // Create worker with Persian and English support
+        const worker = await createWorker(['fas', 'eng']);
+        
+        // Process image
+        const { data } = await worker.recognize(file);
+
       
       // Detect language
       const detected = detectLanguageAdvanced(data.text);
