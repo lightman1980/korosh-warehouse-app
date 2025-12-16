@@ -65,9 +65,9 @@ const validateSecuritySettings = (settings: SecuritySettings): { isValid: boolea
     errors.push('مدت زمان مسدودی باید بین 5 تا 3600 ثانیه باشد');
   }
   
-  if (settings.sessionTimeoutMinutes < 5 || settings.sessionTimeoutMinutes > 480) {
-    errors.push('مدت زمان نشست باید بین 1 تا 480 دقیقه باشد');
-  }
+    if (settings.sessionTimeoutMinutes < 1 || settings.sessionTimeoutMinutes > 480) {
+      errors.push('مدت زمان نشست باید بین 1 تا 480 دقیقه باشد');
+    }
   
   // Password policy validation
   if (settings.passwordPolicy.minLength < 4 || settings.passwordPolicy.minLength > 32) {
