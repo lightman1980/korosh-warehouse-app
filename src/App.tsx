@@ -44,6 +44,7 @@ import { ServerSettings } from './components/Settings/ServerSettings';
 import { DataStorage } from './utils/dataStorage';
 import { useAutoInvoiceChecker } from './hooks/useAutoInvoiceChecker';
 import { useVersionChecker } from './hooks/useVersionChecker';
+import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { initTabManager, updateTabModule, cleanupTabManager } from './utils/tabManager';
 
 // Mapping نام منوها برای نمایش در title
@@ -322,14 +323,35 @@ const AppContent: React.FC = () => {
     []
   );
 
-  const handleLogout = useCallback(() => {
-    authService.logout();
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setActiveModule('dashboard');
-    // پاک کردن ماژول ذخیره شده هنگام logout
-    localStorage.removeItem('activeModule');
-  }, []);
+    const handleLogout = useCallback(() => {
+      authService.logout();
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setActiveModule('dashboard');
+      // پاک کردن ماژول ذخیره شده هنگام logout
+      localStorage.removeItem('activeModule');
+    }, []);
+
+    // Session timeout handler
+    const getSessionTimeout = useCallback(() => {
+      try {
+        const securitySettings = localStorage.getItem('securitySettings');
+        if (securitySettings) {
+          const parsed = JSON.parse(securitySettings);
+          return parsed.sessionTimeoutMinutes || 60;
+        }
+      } catch (error) {
+        console.warn('Failed to load session timeout setting:', error);
+      }
+      return 60; // Default 60 minutes
+    }, []);
+
+    // Use session timeout hook
+    useSessionTimeout({
+      timeoutMinutes: getSessionTimeout(),
+      onTimeout: handleLogout,
+      enabled: isLoggedIn
+    });
 
   const handleDateSelect = useCallback((date: Date | null) => {
     setSelectedDate(date);
