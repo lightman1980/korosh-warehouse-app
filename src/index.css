@@ -190,6 +190,33 @@ div, section, article, aside, nav, main, header, footer {
     @apply w-1 bg-gradient-to-t from-blue-400 to-blue-600 rounded-full transition-all duration-100;
   }
   
+  /* OCR Processing Styles */
+  .ocr-progress-bar {
+    @apply h-2 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 rounded-full transition-all duration-300;
+    background-size: 200% 100%;
+    animation: ocrProgress 2s ease-in-out infinite;
+  }
+  
+  .ocr-processing {
+    @apply relative overflow-hidden;
+  }
+  
+  .ocr-processing::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent;
+    transform: translateX(-100%);
+    animation: ocrShimmer 1.5s infinite;
+  }
+  
+  /* Tesseract Worker Loading */
+  .tesseract-loading {
+    @apply flex items-center justify-center p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl;
+  }
+  
+  .tesseract-worker {
+    @apply w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin;
+  }
+  
   /* Language Badge */
   .lang-badge {
     @apply inline-flex items-center px-2 py-1 text-xs font-medium rounded-full;
@@ -319,6 +346,36 @@ div, section, article, aside, nav, main, header, footer {
   }
   50% {
     box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+  }
+}
+
+@keyframes ocrProgress {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes ocrShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes audioWave {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 20px;
   }
 }
 

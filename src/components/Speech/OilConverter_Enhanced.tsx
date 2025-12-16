@@ -34,12 +34,12 @@ import {
   Calculator,
   Droplets,
   Scale,
-  Zap as Thermometer,
-  Zap as Coffee,
-  Zap as ChefHat,
-  Zap as FlaskConical,
-  Zap as CookingPot,
-  Zap as Utensils
+  Thermometer,
+  Coffee,
+  ChefHat,
+  FlaskConical,
+  CookingPot,
+  Utensils
 } from 'lucide-react';
 
 // Types for Oil Conversion
@@ -335,58 +335,82 @@ export const OilConverter: React.FC<OilConverterProps> = ({
     };
   };
 
-  // Handle conversion calculation
+  // Handle conversion calculation with better error handling
   const calculateConversion = useCallback(() => {
-    if (!inputValue || !inputUnit || !outputUnit || !selectedOil) return;
+    if (!inputValue || !inputUnit || !outputUnit || !selectedOil) {
+      setConversionResult(null);
+      return;
+    }
 
     const value = parseFloat(inputValue);
-    if (isNaN(value)) return;
+    if (isNaN(value) || value <= 0) {
+      setError('لطفاً مقدار معتبر وارد کنید');
+      setConversionResult(null);
+      return;
+    }
+
+    setError(''); // Clear any previous errors
 
     let result: ConversionResult;
 
-    switch (selectedCategory) {
-      case 'volume':
-        result = convertVolume(value, inputUnit, outputUnit, selectedOil);
-        break;
-      case 'weight':
-        result = convertWeight(value, inputUnit, outputUnit);
-        break;
-      case 'temperature':
-        result = convertTemperature(value, inputUnit, outputUnit);
-        break;
-      case 'density':
-        result = convertDensity(value, selectedOil);
-        break;
-      case 'cooking':
-        // For cooking units, use volume conversion
-        result = convertVolume(value, inputUnit, outputUnit, selectedOil);
-        break;
-      default:
-        return;
+    try {
+      switch (selectedCategory) {
+        case 'volume':
+          result = convertVolume(value, inputUnit, outputUnit, selectedOil);
+          break;
+        case 'weight':
+          result = convertWeight(value, inputUnit, outputUnit);
+          break;
+        case 'temperature':
+          result = convertTemperature(value, inputUnit, outputUnit);
+          break;
+        case 'density':
+          result = convertDensity(value, selectedOil);
+          break;
+        case 'cooking':
+          // For cooking units, use volume conversion
+          result = convertVolume(value, inputUnit, outputUnit, selectedOil);
+          break;
+        default:
+          setError('نوع تبدیل انتخاب نشده است');
+          return;
+      }
+
+      setConversionResult(result);
+
+      // Add to transcription history
+      const entry: TranscriptionEntry = {
+        id: `conversion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        text: `${result.description}: ${result.formula}`,
+        timestamp: new Date(),
+        confidence: 1.0,
+        language: 'fa-IR',
+        isFinal: true,
+        sourceType: 'conversion',
+        conversionResult: result
+      };
+
+      setTranscriptionHistory(prev => [entry, ...prev.slice(0, 49)]);
+
+    } catch (error) {
+      console.error('خطا در محاسبه تبدیل:', error);
+      setError('خطا در محاسبه تبدیل');
+      setConversionResult(null);
     }
-
-    setConversionResult(result);
-
-    // Add to transcription history
-    const entry: TranscriptionEntry = {
-      id: `conversion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      text: `${result.description}: ${result.formula}`,
-      timestamp: new Date(),
-      confidence: 1.0,
-      language: 'fa-IR',
-      isFinal: true,
-      sourceType: 'conversion',
-      conversionResult: result
-    };
-
-    setTranscriptionHistory(prev => [entry, ...prev.slice(0, 49)]);
   }, [inputValue, inputUnit, outputUnit, selectedCategory, selectedOil]);
 
-  // Auto-calculate when inputs change
+  // Auto-calculate when inputs change with debouncing
   useEffect(() => {
-    if (inputValue && inputUnit && outputUnit) {
-      calculateConversion();
-    }
+    // Add a small delay to prevent rapid calculations
+    const timer = setTimeout(() => {
+      if (inputValue && inputUnit && outputUnit) {
+        calculateConversion();
+      } else {
+        setConversionResult(null);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [inputValue, inputUnit, outputUnit, selectedCategory, selectedOil, calculateConversion]);
 
   // Get available units for selected category
@@ -462,27 +486,84 @@ export const OilConverter: React.FC<OilConverterProps> = ({
     setInterimTranscript('');
   }, []);
 
-  // File upload handlers
+  // Enhanced file upload handlers with better processing
   const handleAudioFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith('audio/')) {
       setUploadedAudioFile(file);
-      // Simulate transcription
+      setIsProcessing(true);
+      
+      // Simulate realistic transcription with progress
       setTimeout(() => {
-        const simulatedTranscription = `[فایل صوتی: ${file.name}]\nدستورالعمل آشپزی: روغن زیتون را در ماهیتابه گرم کنید و بعد مواد را اضافه کنید.`;
+        const duration = Math.round(Math.random() * 180 + 30); // 30-210 seconds
+        const simulatedTranscription = `[فایل صوتی دستورالعمل: ${file.name}]
+مدت زمان: ${duration} ثانیه
+محتوای تشخیص داده شده:
+"سلام، برای تهیه این غذا ابتدا دو قاشق غذاخوری روغن زیتون در ماهیتابه گرم کنید. سپس پیاز را خرد کرده و تفت دهید تا طلایی شود. بعد گوشت مرغ را اضافه کنید و با حرارت ملایم بپزید."`;
+        
         setTranscript(prev => prev + '\n\n' + simulatedTranscription);
-      }, 2000);
+        setIsProcessing(false);
+        
+        // Add to history
+        const entry: TranscriptionEntry = {
+          id: `audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          text: simulatedTranscription,
+          timestamp: new Date(),
+          confidence: 0.85,
+          language: 'fa-IR',
+          isFinal: true,
+          sourceType: 'file',
+          filename: file.name
+        };
+        
+        setTranscriptionHistory(prev => [entry, ...prev.slice(0, 49)]);
+      }, 2500);
     }
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      // Simulate OCR processing
+      setIsProcessing(true);
+      
+      // Simulate OCR processing with realistic results
       setTimeout(() => {
-        const simulatedOCR = `[تصویر: ${file.name}]\nدستورالعمل: ۲ قاشق غذاخوری روغن کانولا\nدمای پخت: ۱۸۰ درجه سانتی‌گراد\nزمان پخت: ۱۵ دقیقه`;
+        const simulatedOCR = `[تصویر دستورالعمل: ${file.name}]
+محتوای استخراج شده:
+عنوان: دستورالعمل پخت مرغ با روغن زیتون
+مواد لازم:
+• ۲ قاشق غذاخوری روغن زیتون
+• ۱ عدد پیاز متوسط
+• ۵۰۰ گرم سینه مرغ
+• نمک و فلفل به مقدار لازم
+
+دستورالعمل:
+۱. روغن زیتون را در ماهیتابه گرم کنید
+۲. پیاز را خرد کرده و تفت دهید
+۳. مرغ را اضافه کرده و بپزید
+۴. با نمک و فibrate مزه دار کنید
+
+زمان پخت: ۲۵ دقیقه
+دما: ۱۸۰ درجه سانتی‌گراد
+سرو: ۴ نفر`;
+        
         setTranscript(prev => prev + '\n\n' + simulatedOCR);
-      }, 1500);
+        setIsProcessing(false);
+        
+        // Add to history
+        const entry: TranscriptionEntry = {
+          id: `ocr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          text: simulatedOCR,
+          timestamp: new Date(),
+          confidence: 0.92,
+          language: 'fa-IR',
+          isFinal: true,
+          sourceType: 'ocr',
+          filename: file.name
+        };
+        
+        setTranscriptionHistory(prev => [entry, ...prev.slice(0, 49)]);
+      }, 2000);
     }
   };
 
@@ -867,45 +948,68 @@ export const OilConverter: React.FC<OilConverterProps> = ({
               </div>
 
               {/* Conversion Result */}
-              {conversionResult && (
-                <div className="mt-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
-                      نتیجه تبدیل
+              {conversionResult ? (
+                <div className="mt-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800 shadow-lg">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-green-800 dark:text-green-200 flex items-center space-x-2">
+                      <Calculator className="h-5 w-5" />
+                      <span>نتیجه تبدیل</span>
                     </h3>
                     <button
                       onClick={() => copyToClipboard(conversionResult.formula)}
-                      className="flex items-center space-x-2 px-3 py-2 bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-700 transition-all duration-200"
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-700 transition-all duration-200"
                     >
                       <Copy className="h-4 w-4" />
-                      <span>کپی</span>
+                      <span>کپی فرمول</span>
                     </button>
                   </div>
                   
-                  <div className="space-y-3">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-700 dark:text-green-300 mb-2">
+                  <div className="space-y-4">
+                    <div className="text-center bg-white/80 dark:bg-gray-800/80 p-6 rounded-xl border border-green-200 dark:border-green-700">
+                      <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-3 font-mono">
                         {conversionResult.formula}
                       </div>
-                      <div className="text-sm text-green-600 dark:text-green-400">
+                      <div className="text-lg text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 p-3 rounded-lg">
                         {conversionResult.description}
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded-lg">
-                        <div className="text-gray-600 dark:text-gray-400">روغن انتخابی</div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{selectedOil.name}</div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="text-gray-600 dark:text-gray-400 mb-1">روغن انتخابی</div>
+                        <div className="font-bold text-gray-900 dark:text-white text-base">{selectedOil.name}</div>
                       </div>
-                      <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded-lg">
-                        <div className="text-gray-600 dark:text-gray-400">چگالی</div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{selectedOil.density} g/ml</div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="text-gray-600 dark:text-gray-400 mb-1">چگالی</div>
+                        <div className="font-bold text-gray-900 dark:text-white text-base">{selectedOil.density} g/ml</div>
                       </div>
-                      <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded-lg">
-                        <div className="text-gray-600 dark:text-gray-400">نقطه دود</div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{selectedOil.smokePoint}°C</div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="text-gray-600 dark:text-gray-400 mb-1">نقطه دود</div>
+                        <div className="font-bold text-gray-900 dark:text-white text-base">{selectedOil.smokePoint}°C</div>
                       </div>
                     </div>
+                    
+                    <div className="flex items-center justify-center space-x-4 pt-4 border-t border-green-200 dark:border-green-700">
+                      <div className="flex items-center space-x-2 text-green-700 dark:text-green-300">
+                        <CheckCircle className="h-5 w-5" />
+                        <span className="font-medium">محاسبه موفق</span>
+                      </div>
+                      <div className="text-xs text-green-600 dark:text-green-400">
+                        {new Date().toLocaleTimeString('fa-IR')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-6 p-6 bg-gray-50/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <Calculator className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                      آماده برای تبدیل
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-500">
+                      لطفاً مقدار، واحد ورودی و واحد خروجی را انتخاب کنید
+                    </p>
                   </div>
                 </div>
               )}
