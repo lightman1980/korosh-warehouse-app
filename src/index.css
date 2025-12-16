@@ -1,0 +1,388 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Persian Font Support */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-code@v30.1.0/dist/font-face.css');
+
+:root {
+  --bg-color: #ffffff;
+  --text-color: #111827;
+}
+
+html {
+  direction: rtl;
+  text-align: right;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  direction: rtl;
+  text-align: right;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* RTL Support for all elements */
+* {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Override for specific LTR elements if needed */
+[dir="ltr"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Ensure all containers are RTL */
+div, section, article, aside, nav, main, header, footer {
+  direction: rtl;
+  text-align: right;
+}
+
+/* RTL for flex containers */
+.flex {
+  direction: rtl;
+}
+
+/* RTL for grid containers */
+.grid {
+  direction: rtl;
+}
+
+.dark {
+  --bg-color: #1f2937;
+  --text-color: #f9fafb;
+}
+
+/* Custom Base Styles */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  /* Persian RTL Support */
+  [dir="rtl"] {
+    font-family: 'Vazir', 'IRANSans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-gray-800 rounded-lg;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-600 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500;
+  }
+  
+  /* Firefox Scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(209 213 219) rgb(243 244 246);
+  }
+  
+  /* Selection Styles */
+  ::selection {
+    @apply bg-green-500/20 text-green-900;
+  }
+  
+  ::-moz-selection {
+    @apply bg-green-500/20 text-green-900;
+  }
+}
+
+/* Custom Component Styles */
+@layer components {
+  /* Gradient Backgrounds */
+  .bg-gradient-primary {
+    @apply bg-gradient-to-r from-green-500 to-emerald-600;
+  }
+  
+  .bg-gradient-success {
+    @apply bg-gradient-to-r from-green-500 to-emerald-600;
+  }
+  
+  .bg-gradient-warning {
+    @apply bg-gradient-to-r from-yellow-500 to-orange-600;
+  }
+  
+  .bg-gradient-danger {
+    @apply bg-gradient-to-r from-red-500 to-pink-600;
+  }
+  
+  /* Glass Effect */
+  .glass {
+    @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50;
+  }
+  
+  /* Button Variants */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-all duration-200;
+  }
+  
+  .btn-ghost {
+    @apply inline-flex items-center justify-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200;
+  }
+  
+  /* Card Styles */
+  .card {
+    @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-lg;
+  }
+  
+  .card-hover {
+    @apply card hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1;
+  }
+  
+  /* Input Styles */
+  .input {
+    @apply w-full px-4 py-3 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200;
+  }
+  
+  /* Tab Styles */
+  .tab-active {
+    @apply bg-green-600 text-white;
+  }
+  
+  .tab-inactive {
+    @apply text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20;
+  }
+  
+  /* Status Indicators */
+  .status-online {
+    @apply w-3 h-3 bg-green-500 rounded-full animate-pulse;
+  }
+  
+  .status-offline {
+    @apply w-3 h-3 bg-red-500 rounded-full;
+  }
+  
+  .status-processing {
+    @apply w-3 h-3 bg-yellow-500 rounded-full animate-pulse;
+  }
+  
+  /* Animation Classes */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-bounce-in {
+    animation: bounceIn 0.6s ease-out;
+  }
+  
+  /* Audio Level Visualization */
+  .audio-bar {
+    @apply w-1 bg-gradient-to-t from-blue-400 to-blue-600 rounded-full transition-all duration-100;
+  }
+  
+  /* Language Badge */
+  .lang-badge {
+    @apply inline-flex items-center px-2 py-1 text-xs font-medium rounded-full;
+  }
+  
+  .lang-badge-fa {
+    @apply lang-badge bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200;
+  }
+  
+  .lang-badge-en {
+    @apply lang-badge bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
+  }
+  
+  .lang-badge-auto {
+    @apply lang-badge bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200;
+  }
+}
+
+/* Custom Utilities */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  
+  /* RTL Support */
+  .rtl {
+    direction: rtl;
+  }
+  
+  .ltr {
+    direction: ltr;
+  }
+  
+  /* Custom Gradients */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+  
+  /* Custom Shadows */
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+  
+  .shadow-glow-purple {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+  }
+  
+  .shadow-glow-green {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+  
+  /* Backdrop Effects */
+  .backdrop-blur-xs {
+    backdrop-filter: blur(2px);
+  }
+  
+  /* Loading States */
+  .loading-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  
+  .dark .loading-shimmer {
+    background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+    background-size: 200% 100%;
+  }
+}
+
+/* Custom Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+  }
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+  
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* Mobile Optimizations */
+@media (max-width: 640px) {
+  .mobile-hidden {
+    display: none;
+  }
+  
+  .mobile-full {
+    width: 100%;
+  }
+  
+  .mobile-stack {
+    flex-direction: column;
+  }
+}
+
+/* Dark Mode Specific */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .card {
+    @apply border-2 border-gray-800 dark:border-gray-200;
+  }
+  
+  .btn-primary {
+    @apply border-2 border-green-800;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

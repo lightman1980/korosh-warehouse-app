@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="app-version" content="1.0.0" />
+    <meta name="build-time" content="" id="build-time-meta" />
+    <title>سیستم مدیریت انبار مخازن شرکت صنعت غذایی کورش</title>
+    <script>
+      // تنظیم build time در meta tag
+      document.addEventListener('DOMContentLoaded', function() {
+        const buildTimeMeta = document.getElementById('build-time-meta');
+        if (buildTimeMeta) {
+          buildTimeMeta.setAttribute('content', new Date().getTime().toString());
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

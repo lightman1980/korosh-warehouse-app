@@ -1,0 +1,239 @@
+# Docker Compose for WhatsApp Notification System
+# سرویس‌های Docker برای سیستم اعلان واتس‌اپ
+
+version: '3.8'
+
+services:
+  # Main WhatsApp API Service
+  whatsapp-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: whatsapp-notification-api
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # Database Configuration
+      - MONGODB_URI=mongodb://mongodb:27017/whatsapp_system
+      - REDIS_URL=redis://redis:6379
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - API_RATE_LIMIT=100
+      # WhatsApp Provider (configure these in .env)
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_API_KEY=${TWILIO_API_KEY}
+      - TWILIO_PHONE_NUMBER_ID=${TWILIO_PHONE_NUMBER_ID}
+      # Webhook
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:3001/api/webhooks/twilio}
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - whatsapp-network
+
+  # Development Service (uncomment for development)
+  # whatsapp-dev:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: development
+  #   container_name: whatsapp-dev
+  #   ports:
+  #     - "3001:3001"
+  #     - "9229:9229" # Debug port
+  #   environment:
+  #     - NODE_ENV=development
+  #     - DEBUG=whatsapp:*
+  #   volumes:
+  #     - ./:/app
+  #     - /app/node_modules
+  #   depends_on:
+  #     - mongodb
+  #     - redis
+  #   networks:
+  #     - whatsapp-network
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: whatsapp-mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=whatsapp_system
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7.0-alpine
+    container_name: whatsapp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispassword}
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: whatsapp-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - whatsapp-api
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    profiles:
+      - production
+
+  # Monitoring with Prometheus (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: whatsapp-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    profiles:
+      - monitoring
+
+  # Grafana for dashboards (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: whatsapp-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    profiles:
+      - monitoring
+
+  # Log aggregation with ELK Stack (Optional)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: whatsapp-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    profiles:
+      - logging
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.8.0
+    container_name: whatsapp-logstash
+    volumes:
+      - ./monitoring/logstash/config:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    profiles:
+      - logging
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: whatsapp-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    profiles:
+      - logging
+
+# Network configuration
+networks:
+  whatsapp-network:
+    driver: bridge
+    name: whatsapp-network
+
+# Volume configuration
+volumes:
+  mongodb_data:
+    driver: local
+    name: whatsapp-mongodb-data
+  redis_data:
+    driver: local
+    name: whatsapp-redis-data
+  prometheus_data:
+    driver: local
+    name: whatsapp-prometheus-data
+  grafana_data:
+    driver: local
+    name: whatsapp-grafana-data
+  elasticsearch_data:
+    driver: local
+    name: whatsapp-elasticsearch-data

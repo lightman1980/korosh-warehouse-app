@@ -1,0 +1,3192 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Search, ArrowLeft, Save, Edit2, X, Printer, Calendar, Trash2, Plus, AlertCircle, CheckCircle, Info, FileText, Package, Users, Settings, Download, Eye, CheckSquare, HelpCircle, RefreshCw } from 'lucide-react';
+import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
+import { DataStorage } from '../../utils/dataStorage';
+import PersianDatePicker from '../Common/PersianDatePicker';
+
+// تعريف تايپ‌ها براي اطلاعات حواله
+interface ConsignmentSlipInfo {
+  id: string;
+  permitId: string;
+  receiptId: string;
+  counterpartyId: string;
+  contractId: string;
+  permitNumber: string;
+  managementLetterNumber: string;
+  amount: number;
+  // فيلد جديد براي مقدار مجوز حواله
+  permitAmount: number;
+  // فيلد جديد براي مانده مجوز حواله
+  remainingPermitAmount: number;
+  slipDate: Date;
+  internalSiteId: string;
+  contractorSiteId: string;
+  locationId: string;
+  recipientType: 'no-selection' | 'internal-site' | 'contractor-site' | 'counterparty' | 'customer-counterparty';
+
+  companyLocationId?: string;
+  customerLocationId?: string;
+  // اين فيلدها از مجوز و رسيد خوانده مي‌شوند و فقط نمايش داده مي‌شوند
+  counterpartyName: string;
+  contractNumber: string;
+  receiptNumber: string;
+  productName: string;
+  siteName: string;
+  tankName: string;
+  unit: string;
+  wastageAmount: number;
+  finalPermitAmount: number;
+  remainingTransferPermit: number;
+  permitDate: Date;
+  approvalDate: Date;
+  status: string;
+  event: string;
+  // فيلدهاي جديد از رسيد
+  quotaNumber?: string;
+  registrationOrderNumber?: string;
+  receiptBasisAmount?: number;
+  driverName?: string;
+  driverNationalId?: string;
+  driverPlateNumber?: string;
+  shipName?: string;
+  wastagePercentage?: number;
+  customerCounterpartyName?: string;
+  counterpartyLocationName?: string;
+  customerCounterpartyLocationName?: string;
+  indexNumber?: string;
+  cotageNumber?: string;
+  // فيلدهاي مربوط به سايت و مخزن
+  siteId?: string;
+  tankId?: string;
+  // فيلد جديد براي بررسي وضعيت صدور حواله
+  hasIssuedSlip?: boolean;
+  // فیلد توضیحات
+  description?: string;
+  // فیلد شماره تراکنش حواله
+  transactionNumber?: string;
+  // فیلد حالت ویرایش
+  editMode?: string;
+  // فیلد وضعیت بررسی شده
+  isChecked?: boolean;
+}
+
+interface Props {
+  onBack: () => void;
+  baseData?: any;
+  initialData?: any;
+  onSave?: (data: any) => void;
+  calculateRemainingInventory?: (permitId: string, isEditing?: boolean, currentTransactionId?: string) => number;
+  checkedTransactions?: Set<string>;
+  setCheckedTransactions?: React.Dispatch<React.SetStateAction<Set<string>>>;
+  disabledTransactions?: Set<string>;
+  setDisabledTransactions?: React.Dispatch<React.SetStateAction<Set<string>>>;
+}
+
+const ConsignmentDeliverySlip: React.FC<Props> = ({ 
+  onBack, 
+  baseData: propBaseData, 
+  initialData, 
+  onSave, 
+  calculateRemainingInventory,
+  checkedTransactions: propCheckedTransactions = new Set(),
+  setCheckedTransactions: propSetCheckedTransactions,
+  disabledTransactions: propDisabledTransactions = new Set(),
+  setDisabledTransactions: propSetDisabledTransactions
+}) => {
+  const [availablePermits, setAvailablePermits] = useState<ConsignmentSlipInfo[]>([]);
+  const [selectedSlipInfo, setSelectedSlipInfo] = useState<ConsignmentSlipInfo | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [baseData, setBaseData] = useState<any>(propBaseData || {});
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [editingSlipId, setEditingSlipId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [selectedPermitNumber, setSelectedPermitNumber] = useState('');
+  // متغير جديد براي تشخيص اينکه آيا از کامپوننت والد براي ويرايش آمده‌ايم يا خير
+  const [isEditingFromParent, setIsEditingFromParent] = useState(false);
+  // متغير جديد براي تشخيص اينکه آيا از مسير "ايجاد حواله" آمده‌ايم يا خير
+  const [isCreatingFromPermit, setIsCreatingFromPermit] = useState(false);
+  // متغير جديد براي تشخيص حالت ويرايش از مسير تراکنش‌هاي ثبت شده
+  const [isEditingFromTransactionList, setIsEditingFromTransactionList] = useState(false);
+  
+  // State for "To be checked" field
+  const [checkedTransactions, setCheckedTransactions] = useState<Set<string>>(propCheckedTransactions);
+  const [disabledTransactions, setDisabledTransactions] = useState<Set<string>>(propDisabledTransactions);
+  
+  // تابع جدید برای toggle کردن وضعیت بررسی
+  const toggleCheckTransaction = useCallback((transactionId: string) => {
+    setCheckedTransactions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(transactionId)) {
+        newSet.delete(transactionId);
+      } else {
+        newSet.add(transactionId);
+      }
+      return newSet;
+    });
+  }, []);
+  
+  const storage = DataStorage.getInstance();
+
+  // تابع محاسبه موجودي مخزن - با فرمول جديد براي حالت ويرايش و ايجاد
+ // تابع محاسبه موجودي مخزن - با فرمول جديد براي حالت ويرايش و ايجاد
+// تابع محاسبه موجودي مخزن - با فرمول جديد براي حالت ويرايش و ايجاد
+const calculateTankInventory = useCallback((siteId: string, tankId: string, permitId?: string, currentSlipId?: string, isCreating: boolean = false) => {
+  // فرمول جدید "مانده موجودی مخزن در سایت":
+  // (جمع تمام رسیدهای امانی انجام شده در آن سایت و در آن مخزن + 
+  //  جمع تمام رسیدهای تملیکی انجام شده در آن سایت و در آن مخزن + 
+  //  سند اضافه انبار امانی در آن سایت و در آن مخزن + 
+  //  سند اضافه انبار تملیکی در آن سایت و در آن مخزن) - 
+  // (جمع تمام حواله های امانی انجام شده در آن سایت و در آن مخزن + 
+  //  جمع تمام حواله های تملیکی انجام شده در آن سایت و در آن مخزن + 
+  //  سند کسر انبار امانی در آن سایت و در آن مخزن + 
+  //  سند کسر انبار تملیکی در آن سایت و در آن مخزن)
+
+  const receipts = storage.loadData('receipts') || [];
+  const consignmentSlips = storage.loadData('consignment-delivery-slips') || [];
+  const ownershipSlips = storage.loadData('ownership-delivery-slips') || [];
+  const tankAdjustmentSlips = storage.loadData('tank-adjustment-slips') || [];
+  const inventoryAdjustments = storage.loadData('inventoryAdjustments') || [];
+
+  // محاسبه رسیدهای امانی و تملیکی
+  const totalReceipts = receipts
+    .filter((r: any) => r.siteId === siteId && r.tankId === tankId && !r.isVoided)
+    .reduce((sum, r) => sum + (r.finalAmount || r.amount || 0), 0);
+
+  // محاسبه سندهای اضافه انبار امانی و تملیکی (tankAdjustmentSlips)
+  const totalTankAdditions = tankAdjustmentSlips
+    .filter((t: any) => t.siteId === siteId && t.tankId === tankId && t.type === 'add' && !t.isVoided)
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+  
+  // اضافه کردن inventoryAdjustments که نوع addition دارند
+  const totalInventoryAdditions = inventoryAdjustments
+    .filter((doc: any) => doc.siteId === siteId && doc.tankId === tankId && doc.adjustmentType === 'addition' && !doc.isVoided)
+    .reduce((sum, doc: any) => sum + (doc.quantity || 0), 0);
+
+  // محاسبه تمام افت های امانی (wastage)
+  // توجه: افت نباید به موجودی اضافه شود، چون از مقدار رسید کسر می‌شود
+  // finalAmount در رسیدها قبلاً افت را در نظر گرفته است
+  // اما بر اساس فرمول کاربر، افت باید به ورودی اضافه شود
+  const consignmentReceipts = receipts.filter((r: any) => r.userType === 'consignment' && r.siteId === siteId && r.tankId === tankId && !r.isVoided);
+  const totalConsignmentLosses = consignmentReceipts.reduce((sum, r) => sum + Math.abs(r.wastageWeight || 0), 0);
+
+  // محاسبه حواله های امانی (Consignment) - حذف حواله فعلی در حالت ویرایش/ایجاد
+  const totalConsignmentDeliveries = consignmentSlips
+    .filter((s: any) => {
+      // در حالت ایجاد، حواله فعلی هنوز ذخیره نشده پس نیازی به فیلتر نیست
+      // در حالت ویرایش، حواله فعلی را حذف کن
+      if (isCreating && !currentSlipId) {
+        // حالت ایجاد: همه حواله‌های ذخیره شده را حساب کن (حواله فعلی هنوز ذخیره نشده)
+        return s.siteId === siteId && s.tankId === tankId && !s.isVoided;
+      } else if (currentSlipId) {
+        // حالت ویرایش: حواله فعلی را حذف کن
+        return s.siteId === siteId && s.tankId === tankId && !s.isVoided && s.id !== currentSlipId;
+      }
+      // حالت عادی: همه را حساب کن
+      return s.siteId === siteId && s.tankId === tankId && !s.isVoided;
+    })
+    .reduce((sum, s) => sum + (s.amount || 0), 0);
+
+  // محاسبه حواله های تملیکی (Ownership) - در حالت ایجاد حواله امانی، حواله فعلی تملیکی را حذف نکن
+  const totalOwnershipDeliveries = ownershipSlips
+    .filter((s: any) => s.siteId === siteId && s.tankId === tankId && !s.isVoided)
+    .reduce((sum, s) => sum + (s.amount || 0), 0);
+
+  // محاسبه سندهای کسر انبار امانی و تملیکی (tankAdjustmentSlips)
+  const totalTankDeductions = tankAdjustmentSlips
+    .filter((t: any) => t.siteId === siteId && t.tankId === tankId && t.type === 'deduct' && !t.isVoided)
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+  
+  // اضافه کردن inventoryAdjustments که نوع deduction دارند
+  const totalInventoryDeductions = inventoryAdjustments
+    .filter((doc: any) => doc.siteId === siteId && doc.tankId === tankId && doc.adjustmentType === 'deduction' && !doc.isVoided)
+    .reduce((sum, doc: any) => sum + (doc.quantity || 0), 0);
+
+  // فرمول کلی: مجموع ورودی - مجموع خروجی
+  // طبق درخواست کاربر: افت‌های امانی باید به ورودی اضافه شود
+  const totalInputs = totalReceipts + totalTankAdditions + totalInventoryAdditions + totalConsignmentLosses;
+  const totalOutputs = totalConsignmentDeliveries + totalOwnershipDeliveries + totalTankDeductions + totalInventoryDeductions;
+  
+  // اجازه نمایش موجودی منفی برای نشان دادن مشکل - اما در validation باید 0 در نظر گرفته شود
+  return totalInputs - totalOutputs;
+}, [storage]);
+
+  // تابع تبدیل تاریخ میلادی به شمسی
+  const toPersianDate = useCallback((date: Date) => {
+    // تاریخ میلادی
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    
+    // تبدیل به تاریخ julian
+    const gYear = year;
+    const gMonth = month;
+    const gDay = day;
+    
+    // فرمول تبدیل تاریخ میلادی به شمسی
+    const div = (a: number, b: number) => Math.floor(a / b);
+    const mod = (a: number, b: number) => a - b * Math.floor(a / b);
+    
+    // محاسبات
+    const gy = gYear;
+    const gm = gMonth;
+    const gd = gDay;
+    
+    // تاریخ شروع (1399/01/01)
+    const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    const j_days_in_month = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
+    
+    const gy2 = gd > 31 ? gy : (gm > 2 ? gy + 1 : gy);
+    const jy = gy2 - 621;
+    
+    const j_day_no = gd + g_d_m[gm - 1] + (gy2 > gy ? 1 : 0);
+    
+    const j_month_no = j_day_no;
+    let j_month = 1;
+    
+    for (let i = 0; i < 12; i++) {
+      if (j_month_no > (i === 11 ? 30 : j_days_in_month[i])) {
+        j_month++;
+      }
+    }
+    
+    const j_day = j_day_no;
+    
+    // بازگرداندن با فرمت درخواستی کاربر: YYYYMMDD (بدون خط تیره)
+    return jy.toString().padStart(4, '0') + 
+           j_month.toString().padStart(2, '0') + 
+           j_day.toString().padStart(2, '0');
+  }, []);
+
+  // تابع تولید شماره تراکنش حواله با فرمت صحیح و کنترل تکرار
+  const generateConsignmentTransactionNumber = useCallback((date: Date) => {
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+    const persianDate = toPersianDate(date); // YYYYMMDD format
+    
+    // شماره‌گذاری پیوسته برای هر تاریخ با کنترل تکرار
+    // فرمت صحیح: W-YYYYMMDD-XXXXXX (مثل W-14040817-000001)
+    const existingTransactionNumbers = slips
+      .map((s: any) => s.transactionNumber)
+      .filter((num: string) => num && num.startsWith('W-') && num.includes(`-${persianDate}-`))
+      .map((num: string) => {
+        const parts = num.split('-');
+        return parseInt(parts[2] || '0', 10); // بخش سوم که شماره 6 رقمی است
+      })
+      .filter(n => !isNaN(n));
+    
+    let nextNumber = 1;
+    if (existingTransactionNumbers.length > 0) {
+      nextNumber = Math.max(...existingTransactionNumbers) + 1;
+    }
+    
+    // تولید شماره جدید و اطمینان از عدم تکرار
+    let newTransactionNumber;
+    let attempts = 0;
+    do {
+      newTransactionNumber = `W-${persianDate}-${nextNumber.toString().padStart(6, '0')}`;
+      attempts++;
+      nextNumber++;
+    } while (slips.some((s: any) => s.transactionNumber === newTransactionNumber) && attempts < 100);
+    
+    // بازگرداندن با فرمت صحیح: W-YYYYMMDD-XXXXXX
+    return newTransactionNumber;
+  }, [toPersianDate, storage]);
+
+  // تابع محاسبه مانده مجوز حواله با فرمول جدید کاربر - کاملاً اصلاح شده
+  // "مانده مجوز حواله" = (مقدار مجوز اولیه - کل حواله‌هایی که در وضعیت صادر شده هستند)
+  // تابع محاسبه مانده مجوز حواله با فرمول جدید کاربر - کاملاً اصلاح شده
+// "مانده مجوز حواله" = (مقدار مجوز اولیه - کل حواله‌هایی که در وضعیت صادر شده هستند)
+// در تابع calculateRemainingPermitAmount در ConsignmentDeliverySlip.tsx
+const calculateRemainingPermitAmount = useCallback((
+  permitId: string, 
+  permitAmount: number, 
+  currentSlipId?: string, 
+  isEditing: boolean = false, 
+  newAmount?: number, 
+  editingSource?: 'parent' | 'transaction-list'
+) => {
+  const slips = storage.loadData('consignment-delivery-slips') || [];
+  
+  // محاسبه فقط تراکنش‌هایی که در وضعیت "صادر شده" هستند
+  const totalIssuedSlips = slips
+    .filter((s: any) => s.permitId === permitId && !s.isVoided && s.status === 'issued')
+    .reduce((sum: number, slip: any) => sum + (slip.amount || 0), 0);
+  
+  // فرمول جدید: مقدار مجوز - کل حواله‌های صادر شده
+  let remainingAmount = Math.max(0, permitAmount - totalIssuedSlips);
+  
+  if (isEditing && currentSlipId && editingSource === 'transaction-list') {
+    // در حالت ویرایش از مستقیم، مقدار حواله فعلی را دوباره اضافه می‌کنیم
+    const currentSlip = slips.find((s: any) => s.id === currentSlipId);
+    const currentSlipOriginalAmount = currentSlip ? (currentSlip.amount || 0) : 0;
+    
+    if (newAmount === undefined) {
+      // حالت فقط خواندن: حواله فعلی را دوباره اضافه می‌کنیم
+      remainingAmount = (permitAmount - totalIssuedSlips) + currentSlipOriginalAmount;
+    } else {
+      // حالت تغییر مقدار: مقدار جدید را اضافه می‌کنیم
+      remainingAmount = (permitAmount - totalIssuedSlips) + newAmount;
+    }
+    
+    console.log('محاسبه مانده مجوز - حالت ویرایش از مستقیم (فرمول جدید):', {
+      permitAmount,
+      totalIssuedSlips,
+      currentSlipOriginalAmount,
+      newAmount,
+      remainingAmount,
+      formula: `(${permitAmount} - ${totalIssuedSlips}) + ${newAmount !== undefined ? newAmount : currentSlipOriginalAmount} = ${remainingAmount}`,
+      explanation: 'فقط تراکنش‌های در وضعیت "صادر شده" محاسبه می‌شوند'
+    });
+  } else {
+    console.log('محاسبه مانده مجوز - فرمول جدید:', {
+      permitAmount,
+      totalIssuedSlips,
+      remainingAmount,
+      formula: `${permitAmount} - ${totalIssuedSlips} = ${remainingAmount}`,
+      explanation: 'مقدار مجوز اولیه - کل حواله‌هایی که در وضعیت صادر شده هستند'
+    });
+  }
+  
+  return Math.max(0, remainingAmount);
+}, [storage]);
+
+  useEffect(() => {
+    // اگر baseData از props آمده، از آن استفاده کن
+    if (propBaseData && Object.keys(propBaseData).length > 0) {
+      console.log('=== USING PROPBASE DATA ===');
+      console.log('Received baseData:', propBaseData);
+      setBaseData(propBaseData);
+      return;
+    }
+
+    // تلاش برای بارگذاری baseData از localStorage
+    const loadBaseData = () => {
+      try {
+        console.log('=== LOADING BASE DATA FROM STORAGE ===');
+        
+        // تلاش برای بارگذاری از categories
+        let categories = storage.loadData('baseDataCategories') || [];
+        console.log('Categories loaded:', categories.length);
+        
+        if (categories.length === 0) {
+          // اگر categories موجود نبود، از کلیدهای جداگانه بخوان
+          const categoryKeys = ['sites', 'internal-sites', 'contractor-sites', 'locations', 'companies', 'companies-location', 'customer-companies', 'customer-companies-location', 'tanks', 'drivers'];
+          
+          categories = categoryKeys.map(key => {
+            const categoryData = storage.loadData(`category_${key}`);
+            if (categoryData && categoryData.items) {
+              return {
+                id: key,
+                name: categoryData.name || key,
+                items: categoryData.items
+              };
+            }
+            return null;
+          }).filter(Boolean);
+        }
+        
+        // استخراج داده‌ها از categories
+        const internalSites = categories.find((c: any) => c.id === 'internal-sites')?.items || [];
+        const contractorSites = categories.find((c: any) => c.id === 'contractor-sites')?.items || [];
+        const companies = categories.find((c: any) => c.id === 'companies')?.items || [];
+        const customerCompanies = categories.find((c: any) => c.id === 'customer-companies')?.items || [];
+        const locations = categories.find((c: any) => c.id === 'locations')?.items || [];
+        const companiesLocation = categories.find((c: any) => c.id === 'companies-location')?.items || [];
+        const customerCompaniesLocation = categories.find((c: any) => c.id === 'customer-companies-location')?.items || [];
+        const sites = categories.find((c: any) => c.id === 'sites')?.items || [];
+        const tanks = categories.find((c: any) => c.id === 'tanks')?.items || [];
+        const drivers = categories.find((c: any) => c.id === 'drivers')?.items || [];
+        
+        // بارگذاری قراردادها
+        const contracts = storage.loadData('contracts') || [];
+
+        const loadedBaseData = {
+          sites,
+          internalSites,
+          contractorSites,
+          locations,
+          companies,
+          customerCompanies,
+          companiesLocation,
+          customerCompaniesLocation,
+          tanks,
+          drivers,
+          contracts
+        };
+        
+        console.log('=== BASE DATA LOADED ===');
+        console.log('Loaded data counts:', {
+          sites: sites.length,
+          internalSites: internalSites.length,
+          contractorSites: contractorSites.length,
+          locations: locations.length,
+          companies: companies.length,
+          customerCompanies: customerCompanies.length,
+          companiesLocation: companiesLocation.length,
+          customerCompaniesLocation: customerCompaniesLocation.length,
+          tanks: tanks.length,
+          drivers: drivers.length,
+          contracts: contracts.length
+        });
+        
+        setBaseData(loadedBaseData);
+      } catch (error) {
+        console.error('Error loading base data:', error);
+        // در صورت خطا، baseData خالی قرار بده
+        setBaseData({
+          sites: [],
+          internalSites: [],
+          contractorSites: [],
+          locations: [],
+          companies: [],
+          customerCompanies: [],
+          companiesLocation: [],
+          customerCompaniesLocation: [],
+          tanks: [],
+          drivers: [],
+          contracts: []
+        });
+      }
+    };
+
+    loadBaseData();
+
+    // گوش دادن به رویدادهای به‌روزرسانی baseData
+    const handleBaseDataUpdate = () => {
+      console.log('Base data updated, reloading...');
+      loadBaseData();
+    };
+
+    window.addEventListener('baseDataUpdated', handleBaseDataUpdate);
+
+    return () => {
+      window.removeEventListener('baseDataUpdated', handleBaseDataUpdate);
+    };
+  }, [propBaseData, storage]);
+
+  // بارگذاری مجدد داده‌ها در صورت عدم بارگذاری اولیه
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!baseData || Object.keys(baseData).length === 0) {
+        console.log('Attempting to reload base data after timeout...');
+        loadBaseData();
+      }
+    }, 2000); // بعد از 2 ثانیه دوباره تلاش کن
+
+    return () => clearTimeout(timer);
+  }, [baseData]);
+
+  // بارگذاری مجدد داده‌ها در صورت عدم بارگذاری اولیه
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!baseData || Object.keys(baseData).length === 0 || 
+          (!baseData.sites?.length && !baseData.internalSites?.length && !baseData.companies?.length)) {
+        console.log('Retrying base data load...');
+        const loadBaseData = () => {
+          try {
+            let categories = storage.loadData('baseDataCategories') || [];
+            
+            if (categories.length === 0) {
+              const categoryKeys = ['sites', 'internal-sites', 'contractor-sites', 'locations', 'companies', 'companies-location', 'customer-companies', 'customer-companies-location', 'tanks', 'drivers'];
+              
+              categories = categoryKeys.map(key => {
+                const categoryData = storage.loadData(`category_${key}`);
+                if (categoryData && categoryData.items) {
+                  return {
+                    id: key,
+                    name: categoryData.name || key,
+                    items: categoryData.items
+                  };
+                }
+                return null;
+              }).filter(Boolean);
+            }
+            
+            const internalSites = categories.find((c: any) => c.id === 'internal-sites')?.items || [];
+            const contractorSites = categories.find((c: any) => c.id === 'contractor-sites')?.items || [];
+            const companies = categories.find((c: any) => c.id === 'companies')?.items || [];
+            const customerCompanies = categories.find((c: any) => c.id === 'customer-companies')?.items || [];
+            const locations = categories.find((c: any) => c.id === 'locations')?.items || [];
+            const companiesLocation = categories.find((c: any) => c.id === 'companies-location')?.items || [];
+            const customerCompaniesLocation = categories.find((c: any) => c.id === 'customer-companies-location')?.items || [];
+            const sites = categories.find((c: any) => c.id === 'sites')?.items || [];
+            const tanks = categories.find((c: any) => c.id === 'tanks')?.items || [];
+            const drivers = categories.find((c: any) => c.id === 'drivers')?.items || [];
+            
+            const contracts = storage.loadData('contracts') || [];
+
+            const loadedBaseData = {
+              sites,
+              internalSites,
+              contractorSites,
+              locations,
+              companies,
+              customerCompanies,
+              companiesLocation,
+              customerCompaniesLocation,
+              tanks,
+              drivers,
+              contracts
+            };
+            
+            setBaseData(loadedBaseData);
+          } catch (error) {
+            console.error('Error in retry load:', error);
+          }
+        };
+        loadBaseData();
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [baseData, storage]);
+
+  // اين useEffect را براي مديريت initialData به طور کامل جايگزين کنيد
+  useEffect(() => {
+    if (initialData) {
+      console.log('InitialData received:', initialData);
+      
+      // تشخیص حالت بر اساس ویژگی‌های initialData
+      const isFromParentEdit = initialData.id && 
+                               !initialData.id.startsWith('new_') && 
+                               initialData._isParentEdit;
+      
+      // تشخیص حالت ویرایش از تراکنش‌ها
+      const isFromTransactionList = initialData.id && 
+                                    !initialData.id.startsWith('new_') && 
+                                    initialData._editingSource === 'transaction-list';
+      
+      const isNewFromPermit = initialData.id && initialData.id.startsWith('new_');
+      
+      if (isFromParentEdit) {
+        // حالت ویرایش از والد (جدول اطلاعات امانی) - "حالت ویرایش والد"
+        setIsEditingFromParent(true);
+        setIsEditing(true);
+        setIsCreatingFromPermit(false);
+        setEditingSlipId(initialData.id);
+        
+        const permits = storage.loadData('delivery-permits') || [];
+        const permit = permits.find((p: any) => p.id === initialData.permitId);
+        const permitAmount = permit ? (permit.permitAmount || permit.amount || 0) : (initialData.permitAmount || 0);
+        const remainingForEdit = calculateRemainingPermitAmount(
+          initialData.permitId,
+          permitAmount,
+          initialData.id,
+          true,
+          undefined,
+          'parent'
+        );
+        setSelectedSlipInfo({ 
+          ...initialData, 
+          remainingPermitAmount: remainingForEdit,
+          counterpartyId: initialData.counterpartyId || 'no-selection',
+          transactionNumber: initialData.transactionNumber || generateConsignmentTransactionNumber(new Date(initialData.slipDate || new Date())),
+          // ثبت "حالت ویرایش والد" در اطلاعات انتخاب شده
+          editMode: 'حالت ویرایش والد'
+        });
+        console.log('حالت ویرایش والد فعال شد - فرمول: مقدار مجوز - کل حواله‌ها', {
+          example: 'مثال: 5000 - (500+300+200+100) = 3900',
+          remainingForEdit
+        });
+      } else if (isFromTransactionList) {
+        // حالت ویرایش از تراکنش‌های ثبت شده - "حالت ویرایش مستقیم"
+        setIsEditingFromParent(false);
+        setIsEditingFromTransactionList(true); // فعال کردن فلگ حالت ویرایش از مستقیم
+        setIsEditing(true);
+        setIsCreatingFromPermit(false);
+        setEditingSlipId(initialData.id);
+        
+        const permits = storage.loadData('delivery-permits') || [];
+        const permit = permits.find((p: any) => p.id === initialData.permitId);
+        const permitAmount = permit ? (permit.permitAmount || permit.amount || 0) : (initialData.permitAmount || 0);
+        const remainingForEdit = calculateRemainingPermitAmount(
+          initialData.permitId,
+          permitAmount,
+          initialData.id,
+          true,
+          undefined,
+          'transaction-list'
+        );
+        setSelectedSlipInfo({ 
+          ...initialData, 
+          remainingPermitAmount: remainingForEdit,
+          counterpartyId: initialData.counterpartyId || 'no-selection',
+          transactionNumber: initialData.transactionNumber || generateConsignmentTransactionNumber(new Date(initialData.slipDate || new Date())),
+          // ثبت "حالت ویرایش مستقیم" در اطلاعات انتخاب شده
+          editMode: 'حالت ویرایش مستقیم'
+        });
+        console.log('حالت ویرایش از مستقیم فعال شد - فرمول: (مجوز - کل حواله‌ها) + مقدار حواله فعلی', {
+          example: 'مثال: (5000 - (500+300+200+100)) + 100 = 4000',
+          remainingForEdit
+        });
+      } else if (isNewFromPermit || initialData._isNewFromPermit) {
+        // حالت ایجاد جدید از مجوز
+        setIsCreatingFromPermit(true);
+        setIsEditingFromParent(false);
+        handleSelectPermit(initialData);
+      } else {
+        // حالت پیش‌فرض: ایجاد جدید
+        setIsCreatingFromPermit(true);
+        setIsEditingFromParent(false);
+        handleSelectPermit(initialData);
+      }
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    const permits = storage.loadData('delivery-permits') || [];
+    const receipts = storage.loadData('receipts') || [];
+    const contracts = storage.loadData('contracts') || [];
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+
+    const validPermits = permits
+      .filter((p: any) => p.status === 'issued' && p.remainingTransferPermit > 0)
+      .map((p: any) => {
+        const receipt = receipts.find((r: any) => r.id === p.receiptId);
+        const contract = contracts.find((c: any) => c.id === receipt?.contractId);
+        
+        const permitAmountValue = p.permitAmount || p.amount || p.permit_amount || p.finalPermitAmount || p.final_permit_amount || 0;
+        // محاسبه مانده مجوز حواله برای نمایش در لیست (حالت ایجاد - بدون حواله فعلی)
+        const remainingPermitAmount = calculateRemainingPermitAmount(
+          p.id, 
+          parseFloat(permitAmountValue?.toString() || '0'),
+          undefined, // currentSlipId - در لیست حواله فعلی نداریم
+          false, // isEditing - در لیست همیشه حالت ایجاد است
+          undefined,
+          undefined // editingSource - برای حالت ایجاد مهم نیست
+        );
+        const registeredSlips = slips.filter((s: any) => s.permitId === p.id);
+        const hasIssuedSlip = registeredSlips.length > 0;
+        const allSlipsForPermit = slips.filter((s: any) => s.permitId === p.id && !s.isVoided);
+        
+        return {
+          ...p,
+          receipt,
+          contract,
+          permitAmount: parseFloat(permitAmountValue?.toString() || '0'),
+          remainingPermitAmount,
+          counterpartyName: receipt?.counterpartyName,
+          contractNumber: contract?.contractNumber,
+          receiptNumber: receipt?.transactionNumber,
+          productName: receipt?.productName,
+          siteName: receipt?.siteName,
+          tankName: receipt?.tankName,
+          unit: receipt?.unit || contract?.unit || 'kg',
+          siteId: receipt?.siteId,
+          tankId: receipt?.tankId,
+          hasIssuedSlip
+        };
+      });
+
+    setAvailablePermits(validPermits);
+  }, [storage, calculateRemainingPermitAmount]);
+
+  const filteredPermits = useMemo(() => {
+    return availablePermits.filter(permit =>
+      permit.systemPermitNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      permit.managementLetterNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      permit.counterpartyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      permit.permitNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [availablePermits, searchTerm]);
+
+  const handleDownloadData = useCallback(() => {
+    try {
+      const dataForExcel = filteredPermits.map(permit => ({
+        'شماره مجوز': permit.systemPermitNumber || permit.permitNumber,
+        'شماره تراکنش حواله': permit.transactionNumber || '-',
+        'شماره نامه مديريت': permit.managementLetterNumber,
+        'طرف حساب': permit.counterpartyName,
+        'مقدار مجوز حواله': permit.permitAmount || 0,
+        'مانده مجوز حواله': permit.remainingPermitAmount || 0,
+        'تاريخ حواله': permit.slipDate ? formatPersianDate(new Date(permit.slipDate)) : '',
+        'سايت داخلي': baseData.internalSites?.find((s: any) => s.id === permit.internalSiteId)?.name || '',
+        'سايت پيمانکار': baseData.contractorSites?.find((s: any) => s.id === permit.contractorSiteId)?.name || '',
+        'لوکيشن': baseData.locations?.find((l: any) => l.id === permit.locationId)?.name || '',
+        'وضعيت': permit.status === 'issued' ? 'صادر شده' : permit.status === 'draft' ? 'پيش‌نويس' : 'ابطال شده',
+        'رخداد': permit.event || ''
+      }));
+
+      const headers = Object.keys(dataForExcel[0] || {});
+      const csvContent = [
+        headers.join(','),
+        ...dataForExcel.map(row => headers.map(header => `"${row[header]}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `consignment_slips_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert('داده‌ها با موفقيت دانلود شد.');
+    } catch (error) {
+      console.error('Error downloading data:', error);
+      alert('خطا در دانلود داده‌ها. لطفاً دوباره تلاش کنيد.');
+    }
+  }, [filteredPermits, baseData]);
+
+  const handleRequestCorrection = useCallback(() => {
+    if (!selectedSlipInfo) {
+      alert('لطفاً ابتدا يک حواله را انتخاب کنيد.');
+      return;
+    }
+
+    // 1. بررسي اينکه آيا براي اين مجوز حواله‌ای در وضعیت "صادر شده" وجود دارد
+    const issuedSlips = storage.loadData('consignment-delivery-slips') || [];
+    const issuedDeliveriesForPermit = issuedSlips.filter(s => 
+      s.permitId === selectedSlipInfo.permitId && 
+      !s.isVoided && 
+      s.status === 'issued'
+    );
+    if (issuedDeliveriesForPermit.length > 0) {
+      alert('شما مجاز به ثبت "درخواست اصلاحيه" نمي باشيد زيرا از اين مجوز، تراکنشی در وضعیت "صادر شده" وجود دارد.');
+      return;
+    }
+
+    // 2. بررسي اينکه آيا هیچ حواله‌ای مربوط به اين مجوز در سیستم وجود دارد (در هر وضعیتی)
+    const allSlipsForPermit = issuedSlips.filter(s => 
+      s.permitId === selectedSlipInfo.permitId && 
+      !s.isVoided
+    );
+    if (allSlipsForPermit.length > 0) {
+      alert('شما مجاز به ثبت "درخواست اصلاحيه" نمي باشيد زيرا برای این مجوز، تراکنشی در سیستم ثبت شده است.');
+      return;
+    }
+
+    const updatedSlipInfo = {
+      ...selectedSlipInfo,
+      event: 'درخواست اصلاحيه',
+      updatedAt: new Date()
+    };
+
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+    const updatedSlips = slips.map((s: any) => s.id === selectedSlipInfo.id ? updatedSlipInfo : s);
+    storage.saveData('consignment-delivery-slips', updatedSlips);
+
+    const permits = storage.loadData('delivery-permits') || [];
+    const updatedPermits = permits.map((p: any) => {
+      if (p.id === selectedSlipInfo.permitId) {
+        return { ...p, event: 'درخواست اصلاحيه انبار', updatedAt: new Date() };
+      }
+      return p;
+    });
+    storage.saveData('delivery-permits', updatedPermits);
+
+    const deliveries = storage.loadData('deliveries') || [];
+    const updatedDeliveries = deliveries.map((d: any) => {
+      if (d.permitId === selectedSlipInfo.permitId) {
+        return { ...d, event: 'درخواست اصلاحيه', updatedAt: new Date() };
+      }
+      return d;
+    });
+    storage.saveData('deliveries', updatedDeliveries);
+
+    setSelectedSlipInfo(updatedSlipInfo);
+    setAvailablePermits(prev => prev.map(p => p.id === selectedSlipInfo.permitId ? { ...p, event: 'درخواست اصلاحيه انبار' } : p));
+
+    alert('درخواست اصلاحيه با موفقيت ثبت شد.');
+  }, [selectedSlipInfo, storage]);
+/////////////////////////////+++++///////+++//////////////
+? 'مثال: 5000 - (500+300+200+100) = 3900'
+
+    
+    // همچنین از remainingTransferPermit مجوز هم استفاده می‌کنیم (که باید به‌روز باشد)
+    const remainingTransferPermitFromPermit = permit.remainingTransferPermit !== undefined 
+      ? parseFloat(permit.remainingTransferPermit?.toString() || '0')
+      : remainingPermitAmount;
+    
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+    const registeredSlips = slips.filter((s: any) => s.permitId === (permit.permitId || permit.id));
+    const hasIssuedSlip = registeredSlips.length > 0;
+  
+    // تعيين مقدار اوليه amount بر اساس حالت (ايجاد vs ويرايش):
+    // الف) حالت ايجاد: amount = 0 (باید به صورت دستی وارد شود)
+    // ب) حالت ويرايش: amount = مقدار فعلي حواله (حفظ مي‌شود)
+    let initialAmount = 0;
+    if ((isEditingFromParent || isEditingFromTransactionList) && selectedSlipInfo?.amount) {
+      // حالت ويرايش: حفظ مقدار فعلي حواله
+      initialAmount = selectedSlipInfo.amount;
+    } else {
+      // حالت ايجاد: مقدار اولیه را صفر قرار می‌دهیم تا کاربر به صورت دستی وارد کند
+      initialAmount = 0;
+    }
+  
+    // در حالت ویرایت، شماره تراکنش موجود را حفظ می‌کنیم
+    // در حالت ایجاد، شماره تراکنش جدید تولید می‌کنیم
+    const existingTransactionNumber = isEditingFromParent && selectedSlipInfo?.transactionNumber 
+      ? selectedSlipInfo.transactionNumber
+      : (!isCreatingFromPermit && permit.transactionNumber 
+          ? permit.transactionNumber 
+          : generateConsignmentTransactionNumber(new Date(permit.slipDate || new Date())));
+    
+    // تعيين حالت ویرایش برای نمایش
+    let editMode = '';
+    if (editSource === 'parent') {
+      editMode = 'حالت ویرایش والد';
+    } else if (editSource === 'transaction-list') {
+      editMode = 'حالت ویرایش از مستقیم';
+    }
+    
+    const newSlipInfo: ConsignmentSlipInfo = {
+      id: isCreatingFromPermit ? `new_slip_${Date.now()}` : (permit.id || `slip_${Date.now()}`),
+      permitId: permit.permitId || permit.id,
+      receiptId: permit.receiptId,
+      // این خط را تغییر دهید تا همیشه 'no-selection' باشد
+      counterpartyId: 'no-selection',
+      contractId: permit.contractId,
+      permitNumber: permit.systemPermitNumber || permit.permitNumber,
+      managementLetterNumber: permit.managementLetterNumber,
+      amount: initialAmount,
+      // مقدار مجوز حواله: از permit.permitAmount استفاده می‌کنیم (نه کل رسید انبار)
+      permitAmount: parseFloat((permit.permitAmount || permit.amount || 0)?.toString() || '0'),
+      remainingPermitAmount,
+      slipDate: new Date(permit.slipDate) || new Date(),
+      internalSiteId: permit.internalSiteId || '',
+      contractorSiteId: permit.contractorSiteId || '',
+      locationId: permit.locationId || '',
+      recipientType: permit.recipientType || 'no-selection',
+      companyLocationId: permit.companyLocationId || '',
+      customerLocationId: permit.customerLocationId || '',
+      counterpartyName: permit.counterpartyName,
+      contractNumber: permit.contractNumber,
+      receiptNumber: permit.receiptNumber,
+      productName: permit.productName,
+      siteName: permit.siteName,
+      tankName: permit.tankName,
+      unit: permit.unit,
+      wastageAmount: parseFloat(permit.wastageAmount?.toString() || '0'),
+      finalPermitAmount: parseFloat(permit.finalPermitAmount?.toString() || '0'),
+      // استفاده از مقدار محاسبه شده برای remainingPermitAmount و remainingTransferPermit
+      remainingTransferPermit: remainingPermitAmount, // استفاده از مقدار محاسبه شده
+      permitDate: new Date(permit.permitDate),
+      approvalDate: new Date(permit.approvalDate),
+      status: permit.status,
+      event: permit.event,
+      quotaNumber: receipt?.quotaNumber,
+      registrationOrderNumber: receipt?.registrationOrderNumber,
+      receiptBasisAmount: parseFloat(receipt?.receiptBasisAmount?.toString() || '0'),
+      driverName: receipt?.driverName,
+      driverNationalId: receipt?.driverNationalId,
+      driverPlateNumber: receipt?.driverPlateNumber,
+      shipName: receipt?.shipName,
+      wastagePercentage: parseFloat(receipt?.wastagePercentage?.toString() || '0'),
+      customerCounterpartyName: receipt?.customerCounterpartyName,
+      counterpartyLocationName: receipt?.counterpartyLocationName,
+      customerCounterpartyLocationName: receipt?.customerCounterpartyLocationName,
+      indexNumber: receipt?.indexNumber,
+      cotageNumber: receipt?.cotageNumber,
+      siteId: permit.siteId,
+      tankId: permit.tankId,
+      hasIssuedSlip,
+      description: permit.description || '',
+      transactionNumber: existingTransactionNumber,
+      // ثبت حالت ویرایش برای نمایش در UI
+      editMode: editMode
+    };
+    
+    setSelectedSlipInfo(newSlipInfo);
+    setIsEditing(true); // هميشه در حالت ويرايش قرار بگيرد
+    
+    console.log('handleSelectPermit - نتیجه:', {
+      slipId: newSlipInfo.id,
+      isCreatingFromPermit,
+      permitId: newSlipInfo.permitId,
+      initialAmount,
+      remainingPermitAmount: newSlipInfo.remainingPermitAmount,
+      editSource,
+      editMode,
+      formula: editSource === 'transaction-list' 
+        ? '(مجوز - کل حواله‌ها) + مقدار حواله فعلی' 
+        : editSource === 'parent'
+        ? 'مجوز - کل حواله‌ها'
+        : 'مجوز - کل حواله‌های موجود',
+      example: editSource === 'transaction-list' 
+        ? 'مثال: (5000 - 1100) + 100 = 4000'
+        : editSource === 'parent'
+        ? 'مثال: 5000 - (500+300+200+100) = 3900'
+        : 'حالت ایجاد جدید'
+    });
+  };
+
+  const handleEditSlip = (permit: any) => {
+    // در حالت ويرايش مستقيم (از مسیر تراکنش‌های ثبت شده)، ابتدا editingSlipId را تنظيم می‌کنيم
+    setEditingSlipId(permit.id);
+    setIsCreatingFromPermit(false);
+    setIsEditingFromParent(false);
+    setIsEditingFromTransactionList(true); // فعال کردن فلگ حالت ویرایش از مستقیم
+    // اطلاعات مربوط به ویرایش از مستقیم را اضافه می‌کنیم
+    const editData = {
+      ...permit,
+      _editingSource: 'transaction-list', // تعيين منبع ويرايش از تراکنش‌ها
+      _isParentEdit: false
+    };
+    // سپس handleSelectPermit را صدا می‌کنيم
+    handleSelectPermit(editData);
+    setIsEditing(true);
+    console.log('حواله از مسیر تراکنش‌های ثبت شده برای ویرایش انتخاب شد', {
+      permitId: permit.id,
+      editMode: 'حالت ویرایش از مستقیم',
+      formula: '(مجوز - کل حواله‌ها) + مقدار حواله فعلی'
+    });
+  };
+
+  // تابع تغییر وضعیت تراکنش
+  const handleChangeStatus = useCallback((id: string) => {
+    // Find transaction
+    const transaction = existingSlips.find(s => s.id === id);
+    if (!transaction) {
+      alert('خطا: تراکنش مورد نظر يافت نشد.');
+      return;
+    }
+
+    // تعیین وضعیت جدید: اگر فعلاً "پیش نویس" است، به "صادر شده" تغییر کند و بالعکس
+    const currentStatus = transaction.status || 'draft';
+    const newStatus = currentStatus === 'draft' ? 'issued' : 'draft';
+
+    console.log('تغییر وضعیت تراکنش:', {
+      transactionId: id,
+      currentStatus,
+      newStatus,
+      transactionNumber: transaction.transactionNumber
+    });
+
+    // Update delivery status in main deliveries list
+    const updatedDeliveries = storage.loadData('deliveries') || [];
+    const newDeliveries = updatedDeliveries.map(d =>
+      d.id === id ? { ...d, status: newStatus, updatedAt: new Date() } : d
+    );
+    storage.saveData('deliveries', newDeliveries);
+
+    // Update corresponding slip
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+    const updatedSlips = slips.map((s: any) =>
+      s.id === id ? { ...s, status: newStatus, updatedAt: new Date() } : s
+    );
+    storage.saveData('consignment-delivery-slips', updatedSlips);
+
+    // اگر وضعيت به "issued" تغيير کرد و تراکنش دارای مجوز باشد، پیام "درخواست اصلاحیه انبار" را پاک کن
+    if (newStatus === 'issued' && transaction.permitId) {
+      const permits = storage.loadData('delivery-permits') || [];
+      const updatedPermits = permits.map((p: any) => {
+        if (p.id === transaction.permitId) {
+          return { ...p, event: '', updatedAt: new Date() };
+        }
+        return p;
+      });
+      storage.saveData('delivery-permits', updatedPermits);
+    }
+
+    // اعلان تغییر وضعیت
+    const statusText = newStatus === 'draft' ? 'پيش‌نويس' : 'صادر شده';
+    alert(`وضعيت تراکنش ${transaction.transactionNumber} با موفقيت به "${statusText}" تغيير يافت.`);
+  }, [storage]);
+
+  const handleDeleteSlip = (slipId: string) => {
+    if (confirm('آيا از حذف اين حواله اطمينان داريد؟')) {
+      // 1. دریافت اطلاعات حواله قبل از حذف
+      const slips = storage.loadData('consignment-delivery-slips') || [];
+      const slipToDelete = slips.find((s: any) => s.id === slipId);
+      
+      if (!slipToDelete) {
+        alert('خطا: حواله مورد نظر يافت نشد.');
+        return;
+      }
+
+      const deletedAmount = slipToDelete.amount || 0;
+      const permitId = slipToDelete.permitId;
+
+      // 2. بازگردانی مانده مجوز حواله در صورت وجود permitId
+      if (permitId) {
+        const permits = storage.loadData('delivery-permits') || [];
+        const permitIndex = permits.findIndex((p: any) => p.id === permitId);
+        
+        if (permitIndex !== -1) {
+          const permit = permits[permitIndex];
+          // بازگردانی مقدار حذف شده به مانده مجوز حواله
+          permits[permitIndex] = {
+            ...permit,
+            remainingTransferPermit: (permit.remainingTransferPermit || 0) + deletedAmount,
+            updatedAt: new Date()
+          };
+          storage.saveData('delivery-permits', permits);
+        }
+      }
+
+      // 3. حذف از consignment-delivery-slips
+      const updatedSlips = slips.filter((s: any) => s.id !== slipId);
+      storage.saveData('consignment-delivery-slips', updatedSlips);
+
+      // 4. حذف از deliveries
+      const deliveries = storage.loadData('deliveries') || [];
+      const updatedDeliveries = deliveries.filter((d: any) => d.id !== slipId);
+      storage.saveData('deliveries', updatedDeliveries);
+
+      // 5. به‌روزرسانی state
+      setAvailablePermits(prev => prev.filter(p => p.id !== slipId));
+
+      if (selectedSlipInfo?.id === slipId) {
+        setSelectedSlipInfo(null);
+      }
+
+      alert('حواله با موفقيت حذف شد و مانده مجوز به‌روزرساني شد.');
+    }
+  };
+
+  const handleAddNewSlip = () => {
+    setIsAddingNew(true);
+    setIsEditing(true);
+    setEditingSlipId(null);
+    setIsCreatingFromPermit(true); // تصحیح: باید true باشد
+    setIsEditingFromParent(false);
+    
+    const emptySlip: ConsignmentSlipInfo = {
+      id: `new_slip_${Date.now()}`,
+      permitId: '',
+      receiptId: '',
+      counterpartyId: 'no-selection', // <-- خط جدید
+      contractId: '',
+      permitNumber: '',
+      managementLetterNumber: '',
+      amount: 0,
+      permitAmount: 0,
+      remainingPermitAmount: 0,
+      slipDate: new Date(),
+      internalSiteId: '',
+      contractorSiteId: '',
+      locationId: '',
+      recipientType: 'no-selection',
+      companyLocationId: '',
+      customerLocationId: '',
+      counterpartyName: '',
+      contractNumber: '',
+      receiptNumber: '',
+      productName: '',
+      siteName: '',
+      tankName: '',
+      unit: 'kg',
+      wastageAmount: 0,
+      finalPermitAmount: 0,
+      remainingTransferPermit: 0,
+      permitDate: new Date(),
+      approvalDate: new Date(),
+      status: 'draft',
+      event: 'پيش‌نويس',
+      quotaNumber: '',
+      registrationOrderNumber: '',
+      receiptBasisAmount: 0,
+      driverName: '',
+      driverNationalId: '',
+      driverPlateNumber: '',
+      shipName: '',
+      wastagePercentage: 0,
+      customerCounterpartyName: '',
+      counterpartyLocationName: '',
+      customerCounterpartyLocationName: '',
+      indexNumber: '',
+      cotageNumber: '',
+      siteId: '',
+      tankId: '',
+      hasIssuedSlip: false,
+      description: '',
+      transactionNumber: generateConsignmentTransactionNumber(new Date())
+    };
+    
+    setSelectedSlipInfo(emptySlip);
+    setSelectedPermitNumber('');
+  };
+
+  const handleSelectPermitNumber = (permitNumber: string) => {
+    setSelectedPermitNumber(permitNumber);
+    
+    const selectedPermit = availablePermits.find(p => p.systemPermitNumber === permitNumber || p.permitNumber === permitNumber);
+    
+    if (selectedPermit) {
+      handleSelectPermit(selectedPermit);
+      setIsEditing(true);
+      setEditingSlipId(null);
+      setIsCreatingFromPermit(true);
+      setIsEditingFromParent(false); // اطمينان از اينکه در حالت ايجاد هستيم
+    }
+  };
+/////////////////////////////////////////////////////////////////////
+const handleSaveSlip = async () => {
+  if (isSaving) return;
+  if (!selectedSlipInfo) {
+    alert('لطفاً ابتدا يک حواله انتخاب کنيد.');
+    return;
+  }
+
+  setIsSaving(true);
+  
+  try {
+    // --- 1. اعتبارسنجی اولیه ---
+    if (!selectedSlipInfo.amount || selectedSlipInfo.amount <= 0) {
+      alert('لطفاً مقدار حواله را به درستی وارد کنید.');
+      setIsSaving(false);
+      return;
+    }
+    
+    // اعتبارسنجی اضافی برای حالت ایجاد جدید
+    if (isCreatingFromPermit && (!selectedSlipInfo.permitId || selectedSlipInfo.permitId.trim() === '')) {
+      alert('لطفاً ابتدا یک مجوز را انتخاب کنید.');
+      setIsSaving(false);
+      return;
+    }
+    
+    // --- 2. آماده‌سازی داده‌ها برای ذخیره ---
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+    const deliveries = storage.loadData('deliveries') || [];
+    
+    // در حالت "ایجاد جدید"، شماره مجوز جدید ایجاد کن
+    const finalSlipInfo = {
+      ...selectedSlipInfo,
+      amount: parseFloat(selectedSlipInfo.amount.toString()) || 0,
+      status: 'draft', // وضعیت اولیه "پیش نویس"
+      updatedAt: new Date()
+    };
+    
+    // کنترل شماره تراکنش تکراری
+    if (finalSlipInfo.transactionNumber) {
+      const existingSlips = storage.loadData('consignment-delivery-slips') || [];
+      const existingDeliveries = storage.loadData('deliveries') || [];
+      const existingTransactionNumbers = [...existingSlips, ...existingDeliveries]
+        .map(s => s.transactionNumber)
+        .filter(num => num && num !== finalSlipInfo.transactionNumber);
+      
+      if (existingTransactionNumbers.includes(finalSlipInfo.transactionNumber)) {
+        alert(`خطا: شماره تراکنش "${finalSlipInfo.transactionNumber}" قبلاً استفاده شده است. لطفاً شماره دیگری انتخاب کنید.`);
+        setIsSaving(false);
+        return;
+      }
+    }
+    
+    // --- 3. تشخیص اینکه آیا حواله جدید است یا موجود ---
+    const isNewSlip = isCreatingFromPermit || finalSlipInfo.id.startsWith('new_');
+    
+    // --- 4. ذخیره اطلاعات حواله ---
+    if (isNewSlip) {
+      // افزودن حواله جدید
+      slips.push(finalSlipInfo);
+      deliveries.push(finalSlipInfo);
+      
+      // --- 5. به‌روزرسانی مانده مجوز (فقط برای حواله‌های جدید) ---
+      if (finalSlipInfo.permitId) {
+        const permits = storage.loadData('delivery-permits') || [];
+        const permitIndex = permits.findIndex((p: any) => p.id === finalSlipInfo.permitId);
+        
+        if (permitIndex !== -1) {
+          const permit = permits[permitIndex];
+          const newRemainingTransferPermit = Math.max(0, (permit.remainingTransferPermit || 0) - finalSlipInfo.amount);
+          
+          permits[permitIndex] = {
+            ...permit,
+            remainingTransferPermit: newRemainingTransferPermit,
+            updatedAt: new Date()
+          };
+          
+          storage.saveData('delivery-permits', permits);
+        }
+      }
+      
+      // --- 6. ایجاد تراکنش انبار (فقط برای حواله‌های جدید) ---
+      if (finalSlipInfo.permitId) {
+        console.log('در حال ایجاد تراکنش جدید برای حواله:', finalSlipInfo.id);
+
+        const warehouseTransactions = storage.loadData('warehouseTransactions') || [];
+        const newWarehouseTransaction = {
+          id: `warehouse_transaction_${Date.now()}`,
+          type: 'consignment_slip_issue',
+          referenceId: finalSlipInfo.id,
+          permitId: finalSlipInfo.permitId,
+          amount: -Math.abs(finalSlipInfo.amount), // مقدار منفی برای خروج
+          unit: finalSlipInfo.unit,
+          date: finalSlipInfo.slipDate,
+          description: `صدور حواله امانی جدید به شماره ${finalSlipInfo.permitNumber}`,
+          status: 'completed',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        warehouseTransactions.push(newWarehouseTransaction);
+        storage.saveData('warehouseTransactions', warehouseTransactions);
+        
+        console.log('تراکنش جدید انبار با موفقیت ایجاد شد:', newWarehouseTransaction);
+      }
+    } else {
+      // ویرایش حواله موجود
+      const slipIndex = slips.findIndex((s: any) => s.id === finalSlipInfo.id);
+      const deliveryIndex = deliveries.findIndex((d: any) => d.id === finalSlipInfo.id);
+
+      if (slipIndex !== -1) slips[slipIndex] = finalSlipInfo;
+      if (deliveryIndex !== -1) deliveries[deliveryIndex] = finalSlipInfo;
+      
+      // --- 7. به‌روزرسانی تراکنش انبار موجود (فقط برای حواله‌های ویرایش شده) ---
+      if (finalSlipInfo.permitId) {
+        console.log('در حال به‌روزرسانی تراکنش موجود برای حواله:', finalSlipInfo.id);
+
+        const warehouseTransactions = storage.loadData('warehouseTransactions') || [];
+        const transactionIndex = warehouseTransactions.findIndex((t: any) => 
+          t.referenceId === finalSlipInfo.id && t.type === 'consignment_slip_issue'
+        );
+
+        if (transactionIndex !== -1) {
+          warehouseTransactions[transactionIndex] = {
+            ...warehouseTransactions[transactionIndex],
+            amount: -Math.abs(finalSlipInfo.amount), // مقدار منفی برای خروج
+            unit: finalSlipInfo.unit,
+            date: finalSlipInfo.slipDate,
+            description: `ویرایش حواله امانی به شماره ${finalSlipInfo.permitNumber}`,
+            updatedAt: new Date()
+          };
+          
+          storage.saveData('warehouseTransactions', warehouseTransactions);
+          
+          console.log('تراکنش انبار با موفقیت به‌روزرسانی شد:', warehouseTransactions[transactionIndex]);
+        } else {
+          // اگر تراکنشی وجود نداشت، یک تراکنش جدید ایجاد کن
+          const newWarehouseTransaction = {
+            id: `warehouse_transaction_${Date.now()}`,
+            type: 'consignment_slip_issue',
+            referenceId: finalSlipInfo.id,
+            permitId: finalSlipInfo.permitId,
+            amount: -Math.abs(finalSlipInfo.amount), // مقدار منفی برای خروج
+            unit: finalSlipInfo.unit,
+            date: finalSlipInfo.slipDate,
+            description: `ایجاد تراکنش برای حواله امانی ویرایش شده به شماره ${finalSlipInfo.permitNumber}`,
+            status: 'completed',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          warehouseTransactions.push(newWarehouseTransaction);
+          storage.saveData('warehouseTransactions', warehouseTransactions);
+          
+          console.log('تراکنش جدید انبار برای حواله ویرایش شده ایجاد شد:', newWarehouseTransaction);
+        }
+      }
+    }
+
+    // ذخیره تغییرات
+    storage.saveData('consignment-delivery-slips', slips);
+    storage.saveData('deliveries', deliveries);
+
+    // --- 8. به‌روزرسانی وضعیت رابط کاربری ---
+    setSelectedSlipInfo(finalSlipInfo);
+    setErrors({});
+    setIsEditing(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+    
+    // ریست کردن flag های حالت پس از ذخیره موفق
+    if (isCreatingFromPermit) {
+      setIsCreatingFromPermit(false);
+      setEditingSlipId(finalSlipInfo.id);
+    }
+    
+  } catch (error) {
+    console.error('Error saving slip:', error);
+    alert('خطا در ذخيره‌سازي حواله. لطفاً دوباره تلاش کنيد.');
+  } finally {
+    setIsSaving(false);
+  }
+};
+/////////////////////////////////////////////////////////+++////////////
+const handleChange = useCallback((field: keyof ConsignmentSlipInfo, value: any) => {
+  if (!selectedSlipInfo) return;
+  
+  let updatedSlipInfo = {
+    ...selectedSlipInfo,
+    [field]: value
+  };
+  
+  // کنترل مقدار حواله بر اساس مانده مجوز
+  if (field === 'amount' && selectedSlipInfo.permitId) {
+    const newAmount = parseFloat(value) || 0;
+    const minAmount = 0.1; // حداقل مقدار مجاز
+    
+    // تشخیص منبع ویرایش برای اعمال فرمول صحیح
+    const editingSource = isEditingFromParent ? 'parent' : (isEditingFromTransactionList || editingSlipId ? 'transaction-list' : undefined);
+    const isEditingMode = isEditingFromParent || isEditingFromTransactionList || !!editingSlipId;
+    
+    // محاسبه جدید مانده مجوز حواله با فرمول صحیح کاربر
+    const newRemainingPermitAmount = calculateRemainingPermitAmount(
+      selectedSlipInfo.permitId,
+      selectedSlipInfo.permitAmount,
+      selectedSlipInfo.id || editingSlipId || undefined,
+      isEditingMode,
+      newAmount,
+      editingSource
+    );
+    
+    // محدود کردن مقدار وارده به بازه مجاز
+    let finalAmount = newAmount;
+    
+    // کنترل حداقل مقدار (0.1)
+    if (finalAmount < minAmount) {
+      finalAmount = minAmount;
+      updatedSlipInfo.amount = finalAmount;
+      
+      // هشدار فقط برای مقدار بسیار کم (کمتر از 0.05)
+      if (newAmount < 0.05) {
+        alert(`⚠️ هشدار: مقدار حواله نمی‌تواند کمتر از ${minAmount} باشد.\n\nمقدار حواله به ${formatPersianNumber(finalAmount)} ${selectedSlipInfo.unit || 'کیلوگرم'} تغییر یافت (حداقل مقدار مجاز).`);
+      }
+    }
+    // کنترل حداکثر مقدار (مانده مجوز حواله)
+    else if (finalAmount > newRemainingPermitAmount) {
+      finalAmount = newRemainingPermitAmount;
+      updatedSlipInfo.amount = finalAmount;
+      
+      // هشدار برای محدود کردن مقدار
+      alert(`⚠️ هشدار: مقدار حواله نمی‌تواند از مانده مجوز حواله (${formatPersianNumber(newRemainingPermitAmount)} ${selectedSlipInfo.unit || 'کیلوگرم'}) بیشتر باشد.\n\nمقدار حواله به ${formatPersianNumber(finalAmount)} ${selectedSlipInfo.unit || 'کیلوگرم'} تغییر یافت (حداکثر مقدار مجاز).`);
+    }
+    
+    // در هر صورت، مانده مجوز را به‌روزرسانی کن
+    updatedSlipInfo.remainingPermitAmount = newRemainingPermitAmount;
+    
+    // در صورت تغییر مقدار، مقدار نهایی را برای ذخیره‌سازی آماده کن
+    value = finalAmount;
+    updatedSlipInfo.amount = finalAmount;
+    
+    console.log('کنترل مقدار حواله:', {
+      originalAmount: newAmount,
+      finalAmount,
+      minAmount,
+      maxAmount: newRemainingPermitAmount,
+      remainingPermitAmount: newRemainingPermitAmount,
+      editingSource,
+      isEditingMode
+    });
+  }
+  
+  setSelectedSlipInfo(updatedSlipInfo);
+  
+  // پاک کردن خطاهای مربوط به این فیلد
+  if (errors[field]) {
+    setErrors({
+      ...errors,
+      [field]: undefined
+    });
+  }
+}, [selectedSlipInfo, isEditingFromParent, isEditingFromTransactionList, editingSlipId, calculateRemainingPermitAmount, setSelectedSlipInfo, errors, setErrors, formatPersianNumber]);
+  const handlePrintSlip = useCallback(() => {
+    if (!selectedSlipInfo) return;
+    
+    const printContent = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="fa">
+    <head>
+    <meta charset="UTF-8">
+    <title>حواله انبار امانی - ${selectedSlipInfo.permitNumber}</title>
+    <style>
+    @page { 
+      margin: 15mm; 
+      size: A4; 
+      @bottom-center { 
+        content: "صفحه " counter(page) " از " counter(pages); 
+        font-family: 'Yekan Bakh', 'B Nazanin', sans-serif; 
+        font-size: 10pt; 
+        color: #666; 
+      }
+    }
+    body {
+      font-family: 'Yekan Bakh', 'B Nazanin', sans-serif;
+      direction: rtl;
+      line-height: 1.8;
+      margin: 0;
+      padding: 20px;
+      background: #f8fafc;
+      font-size: 13px;
+      color: #1e293b;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+    .slip-container {
+      width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      border: none;
+      border-radius: 16px;
+      padding: 30px;
+      box-sizing: border-box;
+      background: white;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .slip-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+      border-radius: 16px 16px 0 0;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 25px;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 30px;
+      position: relative;
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .company-logo {
+      width: 100px;
+      height: 100px;
+      border: 2px solid #3b82f6;
+      border-radius: 12px;
+      padding: 8px;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .company-info {
+      text-align: right;
+    }
+    .company-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: #1e40af;
+      margin-bottom: 8px;
+    }
+    .company-details {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    .title {
+      font-size: 28px;
+      font-weight: bold;
+      color: #1e40af;
+      text-align: center;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+      margin-bottom: 5px;
+    }
+    .subtitle {
+      font-size: 18px;
+      color: #475569;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+    .date-info {
+      font-size: 14px;
+      color: #64748b;
+      text-align: center;
+    }
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin: 30px 0;
+    }
+    .detail-card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .detail-card h3 {
+      font-size: 16px;
+      font-weight: bold;
+      color: #3b82f6;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      padding: 8px 0;
+    }
+    .detail-label {
+      font-weight: 600;
+      color: #475569;
+    }
+    .detail-value {
+      color: #1e293b;
+      font-weight: 500;
+    }
+    .amount-highlight {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      margin: 30px 0;
+    }
+    .amount-highlight div {
+      font-size: 18px;
+      margin: 5px 0;
+    }
+    .section-title { 
+      font-size: 18px; 
+      font-weight: bold; 
+      color: #3b82f6; 
+      margin: 30px 0 20px 0; 
+      padding: 12px 20px;
+      background: linear-gradient(90deg, #eff6ff, #dbeafe);
+      border: 2px solid #3b82f6;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+    }
+    .details-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .details-table th {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: white;
+      padding: 15px 12px;
+      font-weight: bold;
+      text-align: center;
+      border: 1px solid #3b82f6;
+      font-size: 13px;
+    }
+    .details-table td {
+      border: 1px solid #e2e8f0;
+      padding: 12px;
+      text-align: right;
+      background: white;
+      font-size: 13px;
+    }
+    .details-table tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+    .signature-section {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 3px dashed #cbd5e0;
+      background: linear-gradient(0deg, transparent, #f7fafc, transparent);
+    }
+    .signature-box {
+      text-align: center;
+      width: 30%;
+      padding: 20px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      background: #f8fafc;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+    }
+    .signature-line {
+      border-top: 2px solid #4a5568;
+      height: 2px;
+      width: 80%;
+      margin: 40px auto 10px;
+      position: relative;
+    }
+    .signature-line::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: -2px;
+      width: 10px;
+      height: 8px;
+      background: #4a5568;
+      border-radius: 50%;
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 30px;
+      padding: 15px;
+      border: 1px dashed #cbd5e0;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .watermark {
+      position: absolute;
+      bottom: 40px;
+      right: 40px;
+      opacity: 0.05;
+      font-size: 80px;
+      font-weight: bold;
+      color: #3b82f6;
+      transform: rotate(-45deg);
+      z-index: 0;
+    }
+    </style>
+    </head>
+    <body>
+    <!-- صفحه اول: اطلاعات حواله -->
+    <div class="slip-container">
+    <div class="watermark">کورش</div>
+    <div class="header">
+    <div class="logo-container">
+    <img src="https://z-cdn-media.chatglm.cn/files/7094d229-4d09-430e-98c1-73f61a7991d6_%D9%84%D9%88%DA%AF%D9%88%20%D8%B5%D9%86%D8%B9%D8%AA%20%D8%BA%D8%B0%D8%A7%DB%8C%DB%8C%20%DA%A9%D9%88%D8%B1%D8%B4.jpg?auth_key=1788869487-700454f4145444fcabf14d4109c175fd-0-531d677f789c51954e01f268eaedd559" alt="لوگو شرکت" class="company-logo" onerror="this.src='/لوگو صنعت غذایی کورش.jpg'; this.onerror=function(){this.style.display='none';};" />
+    <div class="company-info">
+    <div class="company-name">شرکت صنعت غذایی کورش</div>
+    <div class="company-details">
+    تهران، خیابان نیل، شماره 241<br>
+    تلفن: 021 83893000<br>
+    www.kouroshfood.com
+    </div>
+    </div>
+    </div>
+    <div style="flex: 1; text-align: center;">
+    <div class="title">حواله انبار امانی</div>
+    <div class="subtitle">شماره: ${selectedSlipInfo.permitNumber}</div>
+    <div class="subtitle">شماره تراکنش: ${selectedSlipInfo.transactionNumber || '-'}</div>
+    <div class="date-info">تاریخ: ${formatPersianDate(new Date())}</div>
+    </div>
+    </div>
+    
+    <div class="details-grid">
+    <div class="detail-card">
+    <h3>اطلاعات حواله</h3>
+    <div class="detail-row">
+    <span class="detail-label">طرف حساب:</span>
+    <span class="detail-value">${selectedSlipInfo.counterpartyName}</span>
+    </div>
+    <div class="detail-row">
+    <span class="detail-label">شماره قرارداد:</span>
+    <span class="detail-value">${selectedSlipInfo.contractNumber}</span>
+    </div>
+    <div class="detail-row">
+    <span class="detail-label">مقدار حواله:</span>
+    <span class="detail-value">${formatPersianNumber(selectedSlipInfo.amount)} ${selectedSlipInfo.unit}</span>
+    </div>
+    <div class="detail-row">
+    <span class="detail-label">تاریخ حواله:</span>
+    <span class="detail-value">${formatPersianDate(selectedSlipInfo.slipDate)}</span>
+    </div>
+    </div>
+    
+    <div class="detail-card">
+    <h3>مکان‌های تحویل</h3>
+    <div class="detail-row">
+    <span class="detail-label">سایت داخلی:</span>
+    <span class="detail-value">${baseData.internalSites?.find((s: any) => s.id === selectedSlipInfo.internalSiteId)?.name || ''}</span>
+    </div>
+    <div class="detail-row">
+    <span class="detail-label">سایت پیمانکار:</span>
+    <span class="detail-value">${baseData.contractorSites?.find((s: any) => s.id === selectedSlipInfo.contractorSiteId)?.name || ''}</span>
+    </div>
+    <div class="detail-row">
+    <span class="detail-label">لوکیشن:</span>
+    <span class="detail-value">${baseData.locations?.find((l: any) => l.id === selectedSlipInfo.locationId)?.name || ''}</span>
+    </div>
+    <div class="detail-row">
+    <span class="detail-label">نوع گیرنده:</span>
+    <span class="detail-value">${selectedSlipInfo.recipientType === 'company' ? 'طرف حساب' : 'مشتری طرف حساب'}</span>
+    </div>
+    </div>
+    </div>
+  
+     ${selectedSlipInfo.recipientType === 'company' ?
+      `<div class="detail-card">
+      <h3>لوکیشن طرف حساب</h3>
+      <div class="detail-row">
+      <span class="detail-label">نام لوکیشن:</span>
+      <span class="detail-value">${baseData.companiesLocation?.find((l: any) => l.id === selectedSlipInfo.companyLocationId)?.name || ''}</span>
+      </div>
+      </div>` :
+      `<div class="detail-card">
+      <h3>مشتری طرف حساب</h3>
+      <div class="detail-row">
+      <span class="detail-label">نام مشتری:</span>
+      <span class="detail-value">${baseData.customerCompanies?.find((c: any) => c.id === selectedSlipInfo.customerLocationId)?.name || ''}</span>
+      </div>
+      <div class="detail-row">
+      <span class="detail-label">لوکیشن مشتری:</span>
+      <span class="detail-value">${baseData.customerCompaniesLocation?.find((l: any) => l.id === selectedSlipInfo.customerLocationId)?.name || ''}</span>
+      </div>
+      </div>`
+    }
+  
+    <div class="amount-highlight">
+    <div>مقدار حواله: ${formatPersianNumber(selectedSlipInfo.amount)} ${selectedSlipInfo.unit}</div>
+    <div>مانده مجوز: ${formatPersianNumber(selectedSlipInfo.remainingPermitAmount)} ${selectedSlipInfo.unit}</div>
+    </div>
+  
+    <div class="footer-note">
+    این سند در تاریخ ${formatPersianDate(new Date())} صادر شده است و دارای اعتبار قانونی می‌باشد.
+    </div>
+    </div>
+  
+    <!-- صفحه دوم: سایر اطلاعات -->
+    <div class="page-break">
+    <div class="slip-container">
+    <div class="watermark">کورش</div>
+    <div class="header">
+    <div style="flex: 1; text-align: center;">
+    <div class="title">جزئیات تکمیلی</div>
+    <div class="subtitle">شماره: ${selectedSlipInfo.permitNumber}</div>
+    <div class="subtitle">شماره تراکنش: ${selectedSlipInfo.transactionNumber || '-'}</div>
+    </div>
+    </div>
+  
+    <div class="section-title">اطلاعات رسید انبار</div>
+    <div class="details-table">
+    <tr><td width="30%">طرف حساب</td><td>${selectedSlipInfo.counterpartyName}</td></tr>
+    <tr><td>مشتری طرف حساب</td><td>${selectedSlipInfo.customerCounterpartyName || '-'}</td></tr>
+    <tr><td>لوکیشن طرف حساب</td><td>${selectedSlipInfo.counterpartyLocationName || '-'}</td></tr>
+    <tr><td>لوکیشن مشتری طرف حساب</td><td>${selectedSlipInfo.customerCounterpartyLocationName || '-'}</td></tr>
+    <tr><td>شماره قرارداد</td><td>${selectedSlipInfo.contractNumber}</td></tr>
+    <tr><td>مقدار مبنی رسید</td><td>${formatPersianNumber(selectedSlipInfo.receiptBasisAmount || 0)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>درصد افت</td><td>${selectedSlipInfo.wastagePercentage ? `${selectedSlipInfo.wastagePercentage}%` : '-'}</td></tr>
+    <tr><td>وزن افت</td><td>${formatPersianNumber(selectedSlipInfo.wastageAmount)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>مقدار رسید</td><td>${formatPersianNumber(selectedSlipInfo.amount)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>نام کالا امانی</td><td>${selectedSlipInfo.productName}</td></tr>
+    <tr><td>سایت مخازن</td><td>${selectedSlipInfo.siteName}</td></tr>
+    <tr><td>مخزن</td><td>${selectedSlipInfo.tankName}</td></tr>
+    <tr><td>شماره مجوز</td><td>${selectedSlipInfo.permitNumber}</td></tr>
+    <tr><td>شماره تراکنش حواله</td><td>${selectedSlipInfo.transactionNumber || '-'}</td></tr>
+    <tr><td>شماره نامه مدیریت</td><td>${selectedSlipInfo.managementLetterNumber}</td></tr>
+    <tr><td>شماره رسید انبار</td><td>${selectedSlipInfo.receiptNumber}</td></tr>
+    <tr><td>شماره سهمیه</td><td>${selectedSlipInfo.quotaNumber || '-'}</td></tr>
+    <tr><td>شماره ثبت</td><td>${selectedSlipInfo.registrationOrderNumber || '-'}</td></tr>
+    <tr><td>شماره شاخص/ثبت سفارش</td><td>${selectedSlipInfo.indexNumber || '-'}</td></tr>
+    <tr><td>شماره کوتاژ</td><td>${selectedSlipInfo.cotageNumber || '-'}</td></tr>
+    <tr><td>نام کشتی</td><td>${selectedSlipInfo.shipName || '-'}</td></tr>
+    <tr><td>نام راننده</td><td>${selectedSlipInfo.driverName || '-'}</td></tr>
+    <tr><td>کد ملی راننده</td><td>${selectedSlipInfo.driverNationalId || '-'}</td></tr>
+    <tr><td>پلاک راننده</td><td>${selectedSlipInfo.driverPlateNumber || '-'}</td></tr>
+    </div>
+  
+    <div class="section-title">اطلاعات مجوز</div>
+    <div class="details-table">
+    <tr><td width="30%">مقدار مجوز حواله</td><td>${formatPersianNumber(selectedSlipInfo.permitAmount)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>مانده مجوز حواله</td><td>${formatPersianNumber(selectedSlipInfo.remainingPermitAmount)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>مقدار افت مجوز</td><td>${formatPersianNumber(selectedSlipInfo.wastageAmount)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>مقدار مجوز بعد از کسر افت</td><td>${formatPersianNumber(selectedSlipInfo.finalPermitAmount)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>مانده مجوز</td><td>${formatPersianNumber(selectedSlipInfo.remainingTransferPermit)} ${selectedSlipInfo.unit}</td></tr>
+    <tr><td>تاریخ مجوز</td><td>${formatPersianDate(selectedSlipInfo.permitDate)}</td></tr>
+    <tr><td>تاریخ تأیید مجوز</td><td>${formatPersianDate(selectedSlipInfo.approvalDate)}</td></tr>
+    <tr><td>وضعیت تراکنش</td><td>${selectedSlipInfo.status}</td></tr>
+    <tr><td>رخداد</td><td>${selectedSlipInfo.event}</td></tr>
+    </div>
+  
+    <div class="signature-section">
+    <div class="signature-box">
+    <div>امضای انباردار</div>
+    <div class="signature-line"></div>
+    </div>
+    <div class="signature-box">
+    <div>امضای تأیید کننده</div>
+    <div class="signature-line"></div>
+    </div>
+    <div class="signature-box">
+    <div>امضای گیرنده</div>
+    <div class="signature-line"></div>
+    </div>
+    </div>
+  
+    <div class="footer-note">
+    این سند در تاریخ ${formatPersianDate(new Date())} توسط سیستم اتوماسیون انبارداری شرکت صنعت غذایی کورش صادر شده است.
+    </div>
+    </div>
+    </div>
+    </body>
+    </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 1000);
+    } else {
+      alert('لطفاً پنجره جدید را در مرورگر خود مجاز کنید.');
+    }
+  }, [selectedSlipInfo, baseData]);
+
+  // توابع برای دریافت اطلاعات کامل از BaseDataManager
+  const getInternalSiteInfo = (siteId: string) => {
+    if (!siteId) return null;
+    return baseData.internalSites?.find((site: any) => site.id === siteId);
+  };
+
+  const getContractorSiteInfo = (siteId: string) => {
+    if (!siteId) return null;
+    return baseData.contractorSites?.find((site: any) => site.id === siteId);
+  };
+
+  const getLocationInfo = (locationId: string) => {
+    if (!locationId) return null;
+    return baseData.locations?.find((location: any) => location.id === locationId);
+  };
+
+  const getCompanyInfo = (companyId: string) => {
+    if (!companyId) return null;
+    return baseData.companies?.find((company: any) => company.id === companyId);
+  };
+
+  const getCompanyLocationInfo = (locationId: string) => {
+    if (!locationId) return null;
+    return baseData.companiesLocation?.find((location: any) => location.id === locationId);
+  };
+
+  const getCustomerCompanyInfo = (companyId: string) => {
+    if (!companyId) return null;
+    return baseData.customerCompanies?.find((company: any) => company.id === companyId);
+  };
+
+  const getCustomerLocationInfo = (locationId: string) => {
+    if (!locationId) return null;
+    return baseData.customerCompaniesLocation?.find((location: any) => location.id === locationId);
+  };
+
+  // اطلاعات انتخاب شده فعلی برای نمایش در جدول
+  const selectedInternalSiteInfo = useMemo(() => 
+    selectedSlipInfo?.internalSiteId ? getInternalSiteInfo(selectedSlipInfo.internalSiteId) : null, 
+    [selectedSlipInfo?.internalSiteId, baseData.internalSites]
+  );
+  
+  const selectedContractorSiteInfo = useMemo(() => 
+    selectedSlipInfo?.contractorSiteId ? getContractorSiteInfo(selectedSlipInfo.contractorSiteId) : null, 
+    [selectedSlipInfo?.contractorSiteId, baseData.contractorSites]
+  );
+  
+  const selectedLocationInfo = useMemo(() => 
+    selectedSlipInfo?.locationId ? getLocationInfo(selectedSlipInfo.locationId) : null, 
+    [selectedSlipInfo?.locationId, baseData.locations]
+  );
+  
+  const selectedCompanyInfo = useMemo(() => 
+    selectedSlipInfo?.counterpartyId ? getCompanyInfo(selectedSlipInfo.counterpartyId) : null, 
+    [selectedSlipInfo?.counterpartyId, baseData.companies]
+  );
+  
+  const selectedCompanyLocationInfo = useMemo(() => 
+    selectedSlipInfo?.companyLocationId ? getCompanyLocationInfo(selectedSlipInfo.companyLocationId) : null, 
+    [selectedSlipInfo?.companyLocationId, baseData.companiesLocation]
+  );
+  
+  const selectedCustomerCompanyInfo = useMemo(() => 
+    selectedSlipInfo?.customerCompanyId ? getCustomerCompanyInfo(selectedSlipInfo.customerCompanyId) : null, 
+    [selectedSlipInfo?.customerCompanyId, baseData.customerCompanies]
+  );
+  
+  const selectedCustomerLocationInfo = useMemo(() => 
+    selectedSlipInfo?.customerLocationId ? getCustomerLocationInfo(selectedSlipInfo.customerLocationId) : null, 
+    [selectedSlipInfo?.customerLocationId, baseData.customerCompaniesLocation]
+  );
+
+
+
+  return (
+    <div className="p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+      <div className="max-w-full mx-auto">
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+              <div className="w-1 h-8 bg-blue-600 rounded ml-3"></div>
+              حواله انبار اماني
+            </h1>
+            <p className="text-gray-600">مديريت و صدور حواله‌هاي انبار اماني</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onBack()}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              بازگشت
+            </button>
+            <img
+              src="/لوگو صنعت غذايي کورش.jpg"
+              alt="لوگو شرکت"
+              className="h-16 w-auto"
+            />
+          </div>
+        </div>
+
+        {saveSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center shadow-sm">
+            <CheckCircle className="h-5 w-5 text-green-600 ml-2" />
+            <span className="text-green-800">
+              {editingSlipId || isEditingFromParent ? 
+                'حواله با موفقيت به‌روزرساني شد.' : 
+                'حواله با موفقيت ثبت شد.'}
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ستون چپ - جدول اطلاعات اماني */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg overflow-hidden">
+              <div className="p-6 border-b-2 border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white flex items-center">
+                    <FileText className="h-5 w-5 ml-2" />
+                    جدول اطلاعات اماني
+                  </h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDownloadData}
+                      className="p-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                      title="دانلود"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={handleAddNewSlip}
+                      className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      افزودن حواله جديد
+                    </button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-200 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="جستجو..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pr-10 pl-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-white focus:border-transparent bg-white/90"
+                  />
+                </div>
+              </div>
+              <div className="h-96 overflow-y-auto overflow-x-auto">
+                <table className="w-full min-w-[1200px] h-full">
+                  <thead className="bg-gradient-to-r from-blue-50 to-blue-100 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-center text-xs font-bold text-blue-700 uppercase tracking-wider">بررسی گردد</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">شماره مجوز</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">طرف حساب</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مشتري طرف حساب</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">شماره قرارداد</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مقدار مجوز حواله</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مانده مجوز حواله</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مقدار حواله</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مانده موجودي مخزن</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">تاريخ حواله</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">سايت داخلي</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">سايت پيمانکار</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">لوکيشن</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">نوع گيرنده</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">لوکيشن گيرنده</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">نام کالا</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مخزن</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">مقدار مبناي رسيد</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">درصد افت</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">نام راننده</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">پلاک</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">نام کشتي</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">شماره نامه مديريت</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">وضعيت</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">عمليات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+  {filteredPermits.map((permit, index) => {
+    // Check if this transaction is marked for checking
+    const isChecked = checkedTransactions.has(permit.id);
+    const isDisabled = disabledTransactions.has(permit.id);
+    
+    return (
+      <tr
+        key={permit.id}
+        className={`${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50 cursor-pointer transition-colors ${
+          isChecked ? 'bg-yellow-100 border-2 border-red-500' : ''
+        } ${
+          isDisabled ? 'opacity-50' : ''
+        }`}
+        onClick={() => handleSelectPermit(permit)}
+      >
+        <td className="px-4 py-4 whitespace-nowrap text-center">
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleCheckTransaction(permit.id);
+            }}
+            className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+          />
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+          {permit.systemPermitNumber || permit.permitNumber}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.counterpartyName}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.customerCounterpartyName || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.contractNumber}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatPersianNumber(permit.permitAmount || permit.amount)} {permit.unit}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatPersianNumber(permit.remainingPermitAmount)} {permit.unit}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatPersianNumber(permit.amount || 0)} {permit.unit}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatPersianNumber(calculateTankInventory(
+            permit.siteId || '', 
+            permit.tankId || '',
+            permit.permitId,
+            permit.id,
+            !permit.hasIssuedSlip // اگر هنوز حواله صادر نشده، حالت ايجاد است
+          ))} {permit.unit}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatPersianDate(permit.slipDate || new Date())}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {baseData.internalSites?.find((s: any) => s.id === permit.internalSiteId)?.name || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {baseData.contractorSites?.find((s: any) => s.id === permit.contractorSiteId)?.name || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {baseData.locations?.find((l: any) => l.id === permit.locationId)?.name || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.recipientType === 'company' ? 'طرف حساب' : 'مشتري طرف حساب'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.recipientType === 'company' 
+            ? baseData.companiesLocation?.find((l: any) => l.id === permit.companyLocationId)?.name || '-'
+            : baseData.customerCompaniesLocation?.find((l: any) => l.id === permit.customerLocationId)?.name || '-'
+          }
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.productName}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.tankName}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatPersianNumber(permit.receiptBasisAmount || 0)} {permit.unit}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.wastagePercentage ? `${permit.wastagePercentage}%` : '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.driverName || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.driverPlateNumber || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.shipName || '-'}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          {permit.managementLetterNumber}
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+            permit.status === 'issued' ? 'bg-green-100 text-green-800' : 
+            permit.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 
+            'bg-red-100 text-red-800'
+          }`}>
+            {permit.status === 'issued' ? 'صادر شده' : 
+             permit.status === 'draft' ? 'پيش‌نويس' : 
+             'ابطال شده'}
+          </span>
+        </td>
+        <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditSlip(permit);
+              }}
+              className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-100 transition-colors"
+              title="ويرايش"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRequestCorrection();
+              }}
+              className="text-yellow-600 hover:text-yellow-800 p-1 rounded hover:bg-yellow-100 transition-colors"
+              title="درخواست اصلاحيه"
+            >
+              <AlertCircle className="h-4 w-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCheckTransaction(permit.id);
+              }}
+              className={`p-1 rounded transition-colors ${
+                isChecked 
+                  ? 'text-yellow-600 bg-yellow-100 hover:bg-yellow-200' 
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+              title="بررسي گردد"
+            >
+              {isChecked ? (
+                <CheckSquare className="h-4 w-4 fill-current" />
+              ) : (
+                <CheckSquare className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteSlip(permit.id);
+              }}
+              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-100 transition-colors"
+              title="حذف"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* ستون راست - جدول اطلاعات حواله اماني */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg overflow-hidden">
+              <div className="p-6 border-b-2 border-gray-200 bg-gradient-to-r from-purple-600 to-purple-700">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-white flex items-center">
+                    <FileText className="h-5 w-5 ml-2" />
+                    اطلاعات حواله اماني
+                  </h2>
+                  <div className="flex items-center gap-2 mb-2">
+  {isCreatingFromPermit ? (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+      حالت ايجاد از مجوز
+    </span>
+  ) : isEditingFromParent ? (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+      حالت ويرايش والد
+    </span>
+  ) : editingSlipId ? (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+      حالت ويرايش مستقيم
+    </span>
+  ) : (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+     حالت ايجاد از مجوز
+    </span>
+  )}
+</div>
+                  <div className="flex gap-2">
+                    <button onClick={handlePrintSlip} className="p-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 transition-colors shadow-sm" title="چاپ">
+                      <Printer className="h-4 w-4" />
+                    </button>
+                    {isEditing ? (
+                      <button
+                        onClick={handleSaveSlip}
+                        className={`p-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition-all shadow-sm ${
+                          isSaving ? 'opacity-70 cursor-not-allowed' : ''
+                        }`}
+                        disabled={isSaving}
+                        title="ذخيره"
+                      >
+                        {isSaving ? (
+                          <div className="flex items-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            در حال ذخيره...
+                          </div>
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </button>
+                    ) : (
+                      <button onClick={() => setIsEditing(true)} className="p-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 transition-colors shadow-sm" title="ويرايش">
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-96 overflow-y-auto">
+              <div className="h-96 overflow-y-auto">
+  <div className="space-y-6">
+    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+      <h3 className="text-lg font-semibold text-blue-700 mb-4">جدول اطلاعات کالا</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">شماره حواله</label>
+  <input
+    type="text"
+    value={selectedSlipInfo?.transactionNumber || selectedSlipInfo?.permitNumber || ''}
+    disabled={true}
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+    placeholder="شماره حواله ذخیره شده"
+  />
+</div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">شماره مجوز</label>
+  <input
+    type="text"
+    value={selectedSlipInfo?.permitNumber || selectedSlipInfo?.systemPermitNumber || ''}
+    disabled={true}
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+    placeholder="شماره مجوز"
+  />
+</div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">شماره قرارداد</label>
+          <input
+            type="text"
+            value={selectedSlipInfo?.contractNumber || ''}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">طرف حسابی تحویل دهنده کالا</label>
+          <input
+            type="text"
+            value={selectedSlipInfo?.counterpartyName || ''}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">سایت موجودی کالا</label>
+          <input
+            type="text"
+            value={selectedSlipInfo?.siteName || ''}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">مخزن موجودی کالا</label>
+          <input
+            type="text"
+            value={selectedSlipInfo?.tankName || ''}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">مانده مجوز حواله</label>
+          <input
+            type="number"
+            value={selectedSlipInfo?.remainingPermitAmount || 0}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">مقدار مجوز</label>
+          <input
+            type="number"
+            value={selectedSlipInfo?.permitAmount || 0}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">تاریخ حواله</label>
+          <input
+            type="text"
+            value={selectedSlipInfo?.slipDate ? formatPersianDate(selectedSlipInfo.slipDate) : ''}
+            disabled={true}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+          />
+        </div>
+      </div>
+    </div>
+    
+    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+      <h3 className="text-lg font-semibold text-green-700 mb-4">جدول صدور حواله امانی</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            مقدار حواله 
+            {selectedSlipInfo?.remainingPermitAmount !== undefined && (
+              <span className="text-xs text-gray-500">(حداقل: 0.1 - حداکثر: {formatPersianNumber(selectedSlipInfo.remainingPermitAmount)} {selectedSlipInfo.unit})</span>
+            )}
+          </label>
+          <input
+            type="number"
+            value={selectedSlipInfo?.amount || 0}
+            onChange={(e) => handleChange('amount', parseFloat(e.target.value) || 0)}
+            disabled={!isEditing}
+            max={isEditingFromTransactionList ? undefined : selectedSlipInfo?.remainingPermitAmount} // در حالت ویرایش از مستقیم max تعریف نمی‌شود
+            min={0.1}
+            step={0.1}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+              isEditingFromTransactionList ? 'bg-blue-50' : '' // هایلایت کردن فیلد در حالت ویرایش از مستقیم
+            }`}
+            title={
+              isEditingFromTransactionList 
+                ? `در حالت ویرایش از مستقیم: مقدار را وارد کنید و سیستم به صورت خودکار کنترل می‌کند`
+                : `حداکثر مقدار مجاز: ${formatPersianNumber(selectedSlipInfo?.remainingPermitAmount || 0)} ${selectedSlipInfo?.unit || 'kg'}`
+            }
+          />
+          {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount}</p>}
+          {isEditingFromTransactionList && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 text-blue-600 ml-2" />
+                <div>
+                  <p className="text-xs text-blue-700 font-medium">حالت ویرایش از مستقیم</p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    می‌توانید مقدار دلخواه وارد کنید. اگر مقدار بیشتر از مانده مجوز باشد، به صورت خودکار به حداکثر مقدار مجاز محدود می‌شود.
+                  </p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    فرمول: (مقدار مجوز - کل حواله‌ها) + همین حواله = {formatPersianNumber(selectedSlipInfo?.remainingPermitAmount || 0)} {selectedSlipInfo?.unit}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedSlipInfo?.editMode && !isEditingFromTransactionList && (
+            <p className="text-xs text-blue-600 mt-1">
+              {selectedSlipInfo.editMode}
+            </p>
+          )}
+        </div>
+        <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">نوع گیرنده</label>
+  <select
+    value={selectedSlipInfo?.recipientType || 'no-selection'}
+    onChange={(e) => handleChange('recipientType', e.target.value)}
+    disabled={!isEditing}
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+  >
+    <option value="no-selection">فاقد انتخاب</option>
+    <option value="internal-site">سایت داخلی</option>
+    <option value="contractor-site">سایت پیمانکار</option>
+    <option value="counterparty">طرف حساب</option>
+    <option value="customer-counterparty">مشتری طرف حساب</option>
+  </select>
+</div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">تاریخ حواله</label>
+          <PersianDatePicker
+            value={selectedSlipInfo?.slipDate || new Date()}
+            onChange={(date) => handleChange('slipDate', date)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">طرف حساب تحویل گیرنده کالا</label>
+  <select
+    value={selectedSlipInfo?.counterpartyId || 'no-selection'}
+    onChange={(e) => handleChange('counterpartyId', e.target.value)}
+    disabled={!isEditing}
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+  >
+    <option value="no-selection">فاقد انتخاب</option>
+    {baseData.companies && baseData.companies.length > 0 ? (
+      baseData.companies.map((c: any) => (
+        <option key={c.id} value={c.id}>{c.name}</option>
+      ))
+    ) : (
+      <option value="" disabled>هیچ شرکت طرف حسابی یافت نشد</option>
+    )}
+  </select>
+</div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">مشتری طرف حساب تحویل گیرنده کالا</label>
+          <select
+            value={selectedSlipInfo?.customerCompanyId || ''}
+            onChange={(e) => handleChange('customerCompanyId', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.customerCompanies && baseData.customerCompanies.length > 0 ? (
+              baseData.customerCompanies.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))
+            ) : (
+              <option value="" disabled>هيچ مشتري طرف حساب يافت نشد</option>
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">سایت داخلی</label>
+          <select
+            value={selectedSlipInfo?.internalSiteId || ''}
+            onChange={(e) => handleChange('internalSiteId', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.internalSites && baseData.internalSites.length > 0 ? (
+              baseData.internalSites.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))
+            ) : (
+              <option value="" disabled>هيچ سايت داخلي يافت نشد</option>
+            )}
+          </select>
+          {errors.internalSiteId && <p className="text-red-500 text-xs mt-1">{errors.internalSiteId}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">لوکیشن</label>
+          <select
+            value={selectedSlipInfo?.locationId || ''}
+            onChange={(e) => handleChange('locationId', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.locations && baseData.locations.length > 0 ? (
+              baseData.locations.map((l: any) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))
+            ) : (
+              <option value="" disabled>هيچ لوکيشن يافت نشد</option>
+            )}
+          </select>
+          {errors.locationId && <p className="text-red-500 text-xs mt-1">{errors.locationId}</p>}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">سایت پیمانکار</label>
+          <select
+            value={selectedSlipInfo?.contractorSiteId || ''}
+            onChange={(e) => handleChange('contractorSiteId', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.contractorSites && baseData.contractorSites.length > 0 ? (
+              baseData.contractorSites.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))
+            ) : (
+              <option value="" disabled>هيچ سايت پيمانکاري يافت نشد</option>
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">لوکیشن طرف حساب</label>
+          <select
+            value={selectedSlipInfo?.companyLocationId || ''}
+            onChange={(e) => handleChange('companyLocationId', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.companiesLocation && baseData.companiesLocation.length > 0 ? (
+              baseData.companiesLocation.map((l: any) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))
+            ) : (
+              <option value="" disabled>هيچ لوکيشن طرف حساب يافت نشد</option>
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">لوکیشن مشتری طرف حساب</label>
+          <select
+            value={selectedSlipInfo?.customerLocationId || ''}
+            onChange={(e) => handleChange('customerLocationId', e.target.value)}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.customerCompaniesLocation && baseData.customerCompaniesLocation.length > 0 ? (
+              baseData.customerCompaniesLocation.map((l: any) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))
+            ) : (
+              <option value="" disabled>هيچ لوکيشن مشتري يافت نشد</option>
+            )}
+          </select>
+        </div>
+        <div className="md:col-span-2 lg:col-span-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">توضیحات</label>
+          <textarea
+            value={selectedSlipInfo?.description || ''}
+            onChange={(e) => handleChange('description', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            rows={3}
+            placeholder="توضیحات اضافی را اینجا وارد کنید..."
+            disabled={!isEditing}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* جداول پايين صفحه - اطلاعات رسيد انبار، مجوزها و اطلاعات حواله جديد */}
+        <div className="mt-6 space-y-6">
+          {/* جدول اطلاعات رسيد انبار */}
+          <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg overflow-hidden">
+            <div className="p-6 border-b-2 border-gray-200 bg-gradient-to-r from-orange-600 to-orange-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  <Package className="h-5 w-5 ml-2" />
+                  اطلاعات رسيد انبار
+                </h2>
+                <div className="flex gap-2">
+                  <button className="p-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 transition-colors shadow-sm" title="دانلود">
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="h-96 overflow-y-auto">
+              {selectedSlipInfo ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">طرف حساب</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.counterpartyName}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">مشتري طرف حساب</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.customerCounterpartyName || '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">لوکيشن طرف حساب</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.counterpartyLocationName || '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">لوکيشن مشتري طرف حساب</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.customerCounterpartyLocationName || '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">شماره قرارداد</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.contractNumber}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">مقدار مبناي رسيد</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.receiptBasisAmount || 0)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">درصد افت</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.wastagePercentage ? `${selectedSlipInfo.wastagePercentage}%` : '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">وزن افت</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.wastageAmount)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">مقدار رسيد</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.amount)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">نام کالا اماني</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.productName}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">سايت مخازن</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.siteName}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">مخزن</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.tankName}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">تاريخ رسيد</h3>
+                    <p className="text-gray-900">{formatPersianDate(selectedSlipInfo.permitDate)}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">واحد سنجش</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">وضعيت تراکنش</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.status}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">شماره رسيد انبار</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.receiptNumber}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">شماره شاخص /ثبت سفارش</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.indexNumber || '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">شماره کوتاژ</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.cotageNumber || '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">رانندگان</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.driverName || '-'}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h3 className="text-sm font-medium text-orange-600 mb-1">نام کشتي</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.shipName || '-'}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                  <Info className="h-8 w-8 mb-2 text-gray-400" />
+                  لطفاً يک مورد را از جدول "اطلاعات اماني" انتخاب کنيد.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* جدول مجوزها */}
+          <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg overflow-hidden">
+            <div className="p-6 border-b-2 border-gray-200 bg-gradient-to-r from-indigo-600 to-indigo-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  <Settings className="h-5 w-5 ml-2" />
+                  مجوزها
+                </h2>
+                <div className="flex gap-2">
+                  <button className="p-2 bg-white text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors shadow-sm" title="دانلود">
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="h-96 overflow-y-auto">
+              {selectedSlipInfo ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">مقدار مجوز حواله</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.permitAmount)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">مانده مجوز حواله</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.remainingPermitAmount)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">مقدار افت مجوز</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.wastageAmount)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">مقدار مجوز بعد از کسر افت</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.finalPermitAmount)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">مانده مجوز</h3>
+                    <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.remainingTransferPermit)} {selectedSlipInfo.unit}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">تاريخ مجوز</h3>
+                    <p className="text-gray-900">{formatPersianDate(selectedSlipInfo.permitDate)}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">تاريخ تاييد مجوز</h3>
+                    <p className="text-gray-900">{formatPersianDate(selectedSlipInfo.approvalDate)}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">وضعيت تراکنش</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.status}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">رخداد</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.event}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">شماره مجوز</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.permitNumber}</p>
+                  </div>
+                  <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <h3 className="text-sm font-medium text-indigo-600 mb-1">شماره نامه مديريت</h3>
+                    <p className="text-gray-900">{selectedSlipInfo.managementLetterNumber}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                  <Info className="h-8 w-8 mb-2 text-gray-400" />
+                  لطفاً يک مورد را از جدول "اطلاعات اماني" انتخاب کنيد.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* جدول اطلاعات حواله جديد */}
+          <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg overflow-hidden">
+            <div className="p-6 border-b-2 border-gray-200 bg-gradient-to-r from-green-600 to-green-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  <Package className="h-5 w-5 ml-2" />
+                  اطلاعات حواله جديد
+                </h2>
+                <div className="flex gap-2">
+                  <button className="p-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition-colors shadow-sm" title="دانلود">
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="h-96 overflow-y-auto">
+              {selectedSlipInfo ? (
+                <div className="space-y-6">
+                  {/* هشدار حالت ویرایش */}
+                  {selectedSlipInfo.editMode && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <AlertCircle className="h-5 w-5 text-yellow-600 ml-2" />
+                        <div>
+                          <h3 className="text-sm font-medium text-yellow-800">حالت ویرایش فعال</h3>
+                          <p className="text-sm text-yellow-700 mt-1">
+                            {selectedSlipInfo.editMode}
+                          </p>
+                          <p className="text-xs text-yellow-600 mt-1">
+                            فرمول محاسبه مانده مجوز حواله بر اساس حالت انتخابی محاسبه می‌شود.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* اطلاعات اصلی حواله */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">شماره حواله</h3>
+                      <p className="text-gray-900">{selectedSlipInfo.transactionNumber}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">شماره مجوز</h3>
+                      <p className="text-gray-900 font-mono">{selectedSlipInfo.permitNumber || '-'}</p>
+                    </div>
+                    {(selectedSlipInfo.editMode) && (
+                      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <h3 className="text-sm font-medium text-yellow-600 mb-1">حالت ویرایش</h3>
+                        <p className="text-gray-900 font-semibold">{selectedSlipInfo.editMode}</p>
+                      </div>
+                    )}
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">مقدار حواله</h3>
+                      <p className="text-gray-900">{formatPersianNumber(selectedSlipInfo.amount)} {selectedSlipInfo.unit}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">تاريخ حواله</h3>
+                      <p className="text-gray-900">{formatPersianDate(selectedSlipInfo.slipDate)}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+  <h3 className="text-sm font-medium text-green-600 mb-1">نوع گیرنده</h3>
+  <p className="text-gray-900">
+    {selectedSlipInfo.recipientType === 'no-selection' ? 'فاقد انتخاب' :
+     selectedSlipInfo.recipientType === 'internal-site' ? 'سایت داخلی' :
+     selectedSlipInfo.recipientType === 'contractor-site' ? 'سایت پیمانکار' :
+     selectedSlipInfo.recipientType === 'counterparty' ? 'طرف حساب' :
+     selectedSlipInfo.recipientType === 'customer-counterparty' ? 'مشتری طرف حساب' :
+     'نامشخص'}
+  </p>
+</div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">توضیحات</h3>
+                      <p className="text-gray-900 text-sm">{selectedSlipInfo.description || 'بدون توضیحات'}</p>
+                    </div>
+                  </div>
+
+                  {/* اطلاعات سایت داخلی */}
+                  {selectedInternalSiteInfo && (
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <h3 className="text-sm font-medium text-blue-600 mb-3">اطلاعات سایت داخلی</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-blue-500 mb-1">نام سایت</h4>
+                          <p className="text-gray-900 text-sm">{selectedInternalSiteInfo.name}</p>
+                        </div>
+                        {selectedInternalSiteInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-blue-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedInternalSiteInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedInternalSiteInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-blue-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedInternalSiteInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedInternalSiteInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-blue-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedInternalSiteInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedInternalSiteInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-blue-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedInternalSiteInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* اطلاعات سایت پیمانکار */}
+                  {selectedContractorSiteInfo && (
+                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                      <h3 className="text-sm font-medium text-purple-600 mb-3">اطلاعات سایت پیمانکار</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-purple-500 mb-1">نام سایت</h4>
+                          <p className="text-gray-900 text-sm">{selectedContractorSiteInfo.name}</p>
+                        </div>
+                        {selectedContractorSiteInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-purple-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedContractorSiteInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedContractorSiteInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-purple-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedContractorSiteInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedContractorSiteInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-purple-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedContractorSiteInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedContractorSiteInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-purple-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedContractorSiteInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* اطلاعات لوکیشن */}
+                  {selectedLocationInfo && (
+                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                      <h3 className="text-sm font-medium text-orange-600 mb-3">اطلاعات لوکیشن</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-orange-500 mb-1">نام لوکیشن</h4>
+                          <p className="text-gray-900 text-sm">{selectedLocationInfo.name}</p>
+                        </div>
+                        {selectedLocationInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-orange-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedLocationInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedLocationInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-orange-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedLocationInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedLocationInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-orange-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedLocationInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedLocationInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-orange-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedLocationInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* اطلاعات شرکت طرف حساب */}
+                  {selectedSlipInfo.recipientType === 'company' && selectedCompanyInfo && (
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                      <h3 className="text-sm font-medium text-indigo-600 mb-3">اطلاعات شرکت طرف حساب</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-indigo-500 mb-1">نام شرکت</h4>
+                          <p className="text-gray-900 text-sm">{selectedCompanyInfo.name}</p>
+                        </div>
+                        {selectedCompanyInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-indigo-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedCompanyInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-indigo-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedCompanyInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-indigo-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedCompanyInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-indigo-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* اطلاعات لوکیشن طرف حساب */}
+                  {selectedSlipInfo.recipientType === 'company' && selectedCompanyLocationInfo && (
+                    <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
+                      <h3 className="text-sm font-medium text-teal-600 mb-3">اطلاعات لوکیشن طرف حساب</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-teal-500 mb-1">نام لوکیشن</h4>
+                          <p className="text-gray-900 text-sm">{selectedCompanyLocationInfo.name}</p>
+                        </div>
+                        {selectedCompanyLocationInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-teal-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyLocationInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedCompanyLocationInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-teal-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyLocationInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedCompanyLocationInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-teal-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyLocationInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedCompanyLocationInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-teal-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedCompanyLocationInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* اطلاعات مشتری طرف حساب */}
+                  {selectedSlipInfo.recipientType === 'customer' && selectedCustomerCompanyInfo && (
+                    <div className="bg-pink-50 p-4 rounded-lg border border-pink-200">
+                      <h3 className="text-sm font-medium text-pink-600 mb-3">اطلاعات مشتری طرف حساب</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-pink-500 mb-1">نام شرکت</h4>
+                          <p className="text-gray-900 text-sm">{selectedCustomerCompanyInfo.name}</p>
+                        </div>
+                        {selectedCustomerCompanyInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-pink-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerCompanyInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedCustomerCompanyInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-pink-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerCompanyInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedCustomerCompanyInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-pink-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerCompanyInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedCustomerCompanyInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-pink-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerCompanyInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* اطلاعات لوکیشن مشتری طرف حساب */}
+                  {selectedSlipInfo.recipientType === 'customer' && selectedCustomerLocationInfo && (
+                    <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                      <h3 className="text-sm font-medium text-red-600 mb-3">اطلاعات لوکیشن مشتری طرف حساب</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <h4 className="text-xs font-medium text-red-500 mb-1">نام لوکیشن</h4>
+                          <p className="text-gray-900 text-sm">{selectedCustomerLocationInfo.name}</p>
+                        </div>
+                        {selectedCustomerLocationInfo.address && (
+                          <div>
+                            <h4 className="text-xs font-medium text-red-500 mb-1">آدرس</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerLocationInfo.address}</p>
+                          </div>
+                        )}
+                        {selectedCustomerLocationInfo.phone && (
+                          <div>
+                            <h4 className="text-xs font-medium text-red-500 mb-1">تلفن</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerLocationInfo.phone}</p>
+                          </div>
+                        )}
+                        {selectedCustomerLocationInfo.postalCode && (
+                          <div>
+                            <h4 className="text-xs font-medium text-red-500 mb-1">کد پستی</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerLocationInfo.postalCode}</p>
+                          </div>
+                        )}
+                        {selectedCustomerLocationInfo.additionalInfo && (
+                          <div className="md:col-span-2">
+                            <h4 className="text-xs font-medium text-red-500 mb-1">توضیحات</h4>
+                            <p className="text-gray-900 text-sm">{selectedCustomerLocationInfo.additionalInfo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* سایر اطلاعات حواله */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">شماره حواله</h3>
+                      <p className="text-gray-900 text-sm font-mono">{selectedSlipInfo.transactionNumber || '-'}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">شماره مجوز</h3>
+                      <p className="text-gray-900 text-sm font-mono">{selectedSlipInfo.permitNumber || '-'}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">نام کالا</h3>
+                      <p className="text-gray-900 text-sm">{selectedSlipInfo.productName}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">مخزن</h3>
+                      <p className="text-gray-900 text-sm">{selectedSlipInfo.tankName}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">شماره قرارداد</h3>
+                      <p className="text-gray-900 text-sm">{selectedSlipInfo.contractNumber}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">وضعيت</h3>
+                      <p className="text-gray-900 text-sm">{selectedSlipInfo.status}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">مانده مجوز حواله</h3>
+                      <p className="text-gray-900 text-sm font-semibold">{formatPersianNumber(selectedSlipInfo.remainingPermitAmount)} {selectedSlipInfo.unit}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">مقدار مجوز حواله</h3>
+                      <p className="text-gray-900 text-sm">{formatPersianNumber(selectedSlipInfo.permitAmount)} {selectedSlipInfo.unit}</p>
+                    </div>
+                    {selectedSlipInfo.driverName && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">نام راننده</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.driverName}</p>
+                      </div>
+                    )}
+                    {selectedSlipInfo.driverPlateNumber && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">پلاک راننده</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.driverPlateNumber}</p>
+                      </div>
+                    )}
+                    {selectedSlipInfo.driverNationalId && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">کد ملي راننده</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.driverNationalId}</p>
+                      </div>
+                    )}
+                    {selectedSlipInfo.shipName && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">نام کشتي</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.shipName}</p>
+                      </div>
+                    )}
+                    {selectedSlipInfo.indexNumber && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">شماره شاخص</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.indexNumber}</p>
+                      </div>
+                    )}
+                    {selectedSlipInfo.cotageNumber && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">شماره کوتاژ</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.cotageNumber}</p>
+                      </div>
+                    )}
+                    {selectedSlipInfo.wastagePercentage && (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h3 className="text-sm font-medium text-green-600 mb-1">درصد افت</h3>
+                        <p className="text-gray-900 text-sm">{selectedSlipInfo.wastagePercentage}%</p>
+                      </div>
+                    )}
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-sm font-medium text-green-600 mb-1">مقدار مبناي رسيد</h3>
+                      <p className="text-gray-900 text-sm">{formatPersianNumber(selectedSlipInfo.receiptBasisAmount || 0)} {selectedSlipInfo.unit}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                  <Info className="h-8 w-8 mb-2 text-gray-400" />
+                  لطفاً يک مورد را از جدول "اطلاعات اماني" انتخاب کنيد.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * خلاصه منطق ویرایش تراکنش‌های امانی:
+ * 
+ * 1. ویرایش از مسیر "تراکنش‌های ثبت شده امانی/تملیکی" (حالت ویرایش از مستقیم):
+ *    - حالت: "حالت ویرایش از مستقیم"
+ *    - فرمول: (مقدار مجوز - کل حواله‌ها) + مقدار حواله فعلی
+ *    - مثال: (5000 - (500+300+200+100)) + 100 = 4000
+ *    - توضیح: حواله فعلی از محاسبات کل حذف می‌شود و سپس دوباره اضافه می‌شود
+ * 
+ * 2. ویرایش از مسیر "جدول اطلاعات امانی" (حالت ویرایش والد):
+ *    - حالت: "حالت ویرایش والد"
+ *    - فرمول: مقدار مجوز - کل حواله‌ها (شامل حواله فعلی)
+ *    - مثال: 5000 - (500+300+200+100) = 3900
+ *    - توضیح: حواله فعلی در محاسبات باقی می‌ماند
+ * 
+ * 3. ویرایش از مسیر "ایجاد حواله جدید" (حالت ایجاد):
+ *    - فرمول: مقدار مجوز - کل حواله‌های صادر شده
+ *    - توضیح: حالت پیش‌فرض برای ایجاد حواله جدید
+ * 
+ * کنترل مقدار حواله:
+ * - در هر دو حالت ویرایش، مقدار حواله نباید بیشتر از "مانده مجوز حواله" باشد
+ * - اگر مقدار وارد شده بیشتر باشد، به صورت خودکار به "مانده مجوز حواله" محدود می‌شود
+ */
+
+export default ConsignmentDeliverySlip;

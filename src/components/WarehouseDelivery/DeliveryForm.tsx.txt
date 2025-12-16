@@ -1,0 +1,1144 @@
+import React, { useState, useMemo } from 'react';
+import { AlertCircle, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { PersianDatePicker } from '../Common/PersianDatePicker';
+import { WarehouseDelivery } from '../../types/WarehouseDeliveryTypes';
+import { formatPersianNumber } from '../../utils/persian';
+import { DataStorage } from '../../utils/dataStorage';
+
+interface DeliveryFormProps {
+  delivery: Partial<WarehouseDelivery>;
+  baseData: any;
+  contracts: any[];
+  errors: Record<string, string>;
+  isEditing: boolean;
+  fromPermit: boolean;
+  onChange: (delivery: Partial<WarehouseDelivery>) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+const DeliveryForm: React.FC<DeliveryFormProps> = ({
+  delivery,
+  baseData,
+  contracts,
+  errors,
+  isEditing,
+  fromPermit,
+  onChange,
+  onSave,
+  onCancel
+}) => {
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const storage = DataStorage.getInstance();
+
+  // دريافت اطلاعات مجوز براي تحويل‌هاي ايجاد شده از مجوز
+  const getPermitInfo = () => {
+    if (!delivery.fromPermit || !delivery.permitId) return null;
+    
+    const permits = storage.loadData('delivery-permits') || [];
+    return permits.find((p: any) => p.id === delivery.permitId);
+  };
+
+  const permitInfo = getPermitInfo();
+
+  // محاسبه مقدار باقيمانده مجوز بر اساس فرمول جديد
+  const remainingPermitAmount = useMemo(() => {
+    if (!delivery.fromPermit) return 0;
+
+    // اگر اطلاعات مجوز موجود است، از آن استفاده کن
+    if (permitInfo && permitInfo.remainingTransferPermit !== undefined) {
+      return permitInfo.remainingTransferPermit;
+    }
+
+    // محاسبه مقدار باقيمانده بر اساس فرمول جديد:
+    // remainingAmount = permitAmount - totalDeliveredAmount
+    const permitAmount = delivery.permitAmount || 0;
+    const slips = storage.loadData('consignment-delivery-slips') || [];
+    
+    // اگر در حالت ويرايش هستيم، بايد حواله فعلي را از محاسبه خارج کنيم
+    const otherSlips = isEditing 
+      ? slips.filter((s: any) => s.permitId === delivery.permitId && s.id !== delivery.id)
+      : slips.filter((s: any) => s.permitId === delivery.permitId);
+    
+    const totalDeliveredAmount = otherSlips.reduce((sum: number, slip: any) => sum + (slip.amount || 0), 0);
+    const calculatedRemaining = Math.max(0, permitAmount - totalDeliveredAmount);
+
+    // به‌روزرساني مقدار باقيمانده در state فقط در حالت ايجاد
+    if (!isEditing && delivery.remainingTransferPermit !== calculatedRemaining) {
+      onChange({ ...delivery, remainingTransferPermit: calculatedRemaining });
+    }
+
+    return calculatedRemaining;
+  }, [delivery.fromPermit, delivery.permitId, delivery.permitAmount, delivery.id, delivery.remainingTransferPermit, onChange, permitInfo, isEditing, storage]);
+
+  // دريافت اطلاعات رسيد
+  const receiptData = useMemo(() => {
+    if (!delivery.receiptId) return null;
+    const receipts = storage.loadData('receipts') || [];
+    return receipts.find((r: any) => r.id === delivery.receiptId);
+  }, [delivery.receiptId]);
+
+  // توابع برای دریافت اطلاعات از baseData
+  const getInternalSiteInfo = (siteId: string) => {
+    if (!siteId || !baseData.internalSites) return null;
+    return baseData.internalSites.find((site: any) => site.id === siteId);
+  };
+
+  const getContractorSiteInfo = (siteId: string) => {
+    if (!siteId || !baseData.contractorSites) return null;
+    return baseData.contractorSites.find((site: any) => site.id === siteId);
+  };
+
+  const getLocationInfo = (locationId: string) => {
+    if (!locationId || !baseData.locations) return null;
+    return baseData.locations.find((location: any) => location.id === locationId);
+  };
+
+  const getCompanyInfo = (companyId: string) => {
+    if (!companyId || !baseData.companies) return null;
+    return baseData.companies.find((company: any) => company.id === companyId);
+  };
+
+  const getCompanyLocationInfo = (locationId: string) => {
+    if (!locationId || !baseData.companiesLocation) return null;
+    return baseData.companiesLocation.find((location: any) => location.id === locationId);
+  };
+
+  const getCustomerCompanyInfo = (companyId: string) => {
+    if (!companyId || !baseData.customerCompanies) return null;
+    return baseData.customerCompanies.find((company: any) => company.id === companyId);
+  };
+
+  const getCustomerLocationInfo = (locationId: string) => {
+    if (!locationId || !baseData.customerCompaniesLocation) return null;
+    return baseData.customerCompaniesLocation.find((location: any) => location.id === locationId);
+  };
+
+  // دریافت اطلاعات انتخاب شده فعلی
+  const internalSiteInfo = useMemo(() => getInternalSiteInfo(delivery.internalSiteId || ''), [delivery.internalSiteId, baseData.internalSites]);
+  const contractorSiteInfo = useMemo(() => getContractorSiteInfo(delivery.contractorSiteId || ''), [delivery.contractorSiteId, baseData.contractorSites]);
+  const locationInfo = useMemo(() => getLocationInfo(delivery.locationId || ''), [delivery.locationId, baseData.locations]);
+  const companyInfo = useMemo(() => getCompanyInfo(delivery.companyId || ''), [delivery.companyId, baseData.companies]);
+  const companyLocationInfo = useMemo(() => getCompanyLocationInfo(delivery.companyLocationId || ''), [delivery.companyLocationId, baseData.companiesLocation]);
+  const customerCompanyInfo = useMemo(() => getCustomerCompanyInfo(delivery.customerCompanyId || ''), [delivery.customerCompanyId, baseData.customerCompanies]);
+  const customerLocationInfo = useMemo(() => getCustomerLocationInfo(delivery.customerLocationId || ''), [delivery.customerLocationId, baseData.customerCompaniesLocation]);
+
+  return (
+    <div className="p-6 border-b border-gray-200 bg-blue-50">
+      <div className="flex items-center gap-2 mb-6">
+        <AlertCircle className="h-5 w-5 text-blue-600" />
+        <h3 className="font-medium text-blue-900">
+          {isEditing ? 'ويرايش حواله' : 'ايجاد حواله جديد'}
+        </h3>
+        {isEditing && fromPermit && (
+          <span className="text-green-600 text-sm">(حالت ويرايش: تمام فيلدها قابل ويرايش هستند)</span>
+        )}
+      </div>
+
+      {/* نمايش اطلاعات مجوز */}
+      {delivery.fromPermit && permitInfo && (
+        <div className={`p-4 rounded-lg border mb-6 ${
+          isEditing 
+            ? 'bg-amber-50 border-amber-200' 
+            : 'bg-indigo-50 border-indigo-200'
+        }`}>
+          <h4 className={`font-medium mb-2 ${
+            isEditing 
+              ? 'text-amber-900' 
+              : 'text-indigo-900'
+          }`}>
+            اطلاعات مجوز
+            {isEditing && (
+              <span className="text-sm font-normal text-amber-700 mr-2">(حالت ويرايش)</span>
+            )}
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">شماره مجوز سيستم</label>
+              <input
+                type="text"
+                value={permitInfo.systemPermitNumber || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">شماره نامه مديريت</label>
+              <input
+                type="text"
+                value={permitInfo.managementLetterNumber || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">مقدار مجوز</label>
+              <input
+                type="text"
+                value={formatPersianNumber(permitInfo.permitAmount || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">مانده مجوز حواله</label>
+              <input
+                type="text"
+                value={formatPersianNumber(remainingPermitAmount)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg font-bold ${
+                  isEditing ? 'bg-orange-100' : 'bg-yellow-100'
+                }`}
+                disabled
+              />
+              {isEditing && (
+                <p className="text-xs text-amber-600 mt-1">
+                  محاسبه شده: {formatPersianNumber(remainingPermitAmount)} کيلوگرم
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">مانده مجوز</label>
+              <input
+                type="text"
+                value={formatPersianNumber(permitInfo.remainingPermit || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-green-100 font-bold"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">وضعيت مجوز</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100">
+                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  permitInfo.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                  permitInfo.status === 'saved' ? 'bg-blue-100 text-blue-800' :
+                  permitInfo.status === 'issued' ? 'bg-green-100 text-green-800' :
+                  permitInfo.status === 'printed' ? 'bg-purple-100 text-purple-800' :
+                  permitInfo.status === 'correction_requested' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {permitInfo.status === 'draft' ? 'پيش‌نويس' :
+                   permitInfo.status === 'saved' ? 'ذخيره شده' :
+                   permitInfo.status === 'issued' ? 'صادر شده' :
+                   permitInfo.status === 'printed' ? 'چاپ شده' :
+                   permitInfo.status === 'correction_requested' ? 'درخواست اصلاحيه' :
+                   permitInfo.status === 'cancelled' ? 'لغو شده' :
+                   'نامشخص'}
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* توضيحات فرمول محاسبه */}
+          <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+            <h5 className="text-sm font-medium text-gray-800 mb-2">راهنماي محاسبه مقدار باقيمانده:</h5>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p><strong>فرمول:</strong> مقدار باقيمانده = مقدار مجوز - مجموع تحويل‌هاي ثبت شده</p>
+              <p><strong>مقدار مجوز:</strong> {formatPersianNumber(delivery.permitAmount || 0)} کيلوگرم</p>
+              <p><strong>مجموع تحويل‌هاي ثبت شده:</strong> {formatPersianNumber((delivery.permitAmount || 0) - remainingPermitAmount)} کيلوگرم</p>
+              <p className={`font-medium ${
+                remainingPermitAmount === 0 ? 'text-red-600' : 
+                remainingPermitAmount < (delivery.permitAmount || 0) * 0.1 ? 'text-amber-600' : 'text-green-600'
+              }`}>
+                <strong>مقدار باقيمانده:</strong> {formatPersianNumber(remainingPermitAmount)} کيلوگرم
+                {remainingPermitAmount === 0 && ' (مجوز تکميل شده است)'}
+                {remainingPermitAmount > 0 && remainingPermitAmount < (delivery.permitAmount || 0) * 0.1 && ' (کمتر از 10% مقدار اوليه)'}
+              </p>
+            </div>
+          </div>
+          {(() => {
+            return delivery.permitId && storage.loadData(`permit_${delivery.permitId}`) && (
+              <div className="mt-2 text-xs text-blue-600">
+                اطلاعات اين مجوز از سيستم مجوزها منتقل شده است
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* نمايش اطلاعات رسيد */}
+      {receiptData && (
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6">
+          <h4 className="font-medium text-green-900 mb-2">اطلاعات رسيد انبار</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">نام سايت</label>
+              <input
+                type="text"
+                value={receiptData.siteName || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">مخزن</label>
+              <input
+                type="text"
+                value={receiptData.tankName || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">نام شرکت</label>
+              <input
+                type="text"
+                value={receiptData.companyName || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">قرارداد</label>
+              <input
+                type="text"
+                value={receiptData.contractNumber || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">نام محصول رسيد</label>
+              <input
+                type="text"
+                value={receiptData.productName || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">واحد اندازه‌گيري</label>
+              <input
+                type="text"
+                value={receiptData.unit === 'kg' ? 'کيلوگرم' : 'تن'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">درصد افت</label>
+              <input
+                type="text"
+                value={receiptData.wastagePercentage ? `${receiptData.wastagePercentage}%` : '-'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">مشتري طرف حساب</label>
+              <input
+                type="text"
+                value={receiptData.customerCounterpartyName || '-'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">لوکيشن طرف حساب</label>
+              <input
+                type="text"
+                value={receiptData.counterpartyLocationName || '-'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">لوکيشن مشتري طرف حساب</label>
+              <input
+                type="text"
+                value={receiptData.customerCounterpartyLocationName || '-'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">شماره شاخص /ثبت سفارش</label>
+              <input
+                type="text"
+                value={receiptData.indexNumber || '-'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">شماره کوتاژ</label>
+              <input
+                type="text"
+                value={receiptData.cotageNumber || '-'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">نام کشتي</label>
+              <input
+                type="text"
+                value={receiptData.shipName || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">شماره سهميه</label>
+              <input
+                type="text"
+                value={receiptData.quotaNumber || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">شماره ثبت/ثبت رسيد</label>
+              <input
+                type="text"
+                value={receiptData.registrationOrderNumber || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                disabled
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {/* نوع حواله */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            نوع حواله <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={delivery.userType || 'owned'}
+            onChange={(e) => onChange({ ...delivery, userType: e.target.value as 'owned' | 'consignment' })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={false}
+          >
+            <option value="owned">حواله تملیکی</option>
+            <option value="consignment">حواله امانی</option>
+          </select>
+        </div>
+
+        {/* محصول */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            محصول <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={delivery.productId || ''}
+            onChange={(e) => onChange({ ...delivery, productId: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              errors.productId ? 'border-red-500' : 'border-gray-300'
+            }`}
+            disabled={false}
+          >
+            <option value="">انتخاب کنيد</option>
+            {(delivery.userType === 'consignment' ? baseData.consignmentProducts : baseData.ownedProducts)?.map(product => (
+              <option key={product.id} value={product.id}>{product.name}</option>
+            ))}
+          </select>
+          {errors.productId && (
+            <p className="text-red-500 text-xs mt-1">{errors.productId}</p>
+          )}
+        </div>
+
+        {/* سايت */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            سايت <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={delivery.siteId || ''}
+            onChange={(e) => onChange({ ...delivery, siteId: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              errors.siteId ? 'border-red-500' : 'border-gray-300'
+            }`}
+            disabled={receiptData ? true : false}
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.sites?.map(site => (
+              <option key={site.id} value={site.id}>{site.name}</option>
+            ))}
+          </select>
+          {errors.siteId && (
+            <p className="text-red-500 text-xs mt-1">{errors.siteId}</p>
+          )}
+        </div>
+
+        {/* مخزن */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            مخزن <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={delivery.tankId || ''}
+            onChange={(e) => onChange({ ...delivery, tankId: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              errors.tankId ? 'border-red-500' : 'border-gray-300'
+            }`}
+            disabled={receiptData ? true : false}
+          >
+            <option value="">انتخاب کنيد</option>
+            {baseData.tanks?.map(tank => (
+              <option key={tank.id} value={tank.id}>{tank.name}</option>
+            ))}
+          </select>
+          {errors.tankId && (
+            <p className="text-red-500 text-xs mt-1">{errors.tankId}</p>
+          )}
+        </div>
+
+        {/* مقدار */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            مقدار حواله <span className="text-red-500">*</span>
+            {delivery.fromPermit && (
+              <span className="text-xs text-gray-500 mr-2">
+                (حداکثر: {formatPersianNumber(isEditing ? (remainingPermitAmount + (delivery.amount || 0)) : (delivery.permitAmount || 0))} کيلوگرم)
+              </span>
+            )}
+          </label>
+          <input
+            type="number"
+            value={delivery.amount || ''}
+            onChange={(e) => {
+              const newAmount = parseFloat(e.target.value) || 0;
+              
+              // محدوديت مقدار بر اساس حالت:
+              // الف) در حالت ايجاد: حداکثر = مقدار مجوز اصلي (permitAmount)
+              // ب) در حالت ويرايش: حداکثر = مانده مجوز حواله + مقدار فعلي حواله
+              let maxAllowedAmount;
+              if (delivery.fromPermit) {
+                maxAllowedAmount = isEditing 
+                  ? (remainingPermitAmount + (delivery.amount || 0))  // حالت ويرايش: مانده + مقدار فعلي
+                  : (delivery.permitAmount || 0);  // حالت ايجاد: مقدار مجوز اصلي
+                  
+                if (newAmount > maxAllowedAmount) {
+                  onChange({ ...delivery, amount: maxAllowedAmount });
+                  return;
+                }
+              }
+              
+              onChange({ ...delivery, amount: newAmount });
+            }}
+            onBlur={() => {
+              // اعتبارسنجي مقدار
+              if (delivery.fromPermit) {
+                const currentAmount = delivery.amount || 0;
+                const maxAllowed = isEditing 
+                  ? (remainingPermitAmount + (delivery.amount || 0))  // حالت ويرايش: مانده + مقدار فعلي
+                  : (delivery.permitAmount || 0);  // حالت ايجاد: مقدار مجوز اصلي
+                
+                if (currentAmount > maxAllowed) {
+                  onChange({ ...delivery, amount: maxAllowed });
+                }
+              }
+            }}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              errors.amount ? 'border-red-500' : 
+              delivery.fromPermit && (delivery.amount || 0) > (isEditing 
+                ? (remainingPermitAmount + (delivery.amount || 0))
+                : (delivery.permitAmount || 0)
+              ) ? 'border-red-500' : 'border-gray-300'
+            }`}
+            placeholder="مقدار را وارد کنيد"
+            min="0"
+            max={delivery.fromPermit ? (isEditing 
+              ? (remainingPermitAmount + (delivery.amount || 0))
+              : (delivery.permitAmount || 0)
+            ) : undefined}
+            step="0.01"
+            disabled={false}
+          />
+          {errors.amount && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {errors.amount}
+            </p>
+          )}
+          
+          {/* پيام‌هاي راهنماي پيشرفته */}
+          {delivery.fromPermit && (
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-blue-600">
+                {isEditing ? 'در حالت ويرايش - ' : 'در حالت ايجاد - '}
+                حداکثر مقدار مجاز: {formatPersianNumber(
+                  isEditing 
+                    ? (remainingPermitAmount + (delivery.amount || 0))  // حالت ويرايش: مانده + مقدار فعلي
+                    : (delivery.permitAmount || 0)  // حالت ايجاد: مقدار مجوز اصلي
+                )} کيلوگرم
+              </p>
+              
+              {isEditing && (
+                <p className="text-xs text-amber-600">
+                  مانده مجوز حواله: {formatPersianNumber(remainingPermitAmount)} کيلوگرم<br/>
+                  مقدار فعلي حواله: {formatPersianNumber(delivery.amount || 0)} کيلوگرم<br/>
+                  حداکثر قابل ثبت: {formatPersianNumber(remainingPermitAmount + (delivery.amount || 0))} کيلوگرم
+                </p>
+              )}
+              
+              {!isEditing && (
+                <p className="text-xs text-green-600">
+                  مقدار مجوز اصلي: {formatPersianNumber(delivery.permitAmount || 0)} کيلوگرم
+                </p>
+              )}
+              
+              {(delivery.amount || 0) > (isEditing 
+                ? (remainingPermitAmount + (delivery.amount || 0))
+                : (delivery.permitAmount || 0)
+              ) && (
+                <p className="text-red-600 text-xs flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  مقدار وارد شده بيش از حد مجاز است
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* واحد */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">واحد</label>
+          <select
+            value={delivery.unit || 'kg'}
+            onChange={(e) => onChange({ ...delivery, unit: e.target.value as 'kg' | 'ton' })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={receiptData ? true : false}
+          >
+            <option value="kg">کيلوگرم</option>
+            <option value="ton">تن</option>
+          </select>
+        </div>
+
+        {/* تاريخ تحويل */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            تاريخ تحويل <span className="text-red-500">*</span>
+          </label>
+          <PersianDatePicker
+            value={delivery.deliveryDate}
+            onChange={(date) => onChange({ ...delivery, deliveryDate: date })}
+            placeholder="انتخاب تاريخ"
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              errors.deliveryDate ? 'border-red-500' : 'border-gray-300'
+            }`}
+          />
+          {errors.deliveryDate && (
+            <p className="text-red-500 text-xs mt-1">{errors.deliveryDate}</p>
+          )}
+        </div>
+
+        {/* شرکت (فقط براي حواله‌هاي اماني) */}
+        {delivery.userType === 'consignment' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              شرکت <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={delivery.companyId || ''}
+              onChange={(e) => onChange({ ...delivery, companyId: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.companyId ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={receiptData ? true : false}
+            >
+              <option value="">انتخاب کنيد</option>
+              {baseData.companies?.map(company => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+            {errors.companyId && (
+              <p className="text-red-500 text-xs mt-1">{errors.companyId}</p>
+            )}
+          </div>
+        )}
+
+        {/* قرارداد (فقط براي حواله‌هاي اماني) */}
+        {delivery.userType === 'consignment' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              قرارداد <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={delivery.contractId || ''}
+              onChange={(e) => onChange({ ...delivery, contractId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={receiptData ? true : false}
+            >
+              <option value="">انتخاب کنيد</option>
+              {contracts.map(contract => (
+                <option key={contract.id} value={contract.id}>{contract.contractNumber}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* محل (فقط برای حواله‌های تملیکی) */}
+        {delivery.userType === 'owned' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              محل <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={delivery.locationId || ''}
+              onChange={(e) => onChange({ ...delivery, locationId: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.locationId ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={false}
+            >
+              <option value="">انتخاب کنيد</option>
+              {baseData.locations?.map(location => (
+                <option key={location.id} value={location.id}>{location.name}</option>
+              ))}
+            </select>
+            {errors.locationId && (
+              <p className="text-red-500 text-xs mt-1">{errors.locationId}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* انتخاب نوع گيرنده */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            نوع گيرنده <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="recipientType"
+                value="internal"
+                checked={delivery.recipientType === 'internal'}
+                onChange={() => onChange({ ...delivery, recipientType: 'internal' })}
+                className="ml-2"
+                disabled={false}
+              />
+              <span>داخلي</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="recipientType"
+                value="company"
+                checked={delivery.recipientType === 'company'}
+                onChange={() => onChange({ ...delivery, recipientType: 'company' })}
+                className="ml-2"
+                disabled={false}
+              />
+              <span>طرف حساب</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="recipientType"
+                value="customer"
+                checked={delivery.recipientType === 'customer'}
+                onChange={() => onChange({ ...delivery, recipientType: 'customer' })}
+                className="ml-2"
+                disabled={false}
+              />
+              <span>مشتري طرف حساب</span>
+            </label>
+          </div>
+        </div>
+
+        {/* فيلدهاي مربوط به نوع گيرنده */}
+        {delivery.recipientType === 'company' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                طرف حساب <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.companyId || ''}
+                onChange={(e) => onChange({ ...delivery, companyId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.companyId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.companies?.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {errors.companyId && (
+                <p className="text-red-500 text-xs mt-1">{errors.companyId}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                لوکيشن طرف حساب <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.companyLocationId || ''}
+                onChange={(e) => onChange({ ...delivery, companyLocationId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.companyLocationId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.locations?.map((location: any) => (
+                  <option key={location.id} value={location.id}>{location.name}</option>
+                ))}
+              </select>
+              {errors.companyLocationId && (
+                <p className="text-red-500 text-xs mt-1">{errors.companyLocationId}</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {delivery.recipientType === 'customer' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                مشتري طرف حساب <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.customerCompanyId || ''}
+                onChange={(e) => onChange({ ...delivery, customerCompanyId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.customerCompanyId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.customerCompanies?.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {errors.customerCompanyId && (
+                <p className="text-red-500 text-xs mt-1">{errors.customerCompanyId}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                لوکيشن مشتري طرف حساب <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.customerLocationId || ''}
+                onChange={(e) => onChange({ ...delivery, customerLocationId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.customerLocationId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.customerCompaniesLocation?.map((location: any) => (
+                  <option key={location.id} value={location.id}>{location.name}</option>
+                ))}
+              </select>
+              {errors.customerLocationId && (
+                <p className="text-red-500 text-xs mt-1">{errors.customerLocationId}</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {delivery.recipientType === 'internal' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                سايت داخلي <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.internalSiteId || ''}
+                onChange={(e) => onChange({ ...delivery, internalSiteId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.internalSiteId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.internalSites?.map((site: any) => (
+                  <option key={site.id} value={site.id}>{site.name}</option>
+                ))}
+              </select>
+              {errors.internalSiteId && (
+                <p className="text-red-500 text-xs mt-1">{errors.internalSiteId}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                سايت پيمانکار <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.contractorSiteId || ''}
+                onChange={(e) => onChange({ ...delivery, contractorSiteId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.contractorSiteId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.contractorSites?.map((site: any) => (
+                  <option key={site.id} value={site.id}>{site.name}</option>
+                ))}
+              </select>
+              {errors.contractorSiteId && (
+                <p className="text-red-500 text-xs mt-1">{errors.contractorSiteId}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                لوکيشن <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={delivery.locationId || ''}
+                onChange={(e) => onChange({ ...delivery, locationId: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.locationId ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.locations?.map((location: any) => (
+                  <option key={location.id} value={location.id}>{location.name}</option>
+                ))}
+              </select>
+              {errors.locationId && (
+                <p className="text-red-500 text-xs mt-1">{errors.locationId}</p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* نمایش اطلاعات انتخاب شده از پایگاه داده */}
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+        <h4 className="font-medium text-gray-900 mb-3">اطلاعات منتخب از پایگاه داده</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* اطلاعات سایت داخلی */}
+          {delivery.recipientType === 'internal' && internalSiteInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات سایت داخلی</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {internalSiteInfo.name}</p>
+                {internalSiteInfo.address && <p><strong>آدرس:</strong> {internalSiteInfo.address}</p>
+                {internalSiteInfo.phone && <p><strong>تلفن:</strong> {internalSiteInfo.phone}</p>
+                {internalSiteInfo.postalCode && <p><strong>کد پستی:</strong> {internalSiteInfo.postalCode}</p>
+                {internalSiteInfo.additionalInfo && <p><strong>توضیحات:</strong> {internalSiteInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* اطلاعات سایت پیمانکار */}
+          {delivery.recipientType === 'internal' && contractorSiteInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات سایت پیمانکار</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {contractorSiteInfo.name}</p>
+                {contractorSiteInfo.address && <p><strong>آدرس:</strong> {contractorSiteInfo.address}</p>
+                {contractorSiteInfo.phone && <p><strong>تلفن:</strong> {contractorSiteInfo.phone}</p>
+                {contractorSiteInfo.postalCode && <p><strong>کد پستی:</strong> {contractorSiteInfo.postalCode}</p>
+                {contractorSiteInfo.additionalInfo && <p><strong>توضیحات:</strong> {contractorSiteInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* اطلاعات لوکیشن */}
+          {locationInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات لوکیشن</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {locationInfo.name}</p>
+                {locationInfo.address && <p><strong>آدرس:</strong> {locationInfo.address}</p>
+                {locationInfo.phone && <p><strong>تلفن:</strong> {locationInfo.phone}</p>
+                {locationInfo.postalCode && <p><strong>کد پستی:</strong> {locationInfo.postalCode}</p>
+                {locationInfo.additionalInfo && <p><strong>توضیحات:</strong> {locationInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* اطلاعات شرکت طرف حساب */}
+          {delivery.recipientType === 'company' && companyInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات شرکت طرف حساب</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {companyInfo.name}</p>
+                {companyInfo.address && <p><strong>آدرس:</strong> {companyInfo.address}</p>
+                {companyInfo.phone && <p><strong>تلفن:</strong> {companyInfo.phone}</p>
+                {companyInfo.postalCode && <p><strong>کد پستی:</strong> {companyInfo.postalCode}</p>
+                {companyInfo.additionalInfo && <p><strong>توضیحات:</strong> {companyInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* اطلاعات لوکیشن طرف حساب */}
+          {delivery.recipientType === 'company' && companyLocationInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات لوکیشن طرف حساب</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {companyLocationInfo.name}</p>
+                {companyLocationInfo.address && <p><strong>آدرس:</strong> {companyLocationInfo.address}</p>
+                {companyLocationInfo.phone && <p><strong>تلفن:</strong> {companyLocationInfo.phone}</p>
+                {companyLocationInfo.postalCode && <p><strong>کد پستی:</strong> {companyLocationInfo.postalCode}</p>
+                {companyLocationInfo.additionalInfo && <p><strong>توضیحات:</strong> {companyLocationInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* اطلاعات مشتری طرف حساب */}
+          {delivery.recipientType === 'customer' && customerCompanyInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات مشتری طرف حساب</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {customerCompanyInfo.name}</p>
+                {customerCompanyInfo.address && <p><strong>آدرس:</strong> {customerCompanyInfo.address}</p>
+                {customerCompanyInfo.phone && <p><strong>تلفن:</strong> {customerCompanyInfo.phone}</p>
+                {customerCompanyInfo.postalCode && <p><strong>کد پستی:</strong> {customerCompanyInfo.postalCode}</p>
+                {customerCompanyInfo.additionalInfo && <p><strong>توضیحات:</strong> {customerCompanyInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* اطلاعات لوکیشن مشتری طرف حساب */}
+          {delivery.recipientType === 'customer' && customerLocationInfo && (
+            <div className="bg-white p-3 rounded border border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">اطلاعات لوکیشن مشتری طرف حساب</h5>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p><strong>نام:</strong> {customerLocationInfo.name}</p>
+                {customerLocationInfo.address && <p><strong>آدرس:</strong> {customerLocationInfo.address}</p>
+                {customerLocationInfo.phone && <p><strong>تلفن:</strong> {customerLocationInfo.phone}</p>
+                {customerLocationInfo.postalCode && <p><strong>کد پستی:</strong> {customerLocationInfo.postalCode}</p>
+                {customerLocationInfo.additionalInfo && <p><strong>توضیحات:</strong> {customerLocationInfo.additionalInfo}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* گزينه‌هاي پيشرفته */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+          className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+        >
+          {showAdvancedOptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          گزينه‌هاي پيشرفته
+        </button>
+      </div>
+
+      {/* گزينه‌هاي پيشرفته */}
+      {showAdvancedOptions && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {/* سایت‌های داخلی (فقط برای حواله‌های تملیکی) */}
+          {delivery.userType === 'owned' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                سايت داخلي
+              </label>
+              <select
+                value={delivery.internalSiteId || ''}
+                onChange={(e) => onChange({ ...delivery, internalSiteId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.internalSites?.map(site => (
+                  <option key={site.id} value={site.id}>{site.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* سایت‌های پیمانکار (فقط برای حواله‌های تملیکی) */}
+          {delivery.userType === 'owned' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                سايت پيمانکار
+              </label>
+              <select
+                value={delivery.contractorSiteId || ''}
+                onChange={(e) => onChange({ ...delivery, contractorSiteId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={false}
+              >
+                <option value="">انتخاب کنيد</option>
+                {baseData.contractorSites?.map(site => (
+                  <option key={site.id} value={site.id}>{site.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* انتخاب راننده */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              راننده
+            </label>
+            <select
+              value={delivery.driverId || ''}
+              onChange={(e) => onChange({ ...delivery, driverId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={false}
+            >
+              <option value="">انتخاب کنيد</option>
+              {baseData.drivers?.map(driver => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.name} - {driver.plateNumber} - {driver.nationalId}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* تحويل اماني (فقط براي حواله‌هاي اماني) */}
+          {delivery.userType === 'consignment' && (
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={delivery.trustDelivery || false}
+                  onChange={(e) => onChange({ ...delivery, trustDelivery: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  disabled={!delivery.fromPermit}
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  تحويل اماني (بدون نياز به گواهي تحويل)
+                </span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                با انتخاب اين گزينه، حواله بدون نياز به گواهي تحويل ثبت مي‌شود
+              </p>
+            </div>
+          )}
+
+          {/* يادداشت‌ها */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">يادداشت‌ها</label>
+            <textarea
+              value={delivery.notes || ''}
+              onChange={(e) => onChange({ ...delivery, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows={3}
+              placeholder="يادداشت‌هاي خود را وارد کنيد..."
+            />
+          </div>
+        </div>
+      )}
+
+      {/* دکمه‌هاي عمليات */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onSave}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          disabled={false}
+        >
+          <Save className="h-4 w-4" />
+          ذخيره حواله
+        </button>
+        <button
+          onClick={onCancel}
+          className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
+        >
+          <X className="h-4 w-4" />
+          انصراف
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default DeliveryForm;

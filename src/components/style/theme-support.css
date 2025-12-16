@@ -1,0 +1,523 @@
+/* Theme Styles for GeneralAppearanceAndNotificationsSettings */
+/* Enhanced with beautiful gradients and modern design */
+
+/* Microsoft Dynamic 365 Theme (Default) - Professional Blue */
+.dynamic365,
+.dynamic365 body {
+  --primary-color: #0078d4;
+  --primary-hover: #106ebe;
+  --primary-light: #40a6ff;
+  --background-color: #ffffff;
+  --surface-color: #f3f2f1;
+  --text-primary: #323130;
+  --text-secondary: #605e5c;
+  --border-color: #edebe9;
+  --shadow-light: rgba(0, 120, 212, 0.08);
+  --shadow-medium: rgba(0, 120, 212, 0.15);
+  --success-color: #107c10;
+  --warning-color: #ff8c00;
+  --error-color: #d13438;
+  background-color: var(--background-color);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dynamic365 .theme-card {
+  background: linear-gradient(135deg, #0078d4 0%, #106ebe 50%, #005a9e 100%);
+  color: white;
+  border: 1px solid #40a6ff;
+  box-shadow: 0 8px 24px rgba(0, 120, 212, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.dynamic365 .theme-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.dynamic365 .theme-preview {
+  background: linear-gradient(45deg, #0078d4, #40a6ff, #106ebe);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+}
+
+/* Light Theme - Clean and Modern */
+.light,
+.light body {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-light: #60a5fa;
+  --background-color: #ffffff;
+  --surface-color: #f8fafc;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --shadow-light: rgba(0, 0, 0, 0.05);
+  --shadow-medium: rgba(0, 0, 0, 0.1);
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  background-color: var(--background-color);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.light .theme-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.light .theme-preview {
+  background: linear-gradient(45deg, #ffffff, #f8fafc, #e5e7eb);
+  border: 2px solid #e5e7eb;
+}
+
+/* Dark Theme - Elegant Dark */
+.dark,
+.dark body {
+  --primary-color: #60a5fa;
+  --primary-hover: #3b82f6;
+  --primary-light: #93c5fd;
+  --background-color: #111827;
+  --surface-color: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --border-color: #374151;
+  --shadow-light: rgba(0, 0, 0, 0.3);
+  --shadow-medium: rgba(0, 0, 0, 0.5);
+  --success-color: #34d399;
+  --warning-color: #fbbf24;
+  --error-color: #f87171;
+  background-color: var(--background-color);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark .theme-card {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  color: #f9fafb;
+  border: 1px solid #374151;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.dark .theme-preview {
+  background: linear-gradient(45deg, #1f2937, #374151, #4b5563);
+  border: 2px solid #4b5563;
+}
+
+/* Ocean Theme - Beautiful Blue Ocean */
+.ocean,
+.ocean body {
+  --primary-color: #0284c7;
+  --primary-hover: #0369a1;
+  --primary-light: #38bdf8;
+  --background-color: #f0f9ff;
+  --surface-color: #e0f2fe;
+  --text-primary: #0c4a6e;
+  --text-secondary: #0369a1;
+  --border-color: #0ea5e9;
+  --shadow-light: rgba(2, 132, 199, 0.15);
+  --shadow-medium: rgba(2, 132, 199, 0.25);
+  --success-color: #06b6d4;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.ocean .theme-card {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%);
+  color: #e0f2fe;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.ocean .theme-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: oceanWave 8s ease-in-out infinite;
+}
+
+@keyframes oceanWave {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(20px, 20px) rotate(180deg); }
+}
+
+.ocean .theme-preview {
+  background: linear-gradient(45deg, #0284c7, #38bdf8, #0ea5e9);
+  border: 2px solid rgba(224, 242, 254, 0.4);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+/* Sunset Theme - Warm Orange/Red */
+.sunset,
+.sunset body {
+  --primary-color: #ea580c;
+  --primary-hover: #dc2626;
+  --primary-light: #fb923c;
+  --background-color: #fff7ed;
+  --surface-color: #fed7aa;
+  --text-primary: #7c2d12;
+  --text-secondary: #9a3412;
+  --border-color: #ea580c;
+  --shadow-light: rgba(234, 88, 12, 0.15);
+  --shadow-medium: rgba(234, 88, 12, 0.25);
+  --success-color: #059669;
+  --warning-color: #d97706;
+  --error-color: #dc2626;
+  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 50%, #fdba74 100%);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.sunset .theme-card {
+  background: linear-gradient(135deg, #ea580c 0%, #dc2626 50%, #991b1b 100%);
+  color: #fed7aa;
+  border: 1px solid #fb923c;
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.sunset .theme-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  animation: sunsetGlow 3s ease-in-out infinite;
+}
+
+@keyframes sunsetGlow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.sunset .theme-preview {
+  background: linear-gradient(45deg, #ea580c, #fb923c, #f97316);
+  border: 2px solid rgba(254, 215, 170, 0.4);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+}
+
+/* Forest Theme - Fresh Green */
+.forest,
+.forest body {
+  --primary-color: #16a34a;
+  --primary-hover: #15803d;
+  --primary-light: #4ade80;
+  --background-color: #f0fdf4;
+  --surface-color: #dcfce7;
+  --text-primary: #14532d;
+  --text-secondary: #166534;
+  --border-color: #16a34a;
+  --shadow-light: rgba(22, 163, 74, 0.15);
+  --shadow-medium: rgba(22, 163, 74, 0.25);
+  --success-color: #059669;
+  --warning-color: #eab308;
+  --error-color: #dc2626;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.forest .theme-card {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 50%, #14532d 100%);
+  color: #dcfce7;
+  border: 1px solid #4ade80;
+  box-shadow: 0 8px 24px rgba(22, 163, 74, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.forest .theme-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.forest .theme-preview {
+  background: linear-gradient(45deg, #16a34a, #4ade80, #22c55e);
+  border: 2px solid rgba(220, 252, 231, 0.4);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+/* Purple Theme - Rich Purple */
+.purple,
+.purple body {
+  --primary-color: #9333ea;
+  --primary-hover: #7c3aed;
+  --primary-light: #c084fc;
+  --background-color: #faf5ff;
+  --surface-color: #f3e8ff;
+  --text-primary: #581c87;
+  --text-secondary: #6b21a8;
+  --border-color: #a855f7;
+  --shadow-light: rgba(147, 51, 234, 0.15);
+  --shadow-medium: rgba(147, 51, 234, 0.25);
+  --success-color: #059669;
+  --warning-color: #eab308;
+  --error-color: #dc2626;
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #e9d5ff 100%);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.purple .theme-card {
+  background: linear-gradient(135deg, #9333ea 0%, #7c3aed 50%, #581c87 100%);
+  color: #f3e8ff;
+  border: 1px solid #c084fc;
+  box-shadow: 0 8px 24px rgba(147, 51, 234, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.purple .theme-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(from 0deg, transparent, rgba(192, 132, 252, 0.2), transparent);
+  animation: purpleRotate 10s linear infinite;
+}
+
+@keyframes purpleRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.purple .theme-preview {
+  background: linear-gradient(45deg, #9333ea, #c084fc, #a855f7);
+  border: 2px solid rgba(243, 232, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+}
+
+/* Rose Theme - Elegant Pink/Red */
+.rose,
+.rose body {
+  --primary-color: #e11d48;
+  --primary-hover: #be185d;
+  --primary-light: #f472b6;
+  --background-color: #fff1f2;
+  --surface-color: #ffe4e6;
+  --text-primary: #881337;
+  --text-secondary: #9f1239;
+  --border-color: #e11d48;
+  --shadow-light: rgba(225, 29, 72, 0.15);
+  --shadow-medium: rgba(225, 29, 72, 0.25);
+  --success-color: #059669;
+  --warning-color: #eab308;
+  --error-color: #dc2626;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 50%, #fecdd3 100%);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.rose .theme-card {
+  background: linear-gradient(135deg, #e11d48 0%, #be185d 50%, #881337 100%);
+  color: #fce7f3;
+  border: 1px solid #f472b6;
+  box-shadow: 0 8px 24px rgba(225, 29, 72, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.rose .theme-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+  animation: rosePulse 3s ease-in-out infinite;
+}
+
+@keyframes rosePulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.rose .theme-preview {
+  background: linear-gradient(45deg, #e11d48, #f472b6, #fb7185);
+  border: 2px solid rgba(252, 231, 243, 0.4);
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+}
+
+/* Windows 2025 Theme - Modern Cyan/Blue */
+.windows2025,
+.windows2025 body {
+  --primary-color: #0284c7;
+  --primary-hover: #0369a1;
+  --primary-light: #38bdf8;
+  --background-color: #f0f9ff;
+  --surface-color: #e0f2fe;
+  --text-primary: #0c4a6e;
+  --text-secondary: #0369a1;
+  --border-color: #0ea5e9;
+  --shadow-light: rgba(2, 132, 199, 0.15);
+  --shadow-medium: rgba(2, 132, 199, 0.25);
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 33%, #bae6fd 66%, #7dd3fc 100%);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.windows2025 .theme-card {
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 33%, #06b6d4 66%, #0891b2 100%);
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.windows2025 .theme-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.windows2025 .theme-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent);
+  background-size: 20px 20px;
+  animation: move 4s linear infinite;
+  opacity: 0.3;
+}
+
+@keyframes move {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 20px; }
+}
+
+.windows2025 .theme-preview {
+  background: linear-gradient(45deg, #0284c7, #38bdf8, #0ea5e9, #06b6d4);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+/* System Theme */
+.system,
+.system body {
+  /* Will inherit from system preferences */
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Theme transition effects */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+.theme-card {
+  transition: all 0.3s ease-in-out;
+  transform: scale(1);
+  border-radius: 12px;
+}
+
+.theme-card:hover {
+  transform: scale(1.02);
+  transition: transform 0.2s ease-in-out;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced radio button styling */
+.theme-option {
+  transition: all 0.2s ease-in-out;
+  border-radius: 12px;
+}
+
+.theme-option:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.theme-option.selected {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Status indicators */
+.status-indicator {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Loading animations */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .theme-card {
+    transform: none;
+  }
+  
+  .theme-card:hover {
+    transform: none;
+  }
+  
+  .theme-option.selected {
+    transform: none;
+  }
+}
+
+/* Global theme application */
+html[data-theme],
+body[data-theme] {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

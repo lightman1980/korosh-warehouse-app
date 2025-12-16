@@ -1,0 +1,29 @@
+{
+  "name": "tanksystem-settings-api",
+  "version": "1.0.0",
+  "description": "API برای ذخیره سازی تنظیمات سیستم TankSystem",
+  "main": "settings_api.js",
+  "scripts": {
+    "start": "node settings_api.js",
+    "dev": "nodemon settings_api.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "settings",
+    "database",
+    "api",
+    "tanksystem"
+  ],
+  "author": "MiniMax Agent",
+  "license": "MIT"
+}
+
+

@@ -1,0 +1,1302 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Plus, Minus, Search, Save, X, AlertCircle, Calendar, Package, Warehouse, Truck, FileText, 
+  BarChart3, Loader2, Edit2, Trash2, Printer, CheckCircle, Paperclip, Eye, Download
+} from 'lucide-react';
+import { formatPersianDate, formatCurrency, formatPersianNumber } from '../../utils/persian';
+import { PersianDatePicker } from '../Common/PersianDatePicker';
+import { DataStorage } from '../../utils/dataStorage';
+
+interface InventoryAdjustment {
+  id: string;
+  documentDate: Date;
+  adjustmentType: 'deduction' | 'addition';
+  productType: 'owned' | 'consignment';
+  productId: string;
+  productName: string;
+  siteId: string;
+  siteName: string;
+  tankId: string;
+  tankName: string;
+  companyId: string;
+  companyName: string;
+  customerCompanyId?: string;
+  customerCompanyName?: string;
+  locationId: string;
+  locationName: string;
+  driverId?: string;
+  driverName?: string;
+  contractId?: string;
+  contractNumber?: string;
+  quantity: number; // در کیلوگرم
+  nature: 'owned' | 'consignment'; // ماهیت موجودی
+  status: 'temporary' | 'printed' | 'attached' | 'finalized';
+  attachmentUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface InventoryRecord {
+  id: string;
+  productType: 'owned' | 'consignment';
+  productId: string;
+  productName: string;
+  siteId: string;
+  siteName: string;
+  tankId: string;
+  tankName: string;
+  companyId: string;
+  companyName: string;
+  customerCompanyId?: string;
+  customerCompanyName?: string;
+  locationId: string;
+  locationName: string;
+  driverId?: string;
+  driverName?: string;
+  contractId?: string;
+  contractNumber?: string;
+  quantity: number; // موجودی فعلی
+  lastUpdated: Date;
+}
+
+// داده‌های پیش‌فرض برای تست
+const defaultBaseData = {
+  'owned-products': [
+    { id: '1', name: 'روغن آفتابگردان-تملکي' },
+    { id: '2', name: 'روغن هاي اولئيک-تملکي' },
+  ],
+  'consignment-products': [
+    { id: '1-1', name: 'روغن آفتابگردان-اماني' },
+    { id: '2-2', name: 'روغن هاي اولئيک-اماني' },
+  ],
+  'sites': [
+    { id: 'site1', name: 'سايت مخازن انزلي' },
+    { id: 'site2', name: 'سايت مخازن جنوب' },
+  ],
+  'tanks': [
+    { id: 'tankA', name: 'مخزن A' },
+    { id: 'tankB', name: 'مخزن B' },
+  ],
+  'companies': [
+    { id: 'comp1', name: 'شرکت محور طلايي' },
+    { id: 'comp2', name: 'شرکت مادر تخصصي' },
+  ],
+  'customer-companies': [
+    { id: 'cust1', name: 'شرکت مشتري محور طلايي' },
+    { id: 'cust2', name: 'شرکت مشتري مادر تخصصي' },
+  ],
+  'locations': [
+    { id: 'loc1', name: 'دفتر مرکزي شرکت محور طلايي' },
+    { id: 'loc2', name: 'انبار شرکت مادر تخصصي' },
+  ],
+  'drivers': [
+    { id: 'drv1', name: 'احمد محمدي' },
+    { id: 'drv2', name: 'علي رضايي' },
+  ],
+  'counterparties': [
+    { id: 'counterparty1', name: 'طرف حساب شمال' },
+    { id: 'counterparty2', name: 'طرف حساب جنوب' },
+  ],
+  'customer-counterparties': [
+    { id: 'customer-counterparty1', name: 'مشتري طرف حساب شمال' },
+    { id: 'customer-counterparty2', name: 'مشتري طرف حساب جنوب' },
+  ],
+  'counterparty-locations': [
+    { id: 'counterparty-location1', name: 'لوکيشن طرف حساب شمال' },
+    { id: 'counterparty-location2', name: 'لوکيشن طرف حساب جنوب' },
+  ],
+  'customer-counterparty-locations': [
+    { id: 'customer-counterparty-location1', name: 'لوکيشن مشتري طرف حساب شمال' },
+    { id: 'customer-counterparty-location2', name: 'لوکيشن مشتري طرف حساب جنوب' },
+  ],
+};
+
+const defaultContracts = [
+  {
+    id: '1',
+    contractNumber: 'CON-001-1404',
+    companyId: 'comp1',
+    companyName: 'شرکت محور طلايي',
+    customerCounterpartyId: 'cust1',
+    customerCounterpartyName: 'شرکت مشتري محور طلايي',
+    counterpartyLocationId: 'loc1',
+    counterpartyLocationName: 'طرف حساب شمال',
+    customerCounterpartyLocationId: 'custloc1',
+    customerCounterpartyLocationName: 'مشتري طرف حساب شمال',
+    startDate: new Date(2024, 2, 1),
+    endDate: new Date(2025, 2, 1),
+    rentalType: 'monthly',
+    rentalRate: 50000000,
+    siteId: 'site1',
+    siteName: 'سايت مخازن انزلي',
+    wastageRate: 0.5,
+    isActive: true,
+    receiptBasis: 'ullage',
+    receiptBasisName: 'وزن آلج کشتي (Ullage weight)',
+    contractWeight: 1000000,
+    remainingWeight: 1000000,
+    createdAt: new Date(2024, 2, 1),
+    updatedAt: new Date(2024, 2, 1),
+  },
+];
+
+export const InventoryAdjustmentManager: React.FC = () => {
+  const storage = DataStorage.getInstance();
+  const [documentDate, setDocumentDate] = useState<Date>(new Date());
+  const [deductionQuantity, setDeductionQuantity] = useState<number>(0);
+  const [additionQuantity, setAdditionQuantity] = useState<number>(0);
+  const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>([]);
+  const [inventory, setInventory] = useState<InventoryRecord[]>([]);
+  
+  // داده‌های پایه
+  const [baseData, setBaseData] = useState<Record<string, any[]>>(defaultBaseData);
+  const [contracts, setContracts] = useState<any[]>(defaultContracts);
+  
+  // فرم‌ها
+  const [deductionForm, setDeductionForm] = useState<Record<string, any>>({});
+  const [additionForm, setAdditionForm] = useState<Record<string, any>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+  
+  // گزارش موجودی
+  const [inventoryReport, setInventoryReport] = useState<InventoryRecord[]>([]);
+  
+  // فیلترهای تاریخ
+  const [dateFilters, setDateFilters] = useState({
+    fromDate: '',
+    toDate: ''
+  });
+  
+  // وضعیت بارگذاری
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // حالت نمایش پیام
+  const [showPrintMessage, setShowPrintMessage] = useState<string | null>(null);
+
+  // بارگذاری داده‌های اولیه
+  useEffect(() => {
+    const loadData = () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // بارگذاری داده‌های پایه
+        const savedBaseData = storage.loadData('baseDataCategories');
+        console.log('Saved base data:', savedBaseData);
+        
+        if (savedBaseData && Array.isArray(savedBaseData)) {
+          const baseDataMap: Record<string, any[]> = {};
+          savedBaseData.forEach((category: any) => {
+            if (category && category.id && Array.isArray(category.items)) {
+              baseDataMap[category.id] = category.items;
+            }
+          });
+          console.log('Processed base data:', baseDataMap);
+          setBaseData(baseDataMap);
+        } else {
+          console.log('Using default base data');
+          setBaseData(defaultBaseData);
+        }
+        
+        // بارگذاری قراردادها
+        const savedContracts = storage.loadData('contracts');
+        console.log('Saved contracts:', savedContracts);
+        
+        if (savedContracts && Array.isArray(savedContracts)) {
+          setContracts(savedContracts);
+        } else {
+          console.log('Using default contracts');
+          setContracts(defaultContracts);
+        }
+        
+        // بارگذاری تنظیمات موجودی
+        const savedInventory = storage.loadData('inventory');
+        console.log('Saved inventory:', savedInventory);
+        
+        if (savedInventory && Array.isArray(savedInventory)) {
+          // تبدیل تاریخ‌ها به شیء Date معتبر
+          const validInventory = savedInventory.map((item: any) => {
+            try {
+              return {
+                ...item,
+                lastUpdated: item.lastUpdated ? new Date(item.lastUpdated) : new Date()
+              };
+            } catch (error) {
+              console.error('Error parsing inventory date:', error, item);
+              return {
+                ...item,
+                lastUpdated: new Date()
+              };
+            }
+          });
+          setInventory(validInventory);
+        } else {
+          console.log('No inventory data found');
+          setInventory([]);
+        }
+        
+        // بارگذاری تنظیمات انبار
+        const savedAdjustments = storage.loadData('inventoryAdjustments');
+        console.log('Saved adjustments:', savedAdjustments);
+        
+        if (savedAdjustments && Array.isArray(savedAdjustments)) {
+          // تبدیل تاریخ‌ها به شیء Date معتبر
+          const validAdjustments = savedAdjustments.map((item: any) => {
+            try {
+              return {
+                ...item,
+                documentDate: item.documentDate ? new Date(item.documentDate) : new Date(),
+                createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+                updatedAt: item.updatedAt ? new Date(item.updatedAt) : new Date()
+              };
+            } catch (error) {
+              console.error('Error parsing adjustment date:', error, item);
+              return {
+                ...item,
+                documentDate: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date()
+              };
+            }
+          });
+          setAdjustments(validAdjustments);
+        } else {
+          console.log('No adjustments data found');
+          setAdjustments([]);
+        }
+        
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError('خطا در بارگذاری داده‌ها');
+        // استفاده از داده‌های پیش‌فرض در صورت خطا
+        setBaseData(defaultBaseData);
+        setContracts(defaultContracts);
+        setInventory([]);
+        setAdjustments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+    
+    // گوش دادن به تغییرات در داده‌های پایه
+    const handleBaseDataUpdated = () => {
+      console.log('Base data updated event received');
+      loadData();
+    };
+    
+    window.addEventListener('baseDataUpdated', handleBaseDataUpdated);
+    window.addEventListener('contractsUpdated', handleBaseDataUpdated);
+    
+    return () => {
+      window.removeEventListener('baseDataUpdated', handleBaseDataUpdated);
+      window.removeEventListener('contractsUpdated', handleBaseDataUpdated);
+    };
+  }, [storage]);
+
+  // به‌روزرسانی گزارش موجودی
+  useEffect(() => {
+    updateInventoryReport();
+  }, [inventory]);
+
+  const updateInventoryReport = () => {
+    setInventoryReport([...inventory]);
+  };
+
+  const handleFormChange = (formType: 'deduction' | 'addition', field: string, value: any) => {
+    if (formType === 'deduction') {
+      setDeductionForm(prev => ({ ...prev, [field]: value }));
+    } else {
+      setAdditionForm(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const validateForm = (form: Record<string, any>): boolean => {
+    const requiredFields = [
+      'productType', 'productId', 'siteId', 'tankId', 
+      'companyId', 'locationId'
+    ];
+    
+    return requiredFields.every(field => form[field]);
+  };
+
+  const handleDeductionSubmit = () => {
+    console.log('Deduction form:', deductionForm);
+    console.log('Deduction quantity:', deductionQuantity);
+    
+    if (!validateForm(deductionForm)) {
+      alert('لطفا تمام فیلدهای الزامی را پر کنید');
+      return;
+    }
+    
+    if (deductionQuantity <= 0) {
+      alert('مقدار کسری انبار باید بزرگتر از صفر باشد');
+      return;
+    }
+    
+    // بررسی موجودی کافی
+    const currentInventory = inventory.find(item => 
+      item.productId === deductionForm.productId &&
+      item.siteId === deductionForm.siteId &&
+      item.tankId === deductionForm.tankId
+    );
+    
+    if (!currentInventory || currentInventory.quantity < deductionQuantity) {
+      alert('موجودی کافی برای کسر انبار وجود ندارد');
+      return;
+    }
+    
+    saveAdjustment('deduction');
+  };
+
+  const handleAdditionSubmit = () => {
+    console.log('Addition form:', additionForm);
+    console.log('Addition quantity:', additionQuantity);
+    
+    if (!validateForm(additionForm)) {
+      alert('لطفا تمام فیلدهای الزامی را پر کنید');
+      return;
+    }
+    
+    if (additionQuantity <= 0) {
+      alert('مقدار اضافه انبار باید بزرگتر از صفر باشد');
+      return;
+    }
+    
+    saveAdjustment('addition');
+  };
+
+  const saveAdjustment = (type: 'deduction' | 'addition', isEdit: boolean = false) => {
+    try {
+      const form = isEdit ? editForm : (type === 'deduction' ? deductionForm : additionForm);
+      const quantity = isEdit ? editForm.quantity : (type === 'deduction' ? deductionQuantity : additionQuantity);
+      
+      console.log('Saving adjustment:', { type, form, quantity, isEdit });
+      
+      // یافتن نام‌های مرتبط
+      const product = baseData[form.productType === 'owned' ? 'owned-products' : 'consignment-products']?.find((p: any) => p.id === form.productId);
+      const site = baseData.sites?.find((s: any) => s.id === form.siteId);
+      const tank = baseData.tanks?.find((t: any) => t.id === form.tankId);
+      const company = baseData.companies?.find((c: any) => c.id === form.companyId);
+      const location = baseData.locations?.find((l: any) => l.id === form.locationId);
+      const driver = baseData.drivers?.find((d: any) => d.id === form.driverId);
+      const contract = contracts.find((c: any) => c.id === form.contractId);
+      
+      // ایجاد تاریخ معتبر
+      const docDate = isEdit && form.documentDate ? new Date(form.documentDate) : documentDate;
+      
+      // بررسی معتبر بودن تاریخ
+      if (isNaN(docDate.getTime())) {
+        console.error('Invalid document date:', docDate);
+        alert('تاریخ سند معتبر نیست');
+        return;
+      }
+      
+      const adjustment: InventoryAdjustment = {
+        id: isEdit ? editingId! : `adj_${Date.now()}`,
+        documentDate: docDate,
+        adjustmentType: type,
+        productType: form.productType,
+        productId: form.productId,
+        productName: product?.name || '',
+        siteId: form.siteId,
+        siteName: site?.name || '',
+        tankId: form.tankId,
+        tankName: tank?.name || '',
+        companyId: form.companyId,
+        companyName: company?.name || '',
+        customerCompanyId: form.customerCompanyId,
+        customerCompanyName: baseData['customer-companies']?.find((c: any) => c.id === form.customerCompanyId)?.name,
+        locationId: form.locationId,
+        locationName: location?.name || '',
+        driverId: form.driverId,
+        driverName: driver?.name || '',
+        contractId: form.contractId,
+        contractNumber: contract?.contractNumber,
+        quantity,
+        nature: form.productType,
+        status: isEdit ? form.status : 'temporary',
+        attachmentUrl: form.attachmentUrl,
+        createdAt: isEdit && form.createdAt ? new Date(form.createdAt) : new Date(),
+        updatedAt: new Date()
+      };
+      
+      console.log('Created adjustment:', adjustment);
+      
+      // ذخیره تنظیم انبار
+      let updatedAdjustments;
+      if (isEdit) {
+        updatedAdjustments = adjustments.map(adj => adj.id === editingId ? adjustment : adj);
+      } else {
+        updatedAdjustments = [...adjustments, adjustment];
+      }
+      storage.saveData('inventoryAdjustments', updatedAdjustments);
+      setAdjustments(updatedAdjustments);
+      
+      // به‌روزرسانی موجودی
+      if (!isEdit || adjustment.status === 'finalized') {
+        updateInventory(adjustment);
+      }
+      
+      // ریست فرم‌ها
+      if (!isEdit) {
+        if (type === 'deduction') {
+          setDeductionForm({});
+          setDeductionQuantity(0);
+        } else {
+          setAdditionForm({});
+          setAdditionQuantity(0);
+        }
+        
+        // نمایش پیام پرینت
+        setShowPrintMessage(adjustment.id);
+      } else {
+        setEditingId(null);
+        setEditForm({});
+      }
+      
+      alert(`سند ${type === 'deduction' ? 'کسری' : 'اضافه'} انبار با موفقیت ${isEdit ? 'ویرایش' : 'ثبت'} شد`);
+    } catch (error) {
+      console.error('Error saving adjustment:', error);
+      alert('خطایی در ثبت سند رخ داد');
+    }
+  };
+
+  const updateInventory = (adjustment: InventoryAdjustment) => {
+    try {
+      console.log('Updating inventory with adjustment:', adjustment);
+      
+      const existingIndex = inventory.findIndex(item => 
+        item.productId === adjustment.productId &&
+        item.siteId === adjustment.siteId &&
+        item.tankId === adjustment.tankId
+      );
+      
+      let updatedInventory = [...inventory];
+      
+      if (existingIndex !== -1) {
+        // به‌روزرسانی موجودی موجود
+        const updatedItem = { ...updatedInventory[existingIndex] };
+        updatedItem.quantity += adjustment.adjustmentType === 'addition' ? adjustment.quantity : -adjustment.quantity;
+        updatedItem.lastUpdated = new Date();
+        updatedInventory[existingIndex] = updatedItem;
+        console.log('Updated existing inventory item:', updatedItem);
+      } else {
+        // ایجاد رکورد جدید
+        const newRecord: InventoryRecord = {
+          id: `inv_${Date.now()}`,
+          productType: adjustment.productType,
+          productId: adjustment.productId,
+          productName: adjustment.productName,
+          siteId: adjustment.siteId,
+          siteName: adjustment.siteName,
+          tankId: adjustment.tankId,
+          tankName: adjustment.tankName,
+          companyId: adjustment.companyId,
+          companyName: adjustment.companyName,
+          customerCompanyId: adjustment.customerCompanyId,
+          customerCompanyName: adjustment.customerCompanyName,
+          locationId: adjustment.locationId,
+          locationName: adjustment.locationName,
+          driverId: adjustment.driverId,
+          driverName: adjustment.driverName,
+          contractId: adjustment.contractId,
+          contractNumber: adjustment.contractNumber,
+          quantity: adjustment.adjustmentType === 'addition' ? adjustment.quantity : -adjustment.quantity,
+          lastUpdated: new Date()
+        };
+        updatedInventory.push(newRecord);
+        console.log('Created new inventory record:', newRecord);
+      }
+      
+      // حذف رکوردهای با موجودی صفر یا منفی
+      updatedInventory = updatedInventory.filter(item => item.quantity > 0);
+      
+      // ذخیره موجودی
+      storage.saveData('inventory', updatedInventory);
+      setInventory(updatedInventory);
+      console.log('Updated inventory saved:', updatedInventory);
+    } catch (error) {
+      console.error('Error updating inventory:', error);
+    }
+  };
+
+  const handleEdit = (adjustment: InventoryAdjustment) => {
+    setEditingId(adjustment.id);
+    setEditForm({
+      ...adjustment,
+      documentDate: adjustment.documentDate.toISOString().split('T')[0]
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف این سند اطمینان دارید؟')) {
+      const updatedAdjustments = adjustments.filter(adj => adj.id !== id);
+      storage.saveData('inventoryAdjustments', updatedAdjustments);
+      setAdjustments(updatedAdjustments);
+    }
+  };
+
+  const handlePrint = (id: string) => {
+    const updatedAdjustments = adjustments.map(adj => 
+      adj.id === id ? { ...adj, status: 'printed' as const } : adj
+    );
+    storage.saveData('inventoryAdjustments', updatedAdjustments);
+    setAdjustments(updatedAdjustments);
+    
+    alert('لطفا پرینت تایید شده سند کسر یا اضافه انبار را ضمیمه فرمایید');
+  };
+
+  const handleAttach = (id: string) => {
+    // در یک پیاده‌سازی واقعی، اینجا باید یک دیالوگ برای آپلود فایل باز شود
+    const fileUrl = prompt('لطفا URL فایل ضمیمه را وارد کنید:');
+    if (fileUrl) {
+      const updatedAdjustments = adjustments.map(adj => 
+        adj.id === id ? { ...adj, status: 'attached' as const, attachmentUrl: fileUrl } : adj
+      );
+      storage.saveData('inventoryAdjustments', updatedAdjustments);
+      setAdjustments(updatedAdjustments);
+    }
+  };
+
+  const handleFinalize = (id: string) => {
+    const updatedAdjustments = adjustments.map(adj => 
+      adj.id === id ? { ...adj, status: 'finalized' as const } : adj
+    );
+    storage.saveData('inventoryAdjustments', updatedAdjustments);
+    setAdjustments(updatedAdjustments);
+    
+    alert('سند با موفقیت نهایی شد');
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      temporary: { label: 'موقت', color: 'bg-yellow-100 text-yellow-800' },
+      printed: { label: 'چاپ شده', color: 'bg-blue-100 text-blue-800' },
+      attached: { label: 'ضمیمه شده', color: 'bg-purple-100 text-purple-800' },
+      finalized: { label: 'نهایی شده', color: 'bg-green-100 text-green-800' }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.temporary;
+    
+    return (
+      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const renderFormSection = (type: 'deduction' | 'addition') => {
+    const form = type === 'deduction' ? deductionForm : additionForm;
+    const quantity = type === 'deduction' ? deductionQuantity : additionQuantity;
+    const setQuantity = type === 'deduction' ? setDeductionQuantity : setAdditionQuantity;
+    const handleSubmit = type === 'deduction' ? handleDeductionSubmit : handleAdditionSubmit;
+    const icon = type === 'deduction' ? <Minus className="h-5 w-5" /> : <Plus className="h-5 w-5" />;
+    const title = type === 'deduction' ? 'ثبت سند کسر انبار' : 'ثبت سند اضافه انبار';
+    const quantityLabel = type === 'deduction' ? 'مقدار کسری انبار' : 'مقدار اضافه انبار';
+    const colorClass = type === 'deduction' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50';
+    
+    console.log(`Rendering ${type} form with data:`, { form, quantity });
+    
+    return (
+      <div className={`p-6 rounded-xl border ${colorClass} shadow-sm`}>
+        <div className="flex items-center gap-2 mb-4">
+          {icon}
+          <h3 className="font-semibold text-gray-900">{title}</h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* نوع محصول */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">نوع محصول</label>
+            <select
+              value={form.productType || ''}
+              onChange={(e) => handleFormChange(type, 'productType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              <option value="owned">تملیکی</option>
+              <option value="consignment">امانی</option>
+            </select>
+          </div>
+          
+          {/* محصول */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">محصول</label>
+            <select
+              value={form.productId || ''}
+              onChange={(e) => handleFormChange(type, 'productId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={!form.productType}
+            >
+              <option value="">انتخاب کنید</option>
+              {form.productType && baseData[form.productType === 'owned' ? 'owned-products' : 'consignment-products']?.map((product: any) => (
+                <option key={product.id} value={product.id}>{product.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* سایت */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">سایت</label>
+            <select
+              value={form.siteId || ''}
+              onChange={(e) => handleFormChange(type, 'siteId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {baseData.sites?.map((site: any) => (
+                <option key={site.id} value={site.id}>{site.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* مخزن */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">مخزن</label>
+            <select
+              value={form.tankId || ''}
+              onChange={(e) => handleFormChange(type, 'tankId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {baseData.tanks?.map((tank: any) => (
+                <option key={tank.id} value={tank.id}>{tank.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* شرکت طرف حساب */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">شرکت طرف حساب</label>
+            <select
+              value={form.companyId || ''}
+              onChange={(e) => handleFormChange(type, 'companyId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {baseData.companies?.map((company: any) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* مشتری طرف حساب */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">مشتری طرف حساب</label>
+            <select
+              value={form.customerCompanyId || ''}
+              onChange={(e) => handleFormChange(type, 'customerCompanyId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {baseData['customer-companies']?.map((company: any) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* لوکیشن */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">لوکیشن</label>
+            <select
+              value={form.locationId || ''}
+              onChange={(e) => handleFormChange(type, 'locationId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {baseData.locations?.map((location: any) => (
+                <option key={location.id} value={location.id}>{location.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* راننده */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">راننده</label>
+            <select
+              value={form.driverId || ''}
+              onChange={(e) => handleFormChange(type, 'driverId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {baseData.drivers?.map((driver: any) => (
+                <option key={driver.id} value={driver.id}>{driver.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* قرارداد */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">قرارداد</label>
+            <select
+              value={form.contractId || ''}
+              onChange={(e) => handleFormChange(type, 'contractId', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">انتخاب کنید</option>
+              {contracts.map((contract: any) => (
+                <option key={contract.id} value={contract.id}>{contract.contractNumber}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* مقدار */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{quantityLabel} (کیلوگرم)</label>
+            <input
+              type="number"
+              min="1"
+              value={quantity || ''}
+              onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+        
+        <div className="mt-4">
+          <button
+            onClick={handleSubmit}
+            className={`px-4 py-2 rounded-lg text-white flex items-center gap-2 ${
+              type === 'deduction' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {icon}
+            {title}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEditModal = () => {
+    if (!editingId) return null;
+    
+    const adjustment = adjustments.find(adj => adj.id === editingId);
+    if (!adjustment) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold">ویرایش سند {adjustment.adjustmentType === 'deduction' ? 'کسری' : 'اضافه'} انبار</h3>
+            <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-700">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* تاریخ سند */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">تاریخ سند</label>
+              <input
+                type="date"
+                value={editForm.documentDate || ''}
+                onChange={(e) => setEditForm({...editForm, documentDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            {/* نوع محصول */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">نوع محصول</label>
+              <select
+                value={editForm.productType || ''}
+                onChange={(e) => setEditForm({...editForm, productType: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="owned">تملیکی</option>
+                <option value="consignment">امانی</option>
+              </select>
+            </div>
+            
+            {/* محصول */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">محصول</label>
+              <select
+                value={editForm.productId || ''}
+                onChange={(e) => setEditForm({...editForm, productId: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">انتخاب کنید</option>
+                {baseData[editForm.productType === 'owned' ? 'owned-products' : 'consignment-products']?.map((product: any) => (
+                  <option key={product.id} value={product.id}>{product.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* سایت */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">سایت</label>
+              <select
+                value={editForm.siteId || ''}
+                onChange={(e) => setEditForm({...editForm, siteId: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">انتخاب کنید</option>
+                {baseData.sites?.map((site: any) => (
+                  <option key={site.id} value={site.id}>{site.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* مخزن */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">مخزن</label>
+              <select
+                value={editForm.tankId || ''}
+                onChange={(e) => setEditForm({...editForm, tankId: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">انتخاب کنید</option>
+                {baseData.tanks?.map((tank: any) => (
+                  <option key={tank.id} value={tank.id}>{tank.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* شرکت طرف حساب */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">شرکت طرف حساب</label>
+              <select
+                value={editForm.companyId || ''}
+                onChange={(e) => setEditForm({...editForm, companyId: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">انتخاب کنید</option>
+                {baseData.companies?.map((company: any) => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* مقدار */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">مقدار (کیلوگرم)</label>
+              <input
+                type="number"
+                min="1"
+                value={editForm.quantity || ''}
+                onChange={(e) => setEditForm({...editForm, quantity: parseInt(e.target.value) || 0})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            {/* وضعیت */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">وضعیت</label>
+              <select
+                value={editForm.status || ''}
+                onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="temporary">موقت</option>
+                <option value="printed">چاپ شده</option>
+                <option value="attached">ضمیمه شده</option>
+                <option value="finalized">نهایی شده</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex gap-2">
+            <button
+              onClick={() => saveAdjustment(adjustment.adjustmentType, true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              ذخیره تغییرات
+            </button>
+            <button
+              onClick={() => setEditingId(null)}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              انصراف
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTransactionsReport = () => {
+    // فیلتر کردن تراکنش‌ها بر اساس فیلترهای تاریخ
+    let filteredAdjustments = [...adjustments];
+    
+    if (dateFilters.fromDate) {
+      filteredAdjustments = filteredAdjustments.filter(adj => {
+        const adjDate = new Date(adj.documentDate);
+        const fromDate = new Date(dateFilters.fromDate);
+        return adjDate >= fromDate;
+      });
+    }
+    
+    if (dateFilters.toDate) {
+      filteredAdjustments = filteredAdjustments.filter(adj => {
+        const adjDate = new Date(adj.documentDate);
+        const toDate = new Date(dateFilters.toDate);
+        return adjDate <= toDate;
+      });
+    }
+    
+    return (
+      <div className="mt-8 bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-gray-900">گزارش تراکنش‌ها</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                خروجی اکسل
+              </button>
+            </div>
+          </div>
+          
+          {/* فیلترهای تاریخ */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">از تاریخ</label>
+              <PersianDatePicker
+                value={dateFilters.fromDate ? new Date(dateFilters.fromDate) : null}
+                onChange={(date) => setDateFilters({...dateFilters, fromDate: date?.toISOString().split('T')[0]})}
+                placeholder="انتخاب تاریخ از"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">تا تاریخ</label>
+              <PersianDatePicker
+                value={dateFilters.toDate ? new Date(dateFilters.toDate) : null}
+                onChange={(date) => setDateFilters({...dateFilters, toDate: date?.toISOString().split('T')[0]})}
+                placeholder="انتخاب تاریخ تا"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* جدول تراکنش‌ها */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاریخ سند</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">محصول</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">سایت</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">مخزن</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">شرکت</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">مقدار (کیلوگرم)</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وضعیت</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">عملیات</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredAdjustments.map((adjustment, index) => (
+                <tr key={adjustment.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatPersianDate(adjustment.documentDate)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      adjustment.adjustmentType === 'deduction' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {adjustment.adjustmentType === 'deduction' ? 'کسری' : 'اضافه'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <Package className="h-4 w-4 text-gray-400 ml-2" />
+                      <span className="text-sm font-medium text-gray-900">{adjustment.productName}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <Warehouse className="h-4 w-4 text-gray-400 ml-2" />
+                      <span className="text-sm text-gray-900">{adjustment.siteName}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {adjustment.tankName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {adjustment.companyName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatPersianNumber(adjustment.quantity)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(adjustment.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEdit(adjustment)}
+                        className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                        title="ویرایش"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(adjustment.id)}
+                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                        title="حذف"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handlePrint(adjustment.id)}
+                        disabled={adjustment.status !== 'temporary'}
+                        className={`p-1 rounded transition-colors ${
+                          adjustment.status === 'temporary' 
+                            ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
+                            : 'text-gray-400 cursor-not-allowed'
+                        }`}
+                        title="پرینت"
+                      >
+                        <Printer className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleAttach(adjustment.id)}
+                        disabled={adjustment.status !== 'printed'}
+                        className={`p-1 rounded transition-colors ${
+                          adjustment.status === 'printed' 
+                            ? 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50' 
+                            : 'text-gray-400 cursor-not-allowed'
+                        }`}
+                        title="ضمیمه"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleFinalize(adjustment.id)}
+                        disabled={adjustment.status !== 'attached'}
+                        className={`p-1 rounded transition-colors ${
+                          adjustment.status === 'attached' 
+                            ? 'text-green-600 hover:text-green-800 hover:bg-green-50' 
+                            : 'text-gray-400 cursor-not-allowed'
+                        }`}
+                        title="نهایی سازی"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {filteredAdjustments.length === 0 && (
+          <div className="p-12 text-center">
+            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">تراکنشی یافت نشد</h3>
+            <p className="text-gray-600">
+              با فیلترهای انتخاب شده، هیچ تراکنشی یافت نشد.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderInventoryReport = () => {
+    console.log('Rendering inventory report with data:', inventoryReport);
+    
+    return (
+      <div className="mt-8 bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-gray-900">گزارش موجودی انبار</h3>
+            </div>
+            <div className="text-sm text-gray-600">
+              مجموع {inventoryReport.length} رکورد موجودی
+            </div>
+          </div>
+        </div>
+        
+        {/* جدول گزارش */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">محصول</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">سایت</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">مخزن</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">شرکت</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">مشتری</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">موجودی (کیلوگرم)</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">موجودی (تن)</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">آخرین به‌روزرسانی</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {inventoryReport.map((record, index) => (
+                <tr key={record.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <Package className="h-4 w-4 text-gray-400 ml-2" />
+                      <span className="text-sm font-medium text-gray-900">{record.productName}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      record.productType === 'owned' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {record.productType === 'owned' ? 'تملیکی' : 'امانی'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <Warehouse className="h-4 w-4 text-gray-400 ml-2" />
+                      <span className="text-sm text-gray-900">{record.siteName}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {record.tankName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {record.companyName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {record.customerCompanyName || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatPersianNumber(record.quantity)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatPersianNumber(record.quantity / 1000)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatPersianDate(record.lastUpdated)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {inventoryReport.length === 0 && (
+          <div className="p-12 text-center">
+            <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">موجودی یافت نشد</h3>
+            <p className="text-gray-600">
+              با فیلترهای انتخاب شده، هیچ موجودی یافت نشد.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">در حال بارگذاری داده‌ها...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <p className="text-red-600 font-medium">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            تلاش مجدد
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('Rendering component with state:', {
+    baseData: Object.keys(baseData),
+    contracts: contracts.length,
+    inventory: inventory.length,
+    adjustments: adjustments.length
+  });
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">کسر/اضافه انبار</h1>
+          <p className="text-gray-600">مدیریت موجودی انبار و ثبت اسناد کسر و اضافه</p>
+        </div>
+        
+        {/* تاریخ سند */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <Calendar className="h-5 w-5 text-blue-600" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">تاریخ سند</label>
+              <PersianDatePicker
+                value={documentDate}
+                onChange={(date) => setDocumentDate(date)}
+                placeholder="انتخاب تاریخ سند"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* فرم‌های کسر و اضافه انبار */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {renderFormSection('deduction')}
+          {renderFormSection('addition')}
+        </div>
+        
+        {/* پیام پرینت */}
+        {showPrintMessage && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <h3 className="font-semibold text-yellow-800">پیام سیستم</h3>
+            </div>
+            <p className="text-yellow-700">
+              لطفا پرینت تایید شده سند کسر یا اضافه انبار را ضمیمه فرمایید
+            </p>
+            <div className="mt-2">
+              <button
+                onClick={() => setShowPrintMessage(null)}
+                className="px-3 py-1 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+              >
+                متوجه شدم
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* گزارش تراکنش‌ها */}
+        {renderTransactionsReport()}
+        
+        {/* گزارش موجودی */}
+        {renderInventoryReport()}
+        
+        {/* مودال ویرایش */}
+        {renderEditModal()}
+      </div>
+    </div>
+  );
+};  
