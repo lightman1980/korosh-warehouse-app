@@ -252,22 +252,22 @@ export const ServerSettings: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 p-4">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="flex items-center">
             <Server className="h-8 w-8 mr-3 text-blue-500" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">تنظیمات سرور</h1>
-              <p className="text-gray-600">پیکربندی کامل سرور برای سیستم TankSystem</p>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">تنظیمات سرور</h1>
+              <p className="text-sm md:text-base text-gray-600">پیکربندی کامل سرور برای سیستم TankSystem</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {/* نشانگر وضعیت سیستم */}
             {systemInfo && (
-              <div className="text-sm text-gray-500">
+              <div className="text-xs md:text-sm text-gray-500 hidden lg:block">
                 <div>سیستم: {systemInfo.platform} {systemInfo.architecture || systemInfo.arch}</div>
                 <div>
                   RAM:&nbsp;
@@ -282,57 +282,57 @@ export const ServerSettings: React.FC = () => {
             {/* دکمه‌های عملیات */}
             <button
               onClick={validateSystem}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+              className="px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
             >
               <CheckCircle className="h-4 w-4" />
-              بررسی سیستم
+              <span className="hidden sm:inline">بررسی سیستم</span>
             </button>
             
             <button
               onClick={testSecurityConfiguration}
               disabled={securityTestRunning}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${
                 securityTestRunning 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-red-600 hover:bg-red-700'
               } text-white`}
             >
               <Shield className="h-4 w-4" />
-              {securityTestRunning ? 'در حال بررسی امنیت...' : 'بررسی امنیت'}
+              <span className="hidden sm:inline">{securityTestRunning ? 'بررسی...' : 'امنیت'}</span>
             </button>
 
             <button
               onClick={runPerformanceBenchmark}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
             >
               <Zap className="h-4 w-4" />
-              آزمون عملکرد
+              <span className="hidden sm:inline">عملکرد</span>
             </button>
             
             <button
               onClick={handleNetworkDiscovery}
               disabled={isDiscovering}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${
                 isDiscovering 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-indigo-600 hover:bg-indigo-700'
               } text-white`}
             >
               <Wifi className="h-4 w-4" />
-              {isDiscovering ? 'در حال جستجو...' : 'جستجوی خودکار'}
+              <span className="hidden sm:inline">{isDiscovering ? 'جستجو...' : 'خودکار'}</span>
             </button>
             
             <button
               onClick={handleConnectionTest}
               disabled={connectionTestRunning}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${
                 connectionTestRunning 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-green-600 hover:bg-green-700'
               } text-white`}
             >
               <TestTube className="h-4 w-4" />
-              {connectionTestRunning ? 'در حال تست...' : 'تست اتصال'}
+              <span className="hidden sm:inline">{connectionTestRunning ? 'تست...' : 'اتصال'}</span>
               {testResults.connection !== undefined && (
                 <span className={`ml-1 ${testResults.connection ? 'text-green-200' : 'text-red-200'}`}>
                   {testResults.connection ? '✓' : '✗'}
@@ -343,7 +343,7 @@ export const ServerSettings: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={saveStatus === 'saving' || isLoading}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-2 ${
                 saveStatus === 'success' 
                   ? 'bg-green-600 hover:bg-green-700' 
                   : saveStatus === 'error'
@@ -352,16 +352,16 @@ export const ServerSettings: React.FC = () => {
               } text-white`}
             >
               <Save className="h-4 w-4" />
-              {saveStatus === 'saving' ? 'در حال ذخیره...' : 'ذخیره'}
+              <span className="hidden sm:inline">{saveStatus === 'saving' ? 'ذخیره...' : 'ذخیره'}</span>
               {saveStatus === 'success' && <CheckCircle className="h-4 w-4" />}
             </button>
             
             <button
               onClick={handleReset}
-              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
+              className="px-3 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
-              بازنشانی
+              <span className="hidden sm:inline">بازنشانی</span>
             </button>
           </div>
         </div>
@@ -681,62 +681,62 @@ export const ServerSettings: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">آدرس سرور</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={settings.server.serverAddress || settings.server.hostname || ''}
-                    onChange={(e) => updateSettings({
-                      server: {
-                        ...settings.server,
-                        serverAddress: e.target.value,
-                        hostname: e.target.value
-                      }
-                    })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="localhost یا IP آدرس"
-                  />
-                  <button
-                    onClick={handleNetworkDiscovery}
-                    disabled={isDiscovering}
-                    className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-1 text-sm"
-                    title="جستجوی خودکار آدرس سرور"
-                  >
-                    <Wifi className="h-4 w-4" />
-                  </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">آدرس سرور</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.server.serverAddress || settings.server.hostname || ''}
+                      onChange={(e) => updateSettings({
+                        server: {
+                          ...settings.server,
+                          serverAddress: e.target.value,
+                          hostname: e.target.value
+                        }
+                      })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                      placeholder="localhost یا IP آدرس"
+                    />
+                    <button
+                      onClick={handleNetworkDiscovery}
+                      disabled={isDiscovering}
+                      className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-1 text-sm flex-shrink-0"
+                      title="جستجوی خودکار آدرس سرور"
+                    >
+                      <Wifi className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    برای شبکه داخلی: IP آدرس سرور (مثال: 192.168.1.100)
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  برای شبکه داخلی: IP آدرس سرور (مثال: 192.168.1.100)
-                </p>
+                
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">پورت</label>
+                  <input
+                    type="number"
+                    value={settings.server.serverPort || settings.server.port || 3000}
+                    onChange={(e) => {
+                      const port = parseInt(e.target.value) || 3000;
+                      updateSettings({
+                        server: {
+                          ...settings.server,
+                          serverPort: port,
+                          port: port
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                    placeholder="3000"
+                    min="1"
+                    max="65535"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    پورت پیش‌فرض: 3000 (HTTP) یا 443 (HTTPS)
+                  </p>
+                </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">پورت</label>
-                <input
-                  type="number"
-                  value={settings.server.serverPort || settings.server.port || 3000}
-                  onChange={(e) => {
-                    const port = parseInt(e.target.value) || 3000;
-                    updateSettings({
-                      server: {
-                        ...settings.server,
-                        serverPort: port,
-                        port: port
-                      }
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="3000"
-                  min="1"
-                  max="65535"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  پورت پیش‌فرض: 3000 (HTTP) یا 443 (HTTPS)
-                </p>
-              </div>
-            </div>
             
             {/* نمایش تنظیمات API فعلی */}
             <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
@@ -803,23 +803,23 @@ export const ServerSettings: React.FC = () => {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">حداکثر اتصالات همزمان</label>
-              <input
-                type="number"
-                value={settings.server.maxConnections}
-                onChange={(e) => updateSettings({
-                  server: {
-                    ...settings.server,
-                    maxConnections: parseInt(e.target.value) || 100
-                  }
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="100"
-                min="1"
-                max="10000"
-              />
-            </div>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-700 mb-2">حداکثر اتصالات همزمان</label>
+                <input
+                  type="number"
+                  value={settings.server.maxConnections}
+                  onChange={(e) => updateSettings({
+                    server: {
+                      ...settings.server,
+                      maxConnections: parseInt(e.target.value) || 100
+                    }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+                  placeholder="100"
+                  min="1"
+                  max="10000"
+                />
+              </div>
 
             <div className="flex items-center">
               <input

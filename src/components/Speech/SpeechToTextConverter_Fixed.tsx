@@ -137,8 +137,8 @@ const detectLanguageAdvanced = (text: string): string => {
   const persianChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
   const englishChars = (text.match(/[a-zA-Z]/g) || []).length;
   
-  const persianWords = ['از', 'به', 'در', 'با', 'برای', 'که', 'این', 'آن', 'را', 'است', 'بود', 'شد'];
-  const englishWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'was', 'are', 'were'];
+  const persianWords = ['از', 'به', 'در', 'با', 'برای', 'که', 'این', 'آن', 'را', 'است', 'بود', 'شد', 'می', 'خواهد', 'شود', 'داشت', 'کرد', 'گفت'];
+  const englishWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'was', 'are', 'were', 'have', 'has', 'had', 'will', 'would'];
   
   const persianWordCount = persianWords.reduce((count, word) => {
     return count + (text.toLowerCase().includes(word) ? 1 : 0);
@@ -149,21 +149,36 @@ const detectLanguageAdvanced = (text: string): string => {
   }, 0);
   
   // Mixed content detection
-  if (persianChars > 0 && englishChars > 0) {
+  if (persianChars > 5 && englishChars > 5) {
+    if (persianChars > englishChars * 1.5) {
+      return 'fa-IR';
+    } else if (englishChars > persianChars * 1.5) {
+      return 'en-US';
+    }
     return 'mixed';
   }
   
+  // Clear Persian dominance
   if (persianChars > englishChars) {
     return 'fa-IR';
-  } else if (englishChars > persianChars) {
-    return 'en-US';
-  } else if (persianWordCount > englishWordCount) {
-    return 'fa-IR';
-  } else if (englishWordCount > persianWordCount) {
+  }
+  
+  // Clear English dominance
+  if (englishChars > persianChars) {
     return 'en-US';
   }
   
-  return 'fa-IR';
+  // Check word patterns if character counts are equal
+  if (persianWordCount > englishWordCount) {
+    return 'fa-IR';
+  }
+  
+  if (englishWordCount > persianWordCount) {
+    return 'en-US';
+  }
+  
+  // Default to English for empty or unclear text
+  return 'en-US';
 };
 
 // Language configuration
