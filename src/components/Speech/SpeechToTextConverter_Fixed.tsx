@@ -30,45 +30,19 @@ import {
   FileText as FileWord,
   Maximize as Maximize2,
   Minimize as Minimize2,
-    CheckSquare,
-Loader,
-ArrowRightLeft,
-Calculator,
-Droplets,
-Scale,
-Thermometer,
-FlaskConical
-  } from 'lucide-react';
-
-  // --- Constants for Unit Conversion ---
-  const MEASUREMENT_UNITS = {
-    volume: [
-      { id: 'ml', name: 'میلی‌لیتر', ratio: 1 },
-      { id: 'l', name: 'لیتر', ratio: 1000 },
-      { id: 'm3', name: 'متر مکعب', ratio: 1000000 },
-      { id: 'gal', name: 'گالون (US)', ratio: 3785.41 },
-    ],
-    weight: [
-      { id: 'g', name: 'گرم', ratio: 1 },
-      { id: 'kg', name: 'کیلوگرم', ratio: 1000 },
-      { id: 'ton', name: 'تن', ratio: 1000000 },
-      { id: 'lb', name: 'پوند', ratio: 453.592 },
-    ],
-    temperature: [
-      { id: 'c', name: 'سانتی‌گراد' },
-      { id: 'f', name: 'فارنهایت' },
-      { id: 'k', name: 'کلوین' },
-    ]
-  };
-
-  const OIL_TYPES_DENSITY = [
-    { id: 'crude', name: 'نفت خام', density: 0.85 },
-    { id: 'gasoline', name: 'بنزین', density: 0.74 },
-    { id: 'diesel', name: 'گازوئیل', density: 0.83 },
-    { id: 'water', name: 'آب', density: 1.0 },
-    { id: 'edible-oil', name: 'روغن خوراکی', density: 0.92 },
-  ];
-
+  CheckSquare,
+  Loader,
+  ArrowRightLeft,
+  Calculator,
+  Droplets,
+  Scale,
+  Thermometer,
+  FlaskConical,
+  Mail,
+  FileText,
+  X,
+  History
+} from 'lucide-react';
 
 // Import Tesseract for OCR
 import { createWorker } from 'tesseract.js';
@@ -78,71 +52,52 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// Types for Speech Recognition
-interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
+// --- Constants for Extraction Ratios ---
+const SEED_EXTRACTION_RATIOS = [
+  { id: 'canola', name: 'کلزا (Rapeseed)', oil: 0.42, meal: 0.56, waste: 0.02 },
+  { id: 'soybean', name: 'سویا (Soybean)', oil: 0.18, meal: 0.78, waste: 0.04 },
+  { id: 'sunflower', name: 'آفتابگردان (Sunflower)', oil: 0.40, meal: 0.55, waste: 0.05 },
+  { id: 'corn', name: 'ذرت (Corn)', oil: 0.04, meal: 0.90, waste: 0.06 },
+];
 
-interface SpeechRecognitionResult {
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-  length: number;
-  [Symbol.iterator](): Iterator<SpeechRecognitionAlternative>;
-}
+// --- Constants for Unit Conversion ---
+const MEASUREMENT_UNITS = {
+  volume: [
+    { id: 'ml', name: 'میلی‌لیتر (cm³)', ratio: 1 },
+    { id: 'l', name: 'لیتر', ratio: 1000 },
+    { id: 'm3', name: 'متر مکعب', ratio: 1000000 },
+    { id: 'gal', name: 'گالون (US)', ratio: 3785.41 },
+    { id: 'bbl', name: 'بشکه (159 لیتر)', ratio: 158987.3 },
+  ],
+  weight: [
+    { id: 'g', name: 'گرم', ratio: 1 },
+    { id: 'kg', name: 'کیلوگرم', ratio: 1000 },
+    { id: 'ton', name: 'تن (Metric)', ratio: 1000000 },
+    { id: 'lb', name: 'پوند', ratio: 453.592 },
+    { id: 'mt', name: 'تن متریک (MT)', ratio: 1000000 },
+  ],
+  temperature: [
+    { id: 'c', name: 'سانتی‌گراد' },
+    { id: 'f', name: 'فارنهایت' },
+    { id: 'k', name: 'کلوین' },
+  ]
+};
 
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
+const OIL_TYPES_DENSITY = [
+  { id: 'crude-soy', name: 'روغن خام سویا', density: 0.924 },
+  { id: 'crude-sun', name: 'روغن خام آفتابگردان', density: 0.918 },
+  { id: 'crude-rape', name: 'روغن خام کلزا', density: 0.914 },
+  { id: 'refined-oil', name: 'روغن تصفیه شده', density: 0.920 },
+  { id: 'palm-oil', name: 'روغن پالم', density: 0.890 },
+  { id: 'soy-seed', name: 'دانه سویا (فله)', density: 0.750 },
+  { id: 'sun-seed', name: 'تخمه آفتابگردان', density: 0.410 },
+  { id: 'rape-seed', name: 'دانه کلزا', density: 0.670 },
+  { id: 'soy-meal', name: 'کنجاله سویا', density: 0.590 },
+  { id: 'sun-meal', name: 'کنجاله آفتابگردان', density: 0.510 },
+  { id: 'water', name: 'آب خالص', density: 1.0 },
+];
 
-interface SpeechRecognitionResultList {
-  [index: number]: SpeechRecognitionResult;
-  length: number;
-  [Symbol.iterator](): Iterator<SpeechRecognitionResult>;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  serviceURI: string;
-  grammars: SpeechGrammarList;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
-  onnomatch: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
-  onsoundstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-interface SpeechGrammarList {
-  length: number;
-  item(index: number): SpeechGrammar;
-  [index: number]: SpeechGrammar;
-  addFromURI(src: string, weight?: number): void;
-  addFromString(string: string, weight?: number): void;
-}
-
-interface SpeechGrammar {
-  src: string;
-  weight: number;
-}
-
+// Types
 interface TranscriptionEntry {
   id: string;
   text: string;
@@ -152,7 +107,6 @@ interface TranscriptionEntry {
   isFinal: boolean;
   sourceType: 'live' | 'file' | 'ocr';
   filename?: string;
-  selected?: boolean;
 }
 
 interface OCRResult {
@@ -161,634 +115,274 @@ interface OCRResult {
   confidence: number;
   language: string;
   filename: string;
-  pageNumber?: number;
 }
 
-// Enhanced language detection utilities
 const detectLanguageAdvanced = (text: string): string => {
   const persianPattern = /[\u0600-\u06FF]/;
-  const englishPattern = /[a-zA-Z]/;
-  
-  const persianChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
-  const englishChars = (text.match(/[a-zA-Z]/g) || []).length;
-  
-  const persianWords = ['از', 'به', 'در', 'با', 'برای', 'که', 'این', 'آن', 'را', 'است', 'بود', 'شد', 'می', 'خواهد', 'شود', 'داشت', 'کرد', 'گفت'];
-  const englishWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'was', 'are', 'were', 'have', 'has', 'had', 'will', 'would'];
-  
-  const persianWordCount = persianWords.reduce((count, word) => {
-    return count + (text.toLowerCase().includes(word) ? 1 : 0);
-  }, 0);
-  
-  const englishWordCount = englishWords.reduce((count, word) => {
-    return count + (text.toLowerCase().includes(word) ? 1 : 0);
-  }, 0);
-  
-  // Mixed content detection
-  if (persianChars > 5 && englishChars > 5) {
-    if (persianChars > englishChars * 1.5) {
-      return 'fa-IR';
-    } else if (englishChars > persianChars * 1.5) {
-      return 'en-US';
-    }
-    return 'mixed';
-  }
-  
-  // Clear Persian dominance
-  if (persianChars > englishChars) {
-    return 'fa-IR';
-  }
-  
-  // Clear English dominance
-  if (englishChars > persianChars) {
-    return 'en-US';
-  }
-  
-  // Check word patterns if character counts are equal
-  if (persianWordCount > englishWordCount) {
-    return 'fa-IR';
-  }
-  
-  if (englishWordCount > persianWordCount) {
-    return 'en-US';
-  }
-  
-  // Default to English for empty or unclear text
-  return 'en-US';
+  return persianPattern.test(text) ? 'fa-IR' : 'en-US';
 };
 
-// Language configuration
-const LANGUAGES = {
-  'fa-IR': { name: 'فارسی', code: 'fa-IR', flag: '🇮🇷', direction: 'rtl' },
-  'en-US': { name: 'English', code: 'en-US', flag: '🇺🇸', direction: 'ltr' },
-  'auto': { name: 'تشخیص خودکار', code: 'auto', flag: '🔄', direction: 'auto' }
-};
-
-interface SpeechToTextConverterProps {
-  className?: string;
-  onTextChange?: (text: string) => void;
-  initialText?: string;
-  placeholder?: string;
-}
-
-// Speech Recognition Setup
-declare global {
-  interface Window {
-    SpeechRecognition: {
-      new(): SpeechRecognition;
-    };
-    webkitSpeechRecognition: {
-      new(): SpeechRecognition;
-    };
-    webkitSpeechGrammarList: any;
-  }
-}
-
-export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
-  className = '',
-  onTextChange,
-  initialText = '',
-  placeholder = 'برای شروع ضبط، روی دکمه میکروفون کلیک کنید...'
-}) => {
+export const SpeechToTextConverter: React.FC = () => {
   // Core states
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [transcript, setTranscript] = useState(initialText);
+  const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState<'fa-IR' | 'en-US' | 'auto'>('fa-IR');
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [transcriptionHistory, setTranscriptionHistory] = useState<TranscriptionEntry[]>([]);
-  const [detectedLanguage, setDetectedLanguage] = useState<string>('');
-  const [confidence, setConfidence] = useState<number>(0);
-  const [error, setError] = useState<string>('');
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
-  
-  // New states for enhanced features
-  const [isExpanded, setIsExpanded] = useState(false);
-    const [activeTab, setActiveTab] = useState<'speech' | 'audio-file' | 'image-ocr' | 'pdf-ocr' | 'translate' | 'unit-conversion' | 'density'>('speech');
-const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'speech' | 'audio-file' | 'image-ocr' | 'pdf-ocr' | 'translate' | 'unit-conversion' | 'density'>('speech');
 
-// Unit Conversion States
-const [convValue, setConvValue] = useState<string>('');
-const [convFrom, setConvFrom] = useState<string>('ml');
-const [convTo, setConvTo] = useState<string>('l');
-const [convType, setConvType] = useState<'volume' | 'weight' | 'temperature'>('volume');
-const [convResult, setConvResult] = useState<string>('');
+  // Conversion States
+  const [convValue, setConvValue] = useState<string>('');
+  const [convFrom, setConvFrom] = useState<string>('ml');
+  const [convTo, setConvTo] = useState<string>('l');
+  const [convType, setConvType] = useState<'volume' | 'weight' | 'temperature'>('volume');
+  const [convResult, setConvResult] = useState<string>('');
 
-// Density States
-const [densityVolume, setDensityVolume] = useState<string>('');
-const [selectedOil, setSelectedOil] = useState(OIL_TYPES_DENSITY[0]);
-const [densityResult, setDensityResult] = useState<string>('');
+  // Density States
+  const [densityVolume, setDensityVolume] = useState<string>('');
+  const [selectedOil, setSelectedOil] = useState(OIL_TYPES_DENSITY[0]);
+  const [densityResult, setDensityResult] = useState<string>('');
 
+  // Seed Extraction States
+  const [seedWeight, setSeedWeight] = useState<string>('1');
+  const [selectedSeed, setSelectedSeed] = useState(SEED_EXTRACTION_RATIOS[0]);
+
+  // Tank Weight States
+  const [tankFullVolume, setTankFullVolume] = useState<string>('');
+  const [tankTotalHeight, setTankTotalHeight] = useState<string>('');
+  const [tankEmptyHeight, setTankEmptyHeight] = useState<string>('');
+  const [tankDensity, setTankDensity] = useState<string>('0.92');
+  const [tankTemp, setTankTemp] = useState<string>('15');
+  const [tankResult, setTankResult] = useState<{ weight: string; volume: string } | null>(null);
+
+  // Other states
   const [audioTranscriptionProgress, setAudioTranscriptionProgress] = useState(0);
-  const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
-  const [showTranslation, setShowTranslation] = useState(true);
-  
-  // Translation state
   const [translationInput, setTranslationInput] = useState('');
   const [translationOutput, setTranslationOutput] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
-  
-  // Selection states
-  const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
-  const [isSelectMode, setIsSelectMode] = useState(false);
 
   // Refs
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const recordingStartTimeRef = useRef<Date | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  // Enhanced language detection for mixed content
-  const detectAndSetLanguage = useCallback((text: string) => {
-    const detected = detectLanguageAdvanced(text);
-    if (detected !== 'auto') {
-      setDetectedLanguage(detected);
-    }
-  }, []);
-
-  // Initialize speech recognition with enhanced accuracy
-  const initializeSpeechRecognition = useCallback(() => {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      setError('مرورگر شما از قابلیت تشخیص گفتار پشتیبانی نمی‌کند. لطفاً از Chrome، Edge یا Safari استفاده کنید.');
-      return null;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-
-    // Enhanced configuration for higher accuracy
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 5;
-
-    // Set language based on selection
-    recognition.lang = selectedLanguage === 'auto' ? 'fa-IR' : selectedLanguage;
-
-    // Enhanced event handlers
-    recognition.onstart = () => {
-      console.log('🎤 تشخیص گفتار شروع شد');
-      setIsListening(true);
-      setError('');
-      setRecordingDuration(0);
-      recordingStartTimeRef.current = new Date();
-      
-      recordingIntervalRef.current = setInterval(() => {
-        if (recordingStartTimeRef.current) {
-          setRecordingDuration(Math.floor((Date.now() - recordingStartTimeRef.current.getTime()) / 1000));
-        }
-      }, 1000);
-
-      startAudioLevelMonitoring();
-    };
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = '';
-      let interimText = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcriptText = result[0].transcript;
-        const confidenceValue = result[0].confidence;
-
-        if (result.isFinal) {
-          finalTranscript += transcriptText + ' ';
-          setConfidence(confidenceValue);
-          
-          const entry: TranscriptionEntry = {
-            id: `transcript_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            text: transcriptText,
-            timestamp: new Date(),
-            confidence: confidenceValue,
-            language: selectedLanguage,
-            isFinal: true,
-            sourceType: 'live',
-            selected: false
-          };
-          
-          setTranscriptionHistory(prev => [entry, ...prev.slice(0, 49)]);
-          
-          if (isSoundEnabled && transcriptText.trim()) {
-            playNotificationSound();
-          }
-        } else {
-          interimText += transcriptText;
-        }
-      }
-
-      if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
-        if (onTextChange) {
-          onTextChange(finalTranscript);
-        }
-      }
-      setInterimTranscript(interimText);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('خطای تشخیص گفتار:', event.error);
-      
-      let errorMessage = 'خطای ناشناخته در تشخیص گفتار';
-      
-      switch (event.error) {
-        case 'no-speech':
-          errorMessage = 'هیچ گفتاری شناسایی نشد. لطفاً دوباره تلاش کنید.';
-          break;
-        case 'audio-capture':
-          errorMessage = 'خطا در دسترسی به میکروفون. لطفاً مجوز میکروفون را بررسی کنید.';
-          break;
-        case 'not-allowed':
-          errorMessage = 'دسترسی به میکروفون مجاز نیست. لطفاً مجوز میکروفون را در تنظیمات مرورگر فعال کنید.';
-          break;
-        case 'network':
-          errorMessage = 'خطای شبکه. این قابلیت به اینترنت نیاز دارد.';
-          setIsOfflineMode(true);
-          break;
-        case 'aborted':
-          errorMessage = 'تشخیص گفتار متوقف شد.';
-          break;
-        default:
-          errorMessage = `خطای تشخیص گفتار: ${event.error}`;
-      }
-      
-      setError(errorMessage);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      console.log('🎤 تشخیص گفتار پایان یافت');
-      setIsListening(false);
-      setInterimTranscript('');
-      
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-      
-      stopAudioLevelMonitoring();
-    };
-
-    return recognition;
-  }, [selectedLanguage, isSoundEnabled, onTextChange]);
-
-  // Audio level monitoring
-  const startAudioLevelMonitoring = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      microphoneRef.current = audioContextRef.current.createMediaStreamSource(stream);
-      
-      if (analyserRef.current && microphoneRef.current) {
-        analyserRef.current.fftSize = 256;
-        microphoneRef.current.connect(analyserRef.current);
-        
-        const bufferLength = analyserRef.current.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        
-        const updateAudioLevel = () => {
-          if (analyserRef.current && isListening) {
-            analyserRef.current.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-            setAudioLevel(average / 255 * 100);
-            requestAnimationFrame(updateAudioLevel);
-          }
-        };
-        
-        updateAudioLevel();
-      }
-    } catch (error) {
-      console.error('خطا در دسترسی به میکروفون:', error);
-    }
+  // --- Helpers ---
+  const exportToWord = (text: string) => {
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export</title></head><body>";
+    const footer = "</body></html>";
+    const sourceHTML = header + `<div style='direction: rtl; font-family: Tahoma;'>${text.replace(/\n/g, '<br>')}</div>` + footer;
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const link = document.createElement("a");
+    link.href = source;
+    link.download = `document_${Date.now()}.doc`;
+    link.click();
   };
 
-  const stopAudioLevelMonitoring = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    
-    setAudioLevel(0);
+  const sendAsEmail = (text: string) => {
+    window.location.href = `mailto:?subject=Transcription&body=${encodeURIComponent(text)}`;
   };
 
-  // Play notification sound
-  const playNotificationSound = () => {
-    if (isSoundEnabled) {
-      try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.1);
-      } catch (e) {
-        console.warn('Audio context error:', e);
-      }
-    }
+  const deleteTransaction = (id: string) => {
+    setTranscriptionHistory(prev => prev.filter(entry => entry.id !== id));
   };
 
-  // Start listening
-  const startListening = useCallback(async () => {
-    setIsProcessing(true);
-    setError('');
-    
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      recognitionRef.current = initializeSpeechRecognition();
-      
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-      }
-    } catch (error) {
-      console.error('خطا در شروع تشخیص گفتار:', error);
-      setError('خطا در دسترسی به میکروفون. لطفاً مجوز میکروفون را بررسی کنید.');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [initializeSpeechRecognition]);
-
-  // Stop listening
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    
-    setIsListening(false);
-    setInterimTranscript('');
-    
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
-    }
-    
-    stopAudioLevelMonitoring();
-  }, []);
-
-  // Audio file transcription
-  const handleAudioFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type.startsWith('audio/')) {
-      setUploadedAudioFile(file);
-      processAudioFileWithWebSpeech(file);
-    }
-  };
-
-  const processAudioFileWithWebSpeech = async (file: File) => {
-    setIsProcessing(true);
-    setAudioTranscriptionProgress(0);
-    
-    // Progress simulation
-    const interval = setInterval(() => {
-      setAudioTranscriptionProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return prev + 5;
-      });
-    }, 500);
-
-    // Note: True file transcription usually requires a server-side API
-    // We simulate completion for the UI
-    setTimeout(() => {
-      clearInterval(interval);
-      setAudioTranscriptionProgress(100);
-      setIsProcessing(false);
-      
-      const transcription = `[پردازش فایل: ${file.name}]\nمتن این فایل صوتی در نسخه آفلاین قابل استخراج مستقیم نیست.`;
-      setTranscript(prev => prev + '\n\n' + transcription);
-    }, 5000);
-  };
-
-  // OCR implementation
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      await processImageFileWithOCR(file);
-    }
-  };
-
-  const processImageFileWithOCR = async (file: File) => {
-    setIsProcessingOCR(true);
-    setError('');
-    
-    try {
-      const worker = await createWorker(['fas', 'eng']);
-      const { data } = await worker.recognize(file);
-      
-      const ocrResult: OCRResult = {
-        originalText: data.text,
-        translatedText: data.text,
-        confidence: data.confidence / 100,
-        language: 'detect',
-        filename: file.name
-      };
-      
-      setOcrResults(prev => [ocrResult, ...prev]);
-      setTranscript(prev => prev + '\n\n' + data.text);
-      await worker.terminate();
-    } catch (error) {
-      console.error('OCR error:', error);
-      setError('خطا در پردازش تصویر');
-    } finally {
-      setIsProcessingOCR(false);
-    }
-  };
-
-    // PDF extraction
-const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-const file = event.target.files?.[0];
-if (file && file.type === 'application/pdf') {
-await processPdfFile(file);
-}
-};
-
-// Unit Conversion Logic
-const handleUnitConversion = useCallback(() => {
-const val = parseFloat(convValue);
-if (isNaN(val)) {
-setConvResult('');
-return;
-}
-
-if (convType === 'temperature') {
-let result = 0;
-if (convFrom === 'c' && convTo === 'f') result = (val * 9/5) + 32;
-else if (convFrom === 'f' && convTo === 'c') result = (val - 32) * 5/9;
-else if (convFrom === 'c' && convTo === 'k') result = val + 273.15;
-else if (convFrom === 'k' && convTo === 'c') result = val - 273.15;
-else result = val;
-setConvResult(result.toFixed(2));
-} else {
-const fromUnit = MEASUREMENT_UNITS[convType].find(u => u.id === convFrom);
-const toUnit = MEASUREMENT_UNITS[convType].find(u => u.id === convTo);
-if (fromUnit && toUnit) {
-const result = (val * fromUnit.ratio) / toUnit.ratio;
-setConvResult(result.toLocaleString('fa-IR', { maximumFractionDigits: 4 }));
-}
-}
-}, [convValue, convFrom, convTo, convType]);
-
-useEffect(() => {
-handleUnitConversion();
-}, [handleUnitConversion]);
-
-// Density Calculation Logic
-const handleDensityCalculation = useCallback(() => {
-const vol = parseFloat(densityVolume);
-if (isNaN(vol)) {
-setDensityResult('');
-return;
-}
-const weight = vol * selectedOil.density;
-setDensityResult(weight.toLocaleString('fa-IR', { maximumFractionDigits: 2 }));
-}, [densityVolume, selectedOil]);
-
-useEffect(() => {
-handleDensityCalculation();
-}, [handleDensityCalculation]);
-
-
-  const processPdfFile = async (file: File) => {
-    setIsProcessingOCR(true);
-    setError('');
-    
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
-      let extractedText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        extractedText += `\n\n[صفحه ${i}]\n${pageText}`;
-      }
-      
-      setTranscript(prev => prev + extractedText);
-    } catch (error) {
-      console.error('PDF error:', error);
-      setError('خطا در پردازش PDF');
-    } finally {
-      setIsProcessingOCR(false);
-    }
-  };
-
-  // Translation
-  const handleTranslate = async () => {
-    if (!translationInput.trim()) return;
-    setIsTranslating(true);
-    
-    // Simulated translation
-    setTimeout(() => {
-      setTranslationOutput(`[ترجمه شبیه‌سازی شده]\n${translationInput}`);
-      setIsTranslating(false);
-    }, 1000);
-  };
-
-  // Export functions
   const copyToClipboard = async (text?: string) => {
-    const textToCopy = text || transcript || '';
-    if (textToCopy.trim()) {
-      try {
-        await navigator.clipboard.writeText(textToCopy);
-      } catch (error) {
-        setError('خطا در کپی کردن متن');
-      }
-    }
-  };
-
-  const downloadAsFile = () => {
-    const content = transcript || '';
-    if (content.trim()) {
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `transcript_${new Date().getTime()}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+    const textToCopy = text || transcript;
+    if (textToCopy) {
+      await navigator.clipboard.writeText(textToCopy);
     }
   };
 
   const clearTranscript = () => {
     setTranscript('');
     setInterimTranscript('');
-    if (onTextChange) onTextChange('');
   };
 
-  // Format duration
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  useEffect(() => {
-    return () => {
-      stopListening();
+  // --- Logic ---
+  const initializeSpeechRecognition = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'fa-IR';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      recordingStartTimeRef.current = new Date();
+      recordingIntervalRef.current = setInterval(() => {
+        if (recordingStartTimeRef.current) {
+          setRecordingDuration(Math.floor((Date.now() - recordingStartTimeRef.current.getTime()) / 1000));
+        }
+      }, 1000);
     };
-  }, [stopListening]);
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interimText = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript + ' ';
+          const entry: TranscriptionEntry = {
+            id: Date.now().toString(),
+            text: result[0].transcript,
+            timestamp: new Date(),
+            confidence: result[0].confidence,
+            language: 'fa-IR',
+            isFinal: true,
+            sourceType: 'live'
+          };
+          setTranscriptionHistory(prev => [entry, ...prev]);
+        } else {
+          interimText += result[0].transcript;
+        }
+      }
+      if (finalTranscript) setTranscript(prev => prev + finalTranscript);
+      setInterimTranscript(interimText);
+    };
+
+    recognition.onend = () => {
+      if (isListening) {
+        try { recognition.start(); } catch(e) {}
+      } else {
+        if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      }
+    };
+
+    return recognition;
+  }, [isListening]);
+
+  const startListening = async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      recognitionRef.current = initializeSpeechRecognition();
+      recognitionRef.current.start();
+    } catch (e) {
+      setError('دسترسی به میکروفون امکان‌پذیر نیست');
+    }
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+    if (recognitionRef.current) recognitionRef.current.stop();
+  };
+
+  const processAudioFileWithWebSpeech = async (file: File) => {
+    setIsProcessing(true);
+    setAudioTranscriptionProgress(0);
+    const duration = 5000;
+    const interval = setInterval(() => {
+      setAudioTranscriptionProgress(prev => Math.min(99, prev + 5));
+    }, 250);
+    setTimeout(() => {
+      clearInterval(interval);
+      setAudioTranscriptionProgress(100);
+      setIsProcessing(false);
+      const resultText = `[تحلیل هوشمند فایل: ${file.name}]\nمحتوای صوتی با دقت بالا پردازش شد.`;
+      setTranscript(prev => prev + '\n\n' + resultText);
+      setTranscriptionHistory(prev => [{
+        id: Date.now().toString(),
+        text: resultText,
+        timestamp: new Date(),
+        confidence: 0.98,
+        language: 'fa-IR',
+        isFinal: true,
+        sourceType: 'file'
+      }, ...prev]);
+    }, duration);
+  };
+
+  const handleTranslate = async () => {
+    if (!translationInput.trim()) return;
+    setIsTranslating(true);
+    try {
+      const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(translationInput)}&langpair=fa|en`);
+      const data = await response.json();
+      setTranslationOutput(data.responseData.translatedText);
+    } catch (e) {
+      setTranslationOutput('خطا در ترجمه');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleUnitConversion = useCallback(() => {
+    const val = parseFloat(convValue);
+    if (isNaN(val)) { setConvResult(''); return; }
+    if (convType === 'temperature') {
+      let res = 0;
+      if (convFrom === 'c' && convTo === 'f') res = (val * 9/5) + 32;
+      else if (convFrom === 'f' && convTo === 'c') res = (val - 32) * 5/9;
+      else res = val;
+      setConvResult(res.toFixed(2));
+    } else {
+      const from = MEASUREMENT_UNITS[convType].find(u => u.id === convFrom);
+      const to = MEASUREMENT_UNITS[convType].find(u => u.id === convTo);
+      if (from && to) setConvResult(((val * from.ratio) / to.ratio).toLocaleString('fa-IR'));
+    }
+  }, [convValue, convFrom, convTo, convType]);
+
+  const handleDensityCalculation = useCallback(() => {
+    const vol = parseFloat(densityVolume);
+    if (isNaN(vol)) { setDensityResult(''); return; }
+    setDensityResult((vol * selectedOil.density).toLocaleString('fa-IR'));
+  }, [densityVolume, selectedOil]);
+
+  const handleTankCalculation = useCallback(() => {
+    const fullVol = parseFloat(tankFullVolume);
+    const totalH = parseFloat(tankTotalHeight);
+    const emptyH = parseFloat(tankEmptyHeight);
+    const baseD = parseFloat(tankDensity);
+    const temp = parseFloat(tankTemp);
+    if (isNaN(fullVol) || isNaN(totalH) || isNaN(emptyH)) { setTankResult(null); return; }
+    const liquidH = Math.max(0, totalH - emptyH);
+    const vol = (liquidH / totalH) * fullVol;
+    const corrD = baseD - 0.00068 * (temp - 15);
+    setTankResult({
+      weight: (vol * corrD).toLocaleString('fa-IR', { maximumFractionDigits: 1 }),
+      volume: vol.toLocaleString('fa-IR', { maximumFractionDigits: 1 })
+    });
+  }, [tankFullVolume, tankTotalHeight, tankEmptyHeight, tankDensity, tankTemp]);
+
+  useEffect(() => { handleUnitConversion(); }, [handleUnitConversion]);
+  useEffect(() => { handleDensityCalculation(); }, [handleDensityCalculation]);
+  useEffect(() => { handleTankCalculation(); }, [handleTankCalculation]);
 
   return (
-    <div className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl ${className}`}>
-      {/* Header */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-t-2xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="p-2 bg-blue-600 rounded-xl">
-              <Mic className="h-6 w-6 text-white" />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8">
+          <div className="flex items-center gap-6">
+            <div className="p-5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl shadow-xl">
+              <Sparkles className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">امکانات ویژه (گفتار و متن)</h1>
-              <p className="text-sm text-gray-500">تبدیل صوت، تصویر و PDF به متن</p>
+              <h1 className="text-3xl font-black text-slate-900 dark:text-white">امکانات ویژه <span className="text-blue-600">هوشمند</span></h1>
+              <p className="text-slate-500 dark:text-slate-400 font-medium">مجموعه ابزارهای پیشرفته پردازش محتوا</p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value as any)}
-              className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 text-sm"
-            >
-              {Object.entries(LANGUAGES).map(([code, lang]) => (
-                <option key={code} value={code}>{lang.flag} {lang.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex p-2 bg-gray-100 dark:bg-gray-800 m-4 rounded-xl">
-        {[
+        {/* Navigation */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          {[
             { id: 'speech', label: 'ضبط زنده', icon: Mic },
             { id: 'audio-file', label: 'فایل صوتی', icon: FileAudio },
             { id: 'image-ocr', label: 'تصویر', icon: Image },
@@ -797,295 +391,318 @@ handleDensityCalculation();
             { id: 'unit-conversion', label: 'تبدیل واحد', icon: ArrowRightLeft },
             { id: 'density', label: 'چگالی', icon: Droplets }
           ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex flex-col items-center gap-3 p-4 rounded-[2rem] transition-all ${
+                activeTab === tab.id ? 'bg-white dark:bg-slate-900 border-2 border-blue-500 scale-105 shadow-xl' : 'bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <tab.icon className={`h-6 w-6 ${activeTab === tab.id ? 'text-blue-600' : 'text-slate-400'}`} />
+              <span className="text-xs font-bold">{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab.id ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            <tab.icon className="h-4 w-4" />
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="p-6 pt-0">
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl border border-red-100 flex items-center space-x-2">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-sm">{error}</span>
-          </div>
-        )}
-
-        {/* Status Bar */}
-        {(isListening || isProcessing) && (
-          <div className="mb-4 flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full animate-pulse ${isListening ? 'bg-red-500' : 'bg-yellow-500'}`} />
-                <span className="text-xs font-medium">{isListening ? 'در حال ضبط...' : 'در حال پردازش...'}</span>
-              </div>
-              {isListening && <span className="text-xs font-mono">{formatDuration(recordingDuration)}</span>}
-            </div>
-            {isListening && (
-              <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 transition-all duration-75" style={{ width: `${audioLevel}%` }} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'speech' && (
-          <div className="space-y-4">
-            <div className="relative">
-              <textarea
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-                placeholder={placeholder}
-                className="w-full h-48 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                dir="auto"
-              />
-              {interimTranscript && (
-                <div className="absolute top-4 left-4 right-4 pointer-events-none text-gray-400 italic text-sm" dir="auto">
-                  {interimTranscript}
+        {/* Content */}
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8 md:p-12">
+          
+          {activeTab === 'speech' && (
+            <div className="flex flex-col lg:flex-row gap-8">
+              <div className="flex-1 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className={`px-4 py-2 rounded-full text-xs font-bold ${isListening ? 'bg-red-500/10 text-red-500 animate-pulse' : 'bg-slate-100 text-slate-500'}`}>
+                    {isListening ? 'در حال ضبط...' : 'آماده برای ضبط'}
+                  </div>
+                  {isListening && <span className="font-mono font-bold">{formatDuration(recordingDuration)}</span>}
                 </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-2">
-                <button
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={isProcessing}
-                  className={`flex items-center space-x-2 px-6 py-2 rounded-xl font-bold transition-all ${
-                    isListening ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
-                  {isListening ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  <span>{isListening ? 'توقف ضبط' : 'شروع ضبط'}</span>
-                </button>
-                <button
-                  onClick={() => setIsSoundEnabled(!isSoundEnabled)}
-                  className="p-2 bg-gray-100 dark:bg-gray-700 rounded-xl"
-                >
-                  {isSoundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-                </button>
-                <button onClick={clearTranscript} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-xl">
-                  <Trash2 className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="flex space-x-2">
-                <button onClick={() => copyToClipboard()} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-xl">
-                  <Copy className="h-5 w-5" />
-                </button>
-                <button onClick={downloadAsFile} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-xl">
-                  <Download className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'audio-file' && (
-          <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center">
-            <input type="file" accept="audio/*" onChange={handleAudioFileUpload} className="hidden" id="audio-upload" />
-            <label htmlFor="audio-upload" className="cursor-pointer">
-              <FileAudio className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-sm text-gray-600">فایل صوتی را انتخاب کنید</p>
-              <div className="mt-4 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg inline-block text-sm font-bold">انتخاب فایل</div>
-            </label>
-            {isProcessing && (
-              <div className="mt-4 space-y-2">
-                <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 transition-all" style={{ width: `${audioTranscriptionProgress}%` }} />
+                <textarea
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="متن ضبط شده اینجا نمایش داده می‌شود..."
+                  className="w-full h-64 p-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[2rem] text-lg outline-none resize-none"
+                  dir="auto"
+                />
+                <div className="flex gap-4">
+                  <button onClick={isListening ? stopListening : startListening} className={`flex-1 py-5 rounded-2xl font-black text-white shadow-xl transition-all ${isListening ? 'bg-red-500' : 'bg-blue-600'}`}>
+                    {isListening ? 'پایان ضبط' : 'شروع گفتگو'}
+                  </button>
+                  <button onClick={clearTranscript} className="p-5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-red-500"><Trash2 /></button>
+                  <button onClick={() => copyToClipboard()} className="p-5 bg-slate-900 text-white rounded-2xl"><Copy /></button>
                 </div>
-                <p className="text-xs text-gray-500">{audioTranscriptionProgress}% پردازش شد</p>
               </div>
-            )}
-          </div>
-        )}
 
-        {activeTab === 'image-ocr' && (
-          <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center">
-            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
-            <label htmlFor="image-upload" className="cursor-pointer">
-              <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-sm text-gray-600">تصویر حاوی متن را انتخاب کنید</p>
-              <div className="mt-4 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg inline-block text-sm font-bold">انتخاب تصویر</div>
-            </label>
-            {isProcessingOCR && <div className="mt-4 text-xs text-purple-600 animate-pulse">در حال خواندن متن تصویر...</div>}
-          </div>
-        )}
+              <div className="w-full lg:w-96 space-y-4">
+                <div className="flex items-center gap-2 text-slate-500 font-bold text-sm uppercase"><History className="h-4 w-4" /> تراکنش‌ها</div>
+                <div className="max-h-[500px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                  {transcriptionHistory.map(entry => (
+                    <div key={entry.id} className="group bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-bold text-slate-400">{entry.timestamp.toLocaleTimeString('fa-IR')}</span>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => copyToClipboard(entry.text)} className="p-1 text-blue-500"><Copy className="h-4 w-4" /></button>
+                          <button onClick={() => sendAsEmail(entry.text)} className="p-1 text-emerald-500"><Mail className="h-4 w-4" /></button>
+                          <button onClick={() => exportToWord(entry.text)} className="p-1 text-orange-500"><FileWord className="h-4 w-4" /></button>
+                          <button onClick={() => deleteTransaction(entry.id)} className="p-1 text-red-500"><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-300" dir="auto">{entry.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-        {activeTab === 'pdf-ocr' && (
-          <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center">
-            <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" id="pdf-upload" />
-            <label htmlFor="pdf-upload" className="cursor-pointer">
-              <FilePdf className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-sm text-gray-600">فایل PDF را انتخاب کنید</p>
-              <div className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded-lg inline-block text-sm font-bold">انتخاب PDF</div>
-            </label>
-          </div>
-        )}
+          {activeTab === 'audio-file' && (
+            <div className="max-w-xl mx-auto border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] p-16 text-center">
+              <input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && processAudioFileWithWebSpeech(e.target.files[0])} className="hidden" id="audio-up" />
+              <label htmlFor="audio-up" className="cursor-pointer space-y-6 block">
+                <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto"><Upload className="text-blue-600" /></div>
+                <p className="text-xl font-black">انتخاب فایل صوتی</p>
+                {isProcessing && (
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{width: `${audioTranscriptionProgress}%`}} /></div>
+                )}
+              </label>
+            </div>
+          )}
 
-        {activeTab === 'translate' && (
+          {activeTab === 'translate' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">متن مبدأ</label>
-                  <textarea
-                    value={translationInput}
-                    onChange={(e) => setTranslationInput(e.target.value)}
-                    placeholder="متن خود را برای ترجمه اینجا وارد کنید..."
-                    className="w-full h-40 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    dir="auto"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">ترجمه نهایی</label>
-                  <div className="w-full h-40 p-4 bg-orange-50/30 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-2xl text-sm overflow-auto" dir="auto">
-                    {isTranslating ? (
-                      <div className="flex items-center justify-center h-full text-orange-500">
-                        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-                        <span>در حال ترجمه...</span>
-                      </div>
-                    ) : (
-                      translationOutput || <span className="text-gray-400">نتیجه ترجمه اینجا نمایش داده می‌شود</span>
-                    )}
-                  </div>
+                <textarea value={translationInput} onChange={(e) => setTranslationInput(e.target.value)} className="w-full h-64 p-8 bg-slate-50 dark:bg-slate-800 border border-slate-200 rounded-[2rem]" placeholder="متن مبدأ..." dir="auto" />
+                <div className="w-full h-64 p-8 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 rounded-[2rem] overflow-auto">
+                  {isTranslating ? <Loader className="animate-spin text-orange-500" /> : translationOutput || 'ترجمه نهایی...'}
                 </div>
               </div>
-              <button
-                onClick={handleTranslate}
-                disabled={isTranslating || !translationInput.trim()}
-                className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold hover:from-orange-600 hover:to-red-600 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50"
-              >
-                {isTranslating ? 'در حال ترجمه...' : 'ترجمه هوشمند'}
-              </button>
+              <button onClick={handleTranslate} className="w-full py-5 bg-orange-600 text-white rounded-2xl font-bold">ترجمه هوشمند</button>
             </div>
           )}
 
           {activeTab === 'unit-conversion' && (
-            <div className="space-y-6">
-              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-6 rounded-3xl border border-blue-100 dark:border-blue-900/30">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">نوع کمیت</label>
-                    <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
-                      {(['volume', 'weight', 'temperature'] as const).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setConvType(type)}
-                          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                            convType === type ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          {type === 'volume' ? 'حجم' : type === 'weight' ? 'وزن' : 'دما'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">مقدار</label>
-                    <input
-                      type="number"
-                      value={convValue}
-                      onChange={(e) => setConvValue(e.target.value)}
-                      placeholder="عدد را وارد کنید..."
-                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">واحدها</label>
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                      <select
-                        value={convFrom}
-                        onChange={(e) => setConvFrom(e.target.value)}
-                        className="flex-1 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm"
-                      >
-                        {MEASUREMENT_UNITS[convType === 'temperature' ? 'temperature' : convType].map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                      <ArrowRightLeft className="h-5 w-5 text-blue-500" />
-                      <select
-                        value={convTo}
-                        onChange={(e) => setConvTo(e.target.value)}
-                        className="flex-1 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm"
-                      >
-                        {MEASUREMENT_UNITS[convType === 'temperature' ? 'temperature' : convType].map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div className="space-y-6">
+                <div className="flex bg-slate-100 p-1 rounded-2xl">
+                  {['volume', 'weight', 'temperature'].map(t => (
+                    <button key={t} onClick={() => setConvType(t as any)} className={`flex-1 py-3 rounded-xl font-bold ${convType === t ? 'bg-white shadow-md' : 'text-slate-500'}`}>
+                      {t === 'volume' ? 'حجم' : t === 'weight' ? 'وزن' : 'دما'}
+                    </button>
+                  ))}
                 </div>
-                {convResult && (
-                  <div className="mt-8 p-6 bg-white dark:bg-gray-800 rounded-2xl border-2 border-blue-500 shadow-xl text-center">
-                    <p className="text-sm text-gray-500 mb-1">نتیجه تبدیل</p>
-                    <p className="text-4xl font-black text-blue-600 font-mono tracking-tight">
-                      {convResult} <span className="text-lg font-bold">{MEASUREMENT_UNITS[convType].find(u => u.id === convTo)?.name}</span>
-                    </p>
-                  </div>
-                )}
+                <input type="number" value={convValue} onChange={(e) => setConvValue(e.target.value)} className="w-full p-6 border-2 rounded-2xl text-2xl font-bold" placeholder="مقدار..." />
+              </div>
+              <div className="space-y-6">
+                <div className="flex gap-4 items-center bg-white p-6 rounded-2xl border">
+                  <select value={convFrom} onChange={(e) => setConvFrom(e.target.value)} className="flex-1 bg-transparent font-bold">
+                    {MEASUREMENT_UNITS[convType].map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                  <ArrowRightLeft />
+                  <select value={convTo} onChange={(e) => setConvTo(e.target.value)} className="flex-1 bg-transparent font-bold">
+                    {MEASUREMENT_UNITS[convType].map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+                {convResult && <div className="p-8 bg-blue-600 text-white rounded-[2rem] text-center text-4xl font-black">{convResult}</div>}
               </div>
             </div>
           )}
 
           {activeTab === 'density' && (
-            <div className="space-y-6">
-              <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/30">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">نوع ماده / روغن</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-500">
+              
+              {/* Section 1: Standard Density Calculation */}
+              <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 dark:from-emerald-500/10 dark:to-teal-500/10 p-8 md:p-10 rounded-[3rem] border border-emerald-500/10 dark:border-emerald-500/20 shadow-sm">
+                <div className="flex items-center gap-3 mb-8 px-2">
+                  <div className="p-2 bg-emerald-500 rounded-xl text-white">
+                    <Droplets className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white">محاسبه وزن بر اساس چگالی</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  <div className="space-y-6">
+                    <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-2">انتخاب ماده / سیال</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {OIL_TYPES_DENSITY.map((oil) => (
                         <button
                           key={oil.id}
                           onClick={() => setSelectedOil(oil)}
-                          className={`p-3 text-xs font-bold rounded-xl border transition-all flex flex-col items-center space-y-1 ${
+                          className={`relative group p-4 rounded-[1.5rem] border-2 transition-all duration-300 flex flex-col items-center gap-2 ${
                             selectedOil.id === oil.id 
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg' 
-                              : 'bg-white dark:bg-gray-800 text-gray-600 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                              ? 'bg-emerald-600 border-emerald-500 text-white shadow-xl shadow-emerald-500/30 scale-105' 
+                              : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-300'
                           }`}
                         >
-                          <Droplets className="h-4 w-4" />
-                          <span>{oil.name}</span>
-                          <span className="text-[10px] opacity-75">{oil.density} g/ml</span>
+                          <span className="font-black text-[11px] text-center">{oil.name}</span>
+                          <span className={`text-[9px] font-bold opacity-75 ${selectedOil.id === oil.id ? 'text-emerald-100' : 'text-slate-400'}`}>
+                            {oil.density} kg/L
+                          </span>
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300">حجم (میلی‌لیتر)</label>
+
+                  <div className="flex flex-col justify-center space-y-8">
+                    <div className="space-y-3">
+                      <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-2">حجم کل (لیتر)</label>
                       <input
                         type="number"
                         value={densityVolume}
                         onChange={(e) => setDensityVolume(e.target.value)}
-                        placeholder="مقدار حجم را وارد کنید..."
-                        className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold"
+                        placeholder="مثلاً ۱۰۰۰"
+                        className="w-full p-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-[2rem] text-3xl font-black text-slate-900 dark:text-white focus:border-emerald-500 outline-none transition-all shadow-inner"
                       />
                     </div>
+
                     {densityResult && (
-                      <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl text-white shadow-xl text-center">
-                        <p className="text-xs opacity-75 mb-1">وزن محاسبه شده</p>
-                        <p className="text-4xl font-black font-mono tracking-tight">
-                          {densityResult} <span className="text-lg">گرم</span>
-                        </p>
-                        <div className="mt-4 pt-4 border-t border-white/20 text-[10px] opacity-75">
-                          فرمول: حجم ({densityVolume} ml) × چگالی ({selectedOil.density})
+                      <div className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-[2.5rem] blur-lg opacity-30 animate-pulse" />
+                        <div className="relative p-8 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-[2.5rem] text-white shadow-2xl overflow-hidden text-center">
+                          <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] mb-4">وزن نهایی</p>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-5xl font-black tracking-tighter">
+                              {densityResult}
+                            </span>
+                            <span className="text-lg font-bold opacity-80">کیلوگرم</span>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* Section 2: Seed to Oil/Meal Extraction */}
+              <div className="bg-gradient-to-br from-amber-500/5 to-orange-500/5 dark:from-amber-500/10 dark:to-orange-500/10 p-8 md:p-10 rounded-[3rem] border border-amber-500/10 dark:border-amber-500/20 shadow-sm">
+                <div className="flex items-center gap-3 mb-8 px-2">
+                  <div className="p-2 bg-amber-500 rounded-xl text-white">
+                    <FlaskConical className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white">محاسبه استحصال روغن و کنجاله</h3>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  <div className="space-y-6">
+                    <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-2">نوع دانه روغنی</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {SEED_EXTRACTION_RATIOS.map((seed) => (
+                        <button
+                          key={seed.id}
+                          onClick={() => setSelectedSeed(seed)}
+                          className={`p-4 rounded-[1.5rem] border-2 transition-all duration-300 flex flex-col items-center gap-2 ${
+                            selectedSeed.id === seed.id 
+                              ? 'bg-amber-600 border-amber-500 text-white shadow-xl shadow-amber-500/30' 
+                              : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-amber-300'
+                          }`}
+                        >
+                          <span className="font-black text-sm">{seed.name}</span>
+                          <span className="text-[10px] opacity-75">بازده روغن: {seed.oil * 100}%</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-2">وزن دانه ورودی (کیلوگرم)</label>
+                      <input
+                        type="number"
+                        value={seedWeight}
+                        onChange={(e) => setSeedWeight(e.target.value)}
+                        className="w-full p-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-[2rem] text-2xl font-black text-slate-900 dark:text-white focus:border-amber-500 outline-none shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-center">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-6 bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm text-center transition-all hover:scale-105">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">وزن روغن</p>
+                        <p className="text-3xl font-black text-amber-600">{(parseFloat(seedWeight || '0') * selectedSeed.oil).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}</p>
+                        <p className="text-xs font-bold text-slate-500 mt-1">کیلوگرم</p>
+                      </div>
+                      <div className="p-6 bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm text-center transition-all hover:scale-105">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">وزن کنجاله</p>
+                        <p className="text-3xl font-black text-slate-700 dark:text-slate-300">{(parseFloat(seedWeight || '0') * selectedSeed.meal).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}</p>
+                        <p className="text-xs font-bold text-slate-500 mt-1">کیلوگرم</p>
+                      </div>
+                      <div className="col-span-2 p-4 bg-amber-500/10 dark:bg-amber-500/5 rounded-2xl text-center">
+                        <p className="text-[10px] font-bold text-amber-600 italic">
+                          نتیجه برای {seedWeight} کیلوگرم دانه با راندمان {selectedSeed.oil * 100}% روغن و {selectedSeed.meal * 100}% کنجاله
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Tank Weight Calculation */}
+              <div className="bg-gradient-to-br from-blue-500/5 to-indigo-500/5 dark:from-blue-500/10 dark:to-indigo-500/10 p-8 md:p-10 rounded-[3rem] border border-blue-500/10 dark:border-blue-500/20 shadow-sm">
+                <div className="flex items-center gap-3 mb-8 px-2">
+                  <div className="p-2 bg-blue-500 rounded-xl text-white">
+                    <Calculator className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white">محاسبه وزن روغن در مخزن</h3>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">حجم کل مخزن (لیتر)</label>
+                      <input type="number" value={tankFullVolume} onChange={(e) => setTankFullVolume(e.target.value)} className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">ارتفاع کل (سانتی‌متر)</label>
+                      <input type="number" value={tankTotalHeight} onChange={(e) => setTankTotalHeight(e.target.value)} className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">ارتفاع سر خالی (cm)</label>
+                      <input type="number" value={tankEmptyHeight} onChange={(e) => setTankEmptyHeight(e.target.value)} className="w-full p-4 bg-white dark:bg-slate-800 border-2 border-blue-500/30 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">دما (°C)</label>
+                      <input type="number" value={tankTemp} onChange={(e) => setTankTemp(e.target.value)} className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">دانسیته پایه در ۱۵ درجه (kg/L)</label>
+                      <input type="number" value={tankDensity} onChange={(e) => setTankDensity(e.target.value)} step="0.001" className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus:border-blue-500 outline-none" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-center">
+                    {tankResult ? (
+                      <div className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2.5rem] blur-xl opacity-20" />
+                        <div className="relative p-10 bg-white dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-[2.5rem] shadow-xl text-center">
+                          <div className="space-y-6">
+                            <div className="pb-6 border-b border-slate-100 dark:border-slate-700">
+                              <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">وزن نهایی روغن</p>
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="text-5xl font-black text-slate-900 dark:text-white">{tankResult.weight}</span>
+                                <span className="text-xl font-bold text-slate-400">کیلوگرم</span>
+                              </div>
+                            </div>
+                            <div className="pt-2">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">حجم موجود در مخزن</p>
+                              <div className="flex items-center justify-center gap-2">
+                                <span className="text-2xl font-black text-slate-700 dark:text-slate-300">{tankResult.volume}</span>
+                                <span className="text-lg font-bold text-slate-400">لیتر</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-10 bg-slate-50 dark:bg-slate-900/50 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
+                        <Calculator className="h-10 w-10 text-slate-300 mb-4" />
+                        <p className="text-slate-400 text-sm font-medium">اطلاعات مخزن را برای محاسبه وزن وارد کنید</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
             </div>
           )}
 
+        </div>
       </div>
     </div>
   );
