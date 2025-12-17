@@ -30,10 +30,45 @@ import {
   FileText as FileWord,
   Maximize as Maximize2,
   Minimize as Minimize2,
-  CheckSquare,
-  Loader,
-  ArrowRightLeft
-} from 'lucide-react';
+    CheckSquare,
+Loader,
+ArrowRightLeft,
+Calculator,
+Droplets,
+Scale,
+Thermometer,
+FlaskConical
+  } from 'lucide-react';
+
+  // --- Constants for Unit Conversion ---
+  const MEASUREMENT_UNITS = {
+    volume: [
+      { id: 'ml', name: 'میلی‌لیتر', ratio: 1 },
+      { id: 'l', name: 'لیتر', ratio: 1000 },
+      { id: 'm3', name: 'متر مکعب', ratio: 1000000 },
+      { id: 'gal', name: 'گالون (US)', ratio: 3785.41 },
+    ],
+    weight: [
+      { id: 'g', name: 'گرم', ratio: 1 },
+      { id: 'kg', name: 'کیلوگرم', ratio: 1000 },
+      { id: 'ton', name: 'تن', ratio: 1000000 },
+      { id: 'lb', name: 'پوند', ratio: 453.592 },
+    ],
+    temperature: [
+      { id: 'c', name: 'سانتی‌گراد' },
+      { id: 'f', name: 'فارنهایت' },
+      { id: 'k', name: 'کلوین' },
+    ]
+  };
+
+  const OIL_TYPES_DENSITY = [
+    { id: 'crude', name: 'نفت خام', density: 0.85 },
+    { id: 'gasoline', name: 'بنزین', density: 0.74 },
+    { id: 'diesel', name: 'گازوئیل', density: 0.83 },
+    { id: 'water', name: 'آب', density: 1.0 },
+    { id: 'edible-oil', name: 'روغن خوراکی', density: 0.92 },
+  ];
+
 
 // Import Tesseract for OCR
 import { createWorker } from 'tesseract.js';
@@ -230,8 +265,21 @@ export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
   
   // New states for enhanced features
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'speech' | 'audio-file' | 'image-ocr' | 'pdf-ocr' | 'translate'>('speech');
-  const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
+    const [activeTab, setActiveTab] = useState<'speech' | 'audio-file' | 'image-ocr' | 'pdf-ocr' | 'translate' | 'unit-conversion' | 'density'>('speech');
+const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
+
+// Unit Conversion States
+const [convValue, setConvValue] = useState<string>('');
+const [convFrom, setConvFrom] = useState<string>('ml');
+const [convTo, setConvTo] = useState<string>('l');
+const [convType, setConvType] = useState<'volume' | 'weight' | 'temperature'>('volume');
+const [convResult, setConvResult] = useState<string>('');
+
+// Density States
+const [densityVolume, setDensityVolume] = useState<string>('');
+const [selectedOil, setSelectedOil] = useState(OIL_TYPES_DENSITY[0]);
+const [densityResult, setDensityResult] = useState<string>('');
+
   const [audioTranscriptionProgress, setAudioTranscriptionProgress] = useState(0);
   const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
@@ -572,13 +620,59 @@ export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
     }
   };
 
-  // PDF extraction
-  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      await processPdfFile(file);
-    }
-  };
+    // PDF extraction
+const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+const file = event.target.files?.[0];
+if (file && file.type === 'application/pdf') {
+await processPdfFile(file);
+}
+};
+
+// Unit Conversion Logic
+const handleUnitConversion = useCallback(() => {
+const val = parseFloat(convValue);
+if (isNaN(val)) {
+setConvResult('');
+return;
+}
+
+if (convType === 'temperature') {
+let result = 0;
+if (convFrom === 'c' && convTo === 'f') result = (val * 9/5) + 32;
+else if (convFrom === 'f' && convTo === 'c') result = (val - 32) * 5/9;
+else if (convFrom === 'c' && convTo === 'k') result = val + 273.15;
+else if (convFrom === 'k' && convTo === 'c') result = val - 273.15;
+else result = val;
+setConvResult(result.toFixed(2));
+} else {
+const fromUnit = MEASUREMENT_UNITS[convType].find(u => u.id === convFrom);
+const toUnit = MEASUREMENT_UNITS[convType].find(u => u.id === convTo);
+if (fromUnit && toUnit) {
+const result = (val * fromUnit.ratio) / toUnit.ratio;
+setConvResult(result.toLocaleString('fa-IR', { maximumFractionDigits: 4 }));
+}
+}
+}, [convValue, convFrom, convTo, convType]);
+
+useEffect(() => {
+handleUnitConversion();
+}, [handleUnitConversion]);
+
+// Density Calculation Logic
+const handleDensityCalculation = useCallback(() => {
+const vol = parseFloat(densityVolume);
+if (isNaN(vol)) {
+setDensityResult('');
+return;
+}
+const weight = vol * selectedOil.density;
+setDensityResult(weight.toLocaleString('fa-IR', { maximumFractionDigits: 2 }));
+}, [densityVolume, selectedOil]);
+
+useEffect(() => {
+handleDensityCalculation();
+}, [handleDensityCalculation]);
+
 
   const processPdfFile = async (file: File) => {
     setIsProcessingOCR(true);
@@ -695,12 +789,15 @@ export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
       {/* Tabs */}
       <div className="flex p-2 bg-gray-100 dark:bg-gray-800 m-4 rounded-xl">
         {[
-          { id: 'speech', label: 'ضبط زنده', icon: Mic },
-          { id: 'audio-file', label: 'فایل صوتی', icon: FileAudio },
-          { id: 'image-ocr', label: 'تصویر', icon: Image },
-          { id: 'pdf-ocr', label: 'PDF', icon: FilePdf },
-          { id: 'translate', label: 'ترجمه', icon: Languages2 }
-        ].map((tab) => (
+            { id: 'speech', label: 'ضبط زنده', icon: Mic },
+            { id: 'audio-file', label: 'فایل صوتی', icon: FileAudio },
+            { id: 'image-ocr', label: 'تصویر', icon: Image },
+            { id: 'pdf-ocr', label: 'PDF', icon: FilePdf },
+            { id: 'translate', label: 'ترجمه', icon: Languages2 },
+            { id: 'unit-conversion', label: 'تبدیل واحد', icon: ArrowRightLeft },
+            { id: 'density', label: 'چگالی', icon: Droplets }
+          ].map((tab) => (
+
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
@@ -834,27 +931,161 @@ export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
         )}
 
         {activeTab === 'translate' && (
-          <div className="space-y-4">
-            <textarea
-              value={translationInput}
-              onChange={(e) => setTranslationInput(e.target.value)}
-              placeholder="متن برای ترجمه..."
-              className="w-full h-24 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 rounded-xl text-sm outline-none"
-            />
-            <button
-              onClick={handleTranslate}
-              disabled={isTranslating}
-              className="w-full py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all"
-            >
-              {isTranslating ? 'در حال ترجمه...' : 'ترجمه متن'}
-            </button>
-            {translationOutput && (
-              <div className="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 rounded-xl text-sm" dir="auto">
-                {translationOutput}
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">متن مبدأ</label>
+                  <textarea
+                    value={translationInput}
+                    onChange={(e) => setTranslationInput(e.target.value)}
+                    placeholder="متن خود را برای ترجمه اینجا وارد کنید..."
+                    className="w-full h-40 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                    dir="auto"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">ترجمه نهایی</label>
+                  <div className="w-full h-40 p-4 bg-orange-50/30 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-2xl text-sm overflow-auto" dir="auto">
+                    {isTranslating ? (
+                      <div className="flex items-center justify-center h-full text-orange-500">
+                        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                        <span>در حال ترجمه...</span>
+                      </div>
+                    ) : (
+                      translationOutput || <span className="text-gray-400">نتیجه ترجمه اینجا نمایش داده می‌شود</span>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+              <button
+                onClick={handleTranslate}
+                disabled={isTranslating || !translationInput.trim()}
+                className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold hover:from-orange-600 hover:to-red-600 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50"
+              >
+                {isTranslating ? 'در حال ترجمه...' : 'ترجمه هوشمند'}
+              </button>
+            </div>
+          )}
+
+          {activeTab === 'unit-conversion' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-6 rounded-3xl border border-blue-100 dark:border-blue-900/30">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">نوع کمیت</label>
+                    <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                      {(['volume', 'weight', 'temperature'] as const).map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setConvType(type)}
+                          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                            convType === type ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {type === 'volume' ? 'حجم' : type === 'weight' ? 'وزن' : 'دما'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">مقدار</label>
+                    <input
+                      type="number"
+                      value={convValue}
+                      onChange={(e) => setConvValue(e.target.value)}
+                      placeholder="عدد را وارد کنید..."
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">واحدها</label>
+                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                      <select
+                        value={convFrom}
+                        onChange={(e) => setConvFrom(e.target.value)}
+                        className="flex-1 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm"
+                      >
+                        {MEASUREMENT_UNITS[convType === 'temperature' ? 'temperature' : convType].map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                      <ArrowRightLeft className="h-5 w-5 text-blue-500" />
+                      <select
+                        value={convTo}
+                        onChange={(e) => setConvTo(e.target.value)}
+                        className="flex-1 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm"
+                      >
+                        {MEASUREMENT_UNITS[convType === 'temperature' ? 'temperature' : convType].map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                {convResult && (
+                  <div className="mt-8 p-6 bg-white dark:bg-gray-800 rounded-2xl border-2 border-blue-500 shadow-xl text-center">
+                    <p className="text-sm text-gray-500 mb-1">نتیجه تبدیل</p>
+                    <p className="text-4xl font-black text-blue-600 font-mono tracking-tight">
+                      {convResult} <span className="text-lg font-bold">{MEASUREMENT_UNITS[convType].find(u => u.id === convTo)?.name}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'density' && (
+            <div className="space-y-6">
+              <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/30">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">نوع ماده / روغن</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {OIL_TYPES_DENSITY.map((oil) => (
+                        <button
+                          key={oil.id}
+                          onClick={() => setSelectedOil(oil)}
+                          className={`p-3 text-xs font-bold rounded-xl border transition-all flex flex-col items-center space-y-1 ${
+                            selectedOil.id === oil.id 
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg' 
+                              : 'bg-white dark:bg-gray-800 text-gray-600 border-gray-200 dark:border-gray-700 hover:border-emerald-300'
+                          }`}
+                        >
+                          <Droplets className="h-4 w-4" />
+                          <span>{oil.name}</span>
+                          <span className="text-[10px] opacity-75">{oil.density} g/ml</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300">حجم (میلی‌لیتر)</label>
+                      <input
+                        type="number"
+                        value={densityVolume}
+                        onChange={(e) => setDensityVolume(e.target.value)}
+                        placeholder="مقدار حجم را وارد کنید..."
+                        className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold"
+                      />
+                    </div>
+                    {densityResult && (
+                      <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl text-white shadow-xl text-center">
+                        <p className="text-xs opacity-75 mb-1">وزن محاسبه شده</p>
+                        <p className="text-4xl font-black font-mono tracking-tight">
+                          {densityResult} <span className="text-lg">گرم</span>
+                        </p>
+                        <div className="mt-4 pt-4 border-t border-white/20 text-[10px] opacity-75">
+                          فرمول: حجم ({densityVolume} ml) × چگالی ({selectedOil.density})
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
       </div>
     </div>
   );
