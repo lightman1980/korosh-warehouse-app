@@ -358,7 +358,8 @@ export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
       setInterimTranscript(interimText);
       
       if (onTextChange) {
-        onTextChange(finalTranscript ? transcript + finalTranscript : transcript + interimText);
+        const currentText = finalTranscript || interimText;
+        onTextChange(currentText);
       }
     };
 
@@ -378,7 +379,8 @@ export const SpeechToTextConverter: React.FC<SpeechToTextConverterProps> = ({
           errorMessage = 'دسترسی به میکروفون مجاز نیست. لطفاً مجوز میکروفون را در تنظیمات مرورگر فعال کنید.';
           break;
         case 'network':
-          errorMessage = 'خطای شبکه. لطفاً اتصال اینترنت خود را بررسی کنید.';
+          errorMessage = 'خطای شبکه. این قابلیت برای پردازش دقیق به اینترنت نیاز دارد. لطفاً اتصال خود را بررسی کنید یا از مرورگری استفاده کنید که از زبان فارسی آفلاین پشتیبانی می‌کند.';
+          setIsOfflineMode(true);
           break;
         case 'aborted':
           errorMessage = 'تشخیص گفتار متوقف شد.';
