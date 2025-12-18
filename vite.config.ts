@@ -9,13 +9,12 @@ export default defineConfig({
     include: ['pdfjs-dist', 'tesseract.js']
   },
     server: {
-      host: '0.0.0.0', // گوش دادن به همه آدرس‌ها (IPv4 و IPv6)
+      host: '0.0.0.0',
       port: 5173,
-      strictPort: true, // پورت را ثابت نگه دار؛ اگر مشغول بود خطا بده
-    // فعال‌سازی HMR overlay و بهبود پایش فایل‌ها برای ویندوز/فایل‌سیستم‌های خاص
-    hmr: {
-      overlay: true,
-    },
+      strictPort: true,
+      hmr: {
+        overlay: true,
+      },
     watch: {
       usePolling: true,
       interval: 200,
