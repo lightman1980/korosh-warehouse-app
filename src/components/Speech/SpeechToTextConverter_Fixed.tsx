@@ -471,15 +471,81 @@ export const SpeechToTextConverter: React.FC = () => {
           )}
 
           {activeTab === 'audio-file' && (
-            <div className="max-w-xl mx-auto border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] p-16 text-center">
-              <input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && processAudioFileWithWebSpeech(e.target.files[0])} className="hidden" id="audio-up" />
-              <label htmlFor="audio-up" className="cursor-pointer space-y-6 block">
-                <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto"><Upload className="text-blue-600" /></div>
-                <p className="text-xl font-black">انتخاب فایل صوتی</p>
-                {isProcessing && (
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{width: `${audioTranscriptionProgress}%`}} /></div>
-                )}
-              </label>
+            <div className="space-y-8 animate-in fade-in zoom-in duration-500">
+              {!isProcessing ? (
+                <div className="max-w-xl mx-auto border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] p-16 text-center hover:border-blue-400 transition-colors group">
+                  <input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && processAudioFileWithWebSpeech(e.target.files[0])} className="hidden" id="audio-up" />
+                  <label htmlFor="audio-up" className="cursor-pointer space-y-6 block">
+                    <div className="w-24 h-24 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto group-hover:scale-110 transition-transform shadow-inner">
+                      <Upload className="h-10 w-10 text-blue-600" />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-2xl font-black text-slate-900 dark:text-white">انتخاب فایل صوتی</p>
+                      <p className="text-slate-500 dark:text-slate-400 font-medium">فرمت‌های MP3, WAV, M4A پشتیبانی می‌شوند</p>
+                    </div>
+                    <div className="pt-4">
+                      <span className="px-6 py-3 bg-blue-600 text-white rounded-full font-bold shadow-lg shadow-blue-500/30">مرور فایل‌ها</span>
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <div className="max-w-xl mx-auto bg-white dark:bg-slate-900 rounded-[3rem] p-12 border border-slate-100 dark:border-slate-800 shadow-xl text-center space-y-8">
+                  <div className="relative w-32 h-32 mx-auto">
+                    <div className="absolute inset-0 border-4 border-blue-100 dark:border-slate-800 rounded-full" />
+                    <div 
+                      className="absolute inset-0 border-4 border-blue-600 rounded-full transition-all duration-300" 
+                      style={{ clipPath: `polygon(50% 50%, -50% -50%, ${audioTranscriptionProgress}% -50%, ${audioTranscriptionProgress}% 150%, -50% 150%)`, transform: 'rotate(-90deg)' }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-2xl font-black text-blue-600">{audioTranscriptionProgress}%</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-xl font-black text-slate-900 dark:text-white animate-pulse">در حال تحلیل هوشمند محتوا...</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                      {audioTranscriptionProgress < 25 && 'بارگذاری و پیش‌پردازش فایل...'}
+                      {audioTranscriptionProgress >= 25 && audioTranscriptionProgress < 45 && 'کاهش نویز و بهینه‌سازی فرکانس...'}
+                      {audioTranscriptionProgress >= 45 && audioTranscriptionProgress < 65 && 'تحلیل ویژگی‌های آکوستیک...'}
+                      {audioTranscriptionProgress >= 65 && audioTranscriptionProgress < 85 && 'تطبیق با مدل‌های زبانی هوش مصنوعی...'}
+                      {audioTranscriptionProgress >= 85 && 'استخراج متن و ساختاربندی...'}
+                    </p>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500" style={{width: `${audioTranscriptionProgress}%`}} />
+                  </div>
+                </div>
+              )}
+
+              {/* نمایش آخرین نتایج فایل‌های صوتی در صورتی که وجود داشته باشند */}
+              {transcriptionHistory.filter(h => h.sourceType === 'file').length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-slate-500 font-bold text-sm uppercase px-2">
+                    <History className="h-4 w-4" /> تاریخچه پردازش فایل صوتی
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {transcriptionHistory.filter(h => h.sourceType === 'file').slice(0, 4).map(entry => (
+                      <div key={entry.id} className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                              <FileAudio className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[150px]">{entry.filename || 'فایل صوتی'}</p>
+                              <p className="text-[10px] text-slate-400">{entry.timestamp.toLocaleTimeString('fa-IR')}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => copyToClipboard(entry.text)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><Copy className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => deleteTransaction(entry.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed" dir="auto">{entry.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
