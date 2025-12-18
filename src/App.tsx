@@ -25,7 +25,7 @@ import { ProductConversionManager } from './components/ProductConversion/Product
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Import Speech-to-Text components
-import SpeechToTextConverter from './components/Speech/SpeechToTextConverter_Fixed';
+import SpeechToTextConverter from './components/Speech/AdvancedTools';
 
 // Import Oil Converter Enhanced
 import OilConverter from './components/Speech/OilConverter_Enhanced';
