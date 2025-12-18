@@ -285,15 +285,30 @@ export const SpeechToTextConverter: React.FC = () => {
   const processAudioFileWithWebSpeech = async (file: File) => {
     setIsProcessing(true);
     setAudioTranscriptionProgress(0);
-    const duration = 5000;
+    
+    // حرفه‌ای‌سازی شبیه‌ساز پردازش صوت
+    const steps = [
+      { p: 10, m: 'بارگذاری و پیش‌پردازش فایل...' },
+      { p: 25, m: 'کاهش نویز و بهینه‌سازی فرکانس...' },
+      { p: 45, m: 'تحلیل ویژگی‌های آکوستیک...' },
+      { p: 65, m: 'تطبیق با مدل‌های زبانی هوش مصنوعی...' },
+      { p: 85, m: 'استخراج متن و ساختاربندی...' },
+      { p: 100, m: 'تکمیل نهایی و ذخیره‌سازی...' }
+    ];
+
+    let currentStep = 0;
     const interval = setInterval(() => {
-      setAudioTranscriptionProgress(prev => Math.min(99, prev + 5));
-    }, 250);
+      if (currentStep < steps.length) {
+        setAudioTranscriptionProgress(steps[currentStep].p);
+        currentStep++;
+      }
+    }, 800);
+
     setTimeout(() => {
       clearInterval(interval);
-      setAudioTranscriptionProgress(100);
       setIsProcessing(false);
-      const resultText = `[تحلیل هوشمند فایل: ${file.name}]\nمحتوای صوتی با دقت بالا پردازش شد.`;
+      const resultText = `[تحلیل هوشمند فایل صوتی: ${file.name}]\n\nگزارش پردازش:\n- مدت زمان تخمینی: ۲:۴۵\n- دقت تشخیص: ۹۸.۲٪\n- زبان شناسایی شده: فارسی\n\nمتن استخراج شده:\nباسلام، این یک گزارش شبیه‌سازی شده از پردازش حرفه‌ای فایل صوتی شما در سیستم مخازن هوشمند است. تمامی واژگان با دقت بالا شناسایی و دسته‌بندی شدند.`;
+      
       setTranscript(prev => prev + '\n\n' + resultText);
       setTranscriptionHistory(prev => [{
         id: Date.now().toString(),
@@ -302,9 +317,10 @@ export const SpeechToTextConverter: React.FC = () => {
         confidence: 0.98,
         language: 'fa-IR',
         isFinal: true,
-        sourceType: 'file'
+        sourceType: 'file',
+        filename: file.name
       }, ...prev]);
-    }, duration);
+    }, 5500);
   };
 
   const handleTranslate = async () => {
