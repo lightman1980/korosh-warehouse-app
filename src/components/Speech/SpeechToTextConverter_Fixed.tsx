@@ -14,8 +14,6 @@ import {
   Droplets,
   Scale,
   FlaskConical,
-  Mail,
-  FileText,
   X,
   Languages,
   Loader,
@@ -26,8 +24,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Volume2,
-  Settings,
   Globe,
   Camera,
   ScanLine,
@@ -35,7 +31,7 @@ import {
   ArrowLeftRight
 } from 'lucide-react';
 
-const SEED_EXTRACTION_RATIOS = [
+const SEED_DATA = [
   { id: 'canola', name: 'کلزا (Canola)', oil: 0.42, meal: 0.56, waste: 0.02 },
   { id: 'soybean', name: 'سویا (Soybean)', oil: 0.18, meal: 0.78, waste: 0.04 },
   { id: 'sunflower', name: 'آفتابگردان (Sunflower)', oil: 0.40, meal: 0.55, waste: 0.05 },
@@ -44,7 +40,7 @@ const SEED_EXTRACTION_RATIOS = [
   { id: 'olive', name: 'زیتون (Olive)', oil: 0.22, meal: 0.73, waste: 0.05 },
 ];
 
-const OIL_TYPES_DENSITY = [
+const OIL_DATA = [
   { id: 'crude-soy', name: 'روغن خام سویا', density: 0.924 },
   { id: 'crude-sun', name: 'روغن خام آفتابگردان', density: 0.918 },
   { id: 'crude-rape', name: 'روغن خام کلزا', density: 0.914 },
@@ -55,29 +51,6 @@ const OIL_TYPES_DENSITY = [
   { id: 'palm-olein', name: 'پالم اولئین', density: 0.910 },
   { id: 'water', name: 'آب خالص (کالیبراسیون)', density: 1.000 },
 ];
-
-const MEASUREMENT_UNITS = {
-  volume: [
-    { id: 'ml', name: 'میلی‌لیتر (ml)', ratio: 1 },
-    { id: 'l', name: 'لیتر (L)', ratio: 1000 },
-    { id: 'm3', name: 'متر مکعب (m³)', ratio: 1000000 },
-    { id: 'gal', name: 'گالون آمریکایی (US Gal)', ratio: 3785.41 },
-    { id: 'gal_uk', name: 'گالون انگلیسی (UK Gal)', ratio: 4546.09 },
-    { id: 'bbl', name: 'بشکه نفتی (159L)', ratio: 158987.3 },
-  ],
-  weight: [
-    { id: 'g', name: 'گرم (g)', ratio: 1 },
-    { id: 'kg', name: 'کیلوگرم (kg)', ratio: 1000 },
-    { id: 'ton', name: 'تن متریک (Metric Ton)', ratio: 1000000 },
-    { id: 'lb', name: 'پوند (lb)', ratio: 453.592 },
-    { id: 'oz', name: 'اونس (oz)', ratio: 28.3495 },
-  ],
-  temperature: [
-    { id: 'c', name: 'سانتی‌گراد (°C)' },
-    { id: 'f', name: 'فارنهایت (°F)' },
-    { id: 'k', name: 'کلوین (K)' },
-  ]
-};
 
 interface TranscriptionEntry {
   id: string;
@@ -105,11 +78,11 @@ export const SpeechToTextConverter: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   const [densityVolume, setDensityVolume] = useState<string>('');
-  const [selectedOil, setSelectedOil] = useState(OIL_TYPES_DENSITY[0]);
+  const [selectedOil, setSelectedOil] = useState(OIL_DATA[0]);
   const [densityResult, setDensityResult] = useState<string>('');
   
   const [seedWeight, setSeedWeight] = useState<string>('1000');
-  const [selectedSeed, setSelectedSeed] = useState(SEED_EXTRACTION_RATIOS[0]);
+  const [selectedSeed, setSelectedSeed] = useState(SEED_DATA[0]);
 
   const [tankFullVolume, setTankFullVolume] = useState<string>('');
   const [tankTotalHeight, setTankTotalHeight] = useState<string>('');
@@ -118,12 +91,6 @@ export const SpeechToTextConverter: React.FC = () => {
   const [tankTemp, setTankTemp] = useState<string>('15');
   const [tankTempCoef, setTankTempCoef] = useState<string>('0.00068');
   const [tankResult, setTankResult] = useState<{ weight: string; volume: string; correctedDensity: string } | null>(null);
-
-  const [convValue, setConvValue] = useState<string>('');
-  const [convFrom, setConvFrom] = useState<string>('l');
-  const [convTo, setConvTo] = useState<string>('kg');
-  const [convType, setConvType] = useState<'volume' | 'weight' | 'temperature'>('volume');
-  const [convResult, setConvResult] = useState<string>('');
 
   const [translationInput, setTranslationInput] = useState('');
   const [translationOutput, setTranslationOutput] = useState('');
@@ -152,10 +119,6 @@ export const SpeechToTextConverter: React.FC = () => {
     link.href = source;
     link.download = `report_${Date.now()}.doc`;
     link.click();
-  };
-
-  const sendAsEmail = (text: string) => {
-    window.location.href = `mailto:?subject=گزارش هوشمند&body=${encodeURIComponent(text)}`;
   };
 
   const copyToClipboard = async (text: string) => {
@@ -467,31 +430,6 @@ export const SpeechToTextConverter: React.FC = () => {
     setTranslationOutput(translationInput);
   };
 
-  const handleUnitConversion = useCallback(() => {
-    const val = parseFloat(convValue);
-    if (isNaN(val)) { setConvResult(''); return; }
-    
-    if (convType === 'temperature') {
-      let res = 0;
-      if (convFrom === 'c' && convTo === 'f') res = (val * 9/5) + 32;
-      else if (convFrom === 'f' && convTo === 'c') res = (val - 32) * 5/9;
-      else if (convFrom === 'c' && convTo === 'k') res = val + 273.15;
-      else if (convFrom === 'k' && convTo === 'c') res = val - 273.15;
-      else if (convFrom === 'f' && convTo === 'k') res = (val - 32) * 5/9 + 273.15;
-      else if (convFrom === 'k' && convTo === 'f') res = (val - 273.15) * 9/5 + 32;
-      else res = val;
-      setConvResult(res.toLocaleString('fa-IR', { maximumFractionDigits: 2 }));
-    } else {
-      const units = MEASUREMENT_UNITS[convType] as { id: string; name: string; ratio: number }[];
-      const from = units.find(u => u.id === convFrom);
-      const to = units.find(u => u.id === convTo);
-      if (from && to) {
-        const result = (val * from.ratio) / to.ratio;
-        setConvResult(result.toLocaleString('fa-IR', { maximumFractionDigits: 6 }));
-      }
-    }
-  }, [convValue, convFrom, convTo, convType]);
-
   const handleDensityCalculation = useCallback(() => {
     const vol = parseFloat(densityVolume);
     if (isNaN(vol)) { setDensityResult(''); return; }
@@ -524,7 +462,6 @@ export const SpeechToTextConverter: React.FC = () => {
     });
   }, [tankFullVolume, tankTotalHeight, tankEmptyHeight, tankDensity, tankTemp, tankTempCoef]);
 
-  useEffect(() => { handleUnitConversion(); }, [handleUnitConversion]);
   useEffect(() => { handleDensityCalculation(); }, [handleDensityCalculation]);
   useEffect(() => { handleTankCalculation(); }, [handleTankCalculation]);
 
@@ -1012,7 +949,7 @@ export const SpeechToTextConverter: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      {OIL_TYPES_DENSITY.map((oil) => (
+                      {OIL_DATA.map((oil) => (
                         <button
                           key={oil.id}
                           onClick={() => setSelectedOil(oil)}
@@ -1073,7 +1010,7 @@ export const SpeechToTextConverter: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {SEED_EXTRACTION_RATIOS.map((seed) => (
+                      {SEED_DATA.map((seed) => (
                         <button
                           key={seed.id}
                           onClick={() => setSelectedSeed(seed)}
