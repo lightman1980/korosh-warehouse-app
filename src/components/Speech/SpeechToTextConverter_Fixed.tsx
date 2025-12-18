@@ -93,15 +93,6 @@ const MEASUREMENT_UNITS = {
   ]
 };
 
-const OIL_TYPES_DENSITY = [
-  { id: 'crude-soy', name: 'روغن خام سویا', density: 0.924 },
-  { id: 'crude-sun', name: 'روغن خام آفتابگردان', density: 0.918 },
-  { id: 'crude-rape', name: 'روغن خام کلزا', density: 0.914 },
-  { id: 'refined-oil', name: 'روغن تصفیه شده', density: 0.920 },
-  { id: 'palm-oil', name: 'روغن پالم', density: 0.890 },
-  { id: 'water', name: 'آب خالص', density: 1.0 },
-];
-
 // Types
 interface TranscriptionEntry {
   id: string;
