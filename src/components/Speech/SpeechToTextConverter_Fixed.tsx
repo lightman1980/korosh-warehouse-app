@@ -145,121 +145,6 @@ const SpeechToTextConverter: React.FC = () => {
     setInterimTranscript('');
   }, []);
 
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAudioFile(file);
-      setAudioTranscript('');
-    }
-  };
-
-  const processAudioFile = async () => {
-    if (!audioFile) return;
-    
-    setIsProcessingAudio(true);
-    setAudioTranscript('در حال آماده‌سازی...');
-    
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const arrayBuffer = await audioFile.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (!SpeechRecognition) {
-        setAudioTranscript('⚠️ برای تبدیل فایل صوتی، مرورگر Chrome لازم است.');
-        setIsProcessingAudio(false);
-        return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'fa-IR';
-      
-      let fullTranscript = '';
-      
-      recognition.onresult = (event: any) => {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            fullTranscript += event.results[i][0].transcript + ' ';
-            setAudioTranscript(fullTranscript);
-          }
-        }
-      };
-
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      
-      setAudioTranscript('🎧 در حال پخش و تشخیص صدا...');
-      
-      recognition.start();
-      source.start(0);
-      
-      source.onended = () => {
-        setTimeout(() => {
-          recognition.stop();
-          setIsProcessingAudio(false);
-        }, 2000);
-      };
-      
-    } catch (error) {
-      console.error('Audio processing error:', error);
-      setAudioTranscript('خطا در پردازش فایل.');
-      setIsProcessingAudio(false);
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setOcrResult('');
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const processOCR = async () => {
-    if (!imageFile) return;
-    
-    setIsProcessingOcr(true);
-    setOcrResult('در حال پردازش...');
-    
-    try {
-      const Tesseract = await import('tesseract.js');
-      const result = await Tesseract.recognize(imageFile, 'fas+eng');
-      setOcrResult(result.data.text.trim());
-    } catch (error) {
-      console.error('OCR Error:', error);
-      setOcrResult('خطا در استخراج متن.');
-    } finally {
-      setIsProcessingOcr(false);
-    }
-  };
-
-  const translateText = async () => {
-    if (!sourceText.trim()) return;
-    
-    setIsTranslating(true);
-    try {
-      const sourceLang = translateDirection === 'fa-en' ? 'fa' : 'en';
-      const targetLang = translateDirection === 'fa-en' ? 'en' : 'fa';
-      const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(sourceText)}&langpair=${sourceLang}|${targetLang}`);
-      const data = await response.json();
-      setTranslatedText(data.responseData.translatedText);
-    } catch (error) {
-      setTranslatedText('⚠️ خطا در ترجمه.');
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
   const calculateDensity = () => {
     const volume = parseFloat(oilVolume);
     if (isNaN(volume) || volume <= 0) return;
@@ -278,30 +163,6 @@ const SpeechToTextConverter: React.FC = () => {
       meal: (weight * seed.mealPercent) / 100,
       loss: (weight * seed.lossPercent) / 100,
     });
-  };
-
-  const calculateTankWeight = () => {
-    const diameter = parseFloat(tankData.diameter);
-    const length = parseFloat(tankData.length);
-    const fillLevel = parseFloat(tankData.fillLevel);
-    const temperature = parseFloat(tankData.temperature);
-    
-    if (isNaN(diameter) || isNaN(length) || isNaN(fillLevel)) return;
-    const oil = OIL_TYPES_DENSITY.find(o => o.id === tankData.oilType);
-    if (!oil) return;
-    
-    const R = diameter / 2;
-    const h = fillLevel;
-    const L = length;
-    
-    let area: number;
-    if (h >= diameter) area = Math.PI * R * R;
-    else if (h <= 0) area = 0;
-    else area = R * R * Math.acos((R - h) / R) - (R - h) * Math.sqrt(2 * R * h - h * h);
-    
-    const volumeLiters = area * L * 1000;
-    const correctedVolume = volumeLiters * (1 - 0.0007 * (temperature - 20));
-    setTankResult({ volume: correctedVolume, weight: correctedVolume * oil.density, fillPercent: (h / diameter) * 100 });
   };
 
   return (
@@ -358,7 +219,6 @@ const SpeechToTextConverter: React.FC = () => {
               </div>
             </div>
           )}
-          {/* Other tabs simplified for space */}
         </div>
       </div>
     </div>
