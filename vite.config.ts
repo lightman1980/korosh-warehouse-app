@@ -10,8 +10,8 @@ export default defineConfig({
   },
     server: {
       host: '0.0.0.0', // گوش دادن به همه آدرس‌ها (IPv4 و IPv6)
-      port: 5174,
-      strictPort: false, // پورت را ثابت نگه دار؛ اگر مشغول بود خطا بده
+      port: 5173,
+      strictPort: true, // پورت را ثابت نگه دار؛ اگر مشغول بود خطا بده
     // فعال‌سازی HMR overlay و بهبود پایش فایل‌ها برای ویندوز/فایل‌سیستم‌های خاص
     hmr: {
       overlay: true,
