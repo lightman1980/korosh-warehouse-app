@@ -33,42 +33,21 @@ import {
   } from 'lucide-react';
 
 // --- Constants ---
-const SEED_EXTRACTION_RATIOS = [
-  { id: 'canola', name: 'کلزا (Canola)', oil: 0.42, meal: 0.56, waste: 0.02 },
-  { id: 'soybean', name: 'سویا (Soybean)', oil: 0.18, meal: 0.78, waste: 0.04 },
-  { id: 'sunflower', name: 'آفتابگردان (Sunflower)', oil: 0.40, meal: 0.55, waste: 0.05 },
-  { id: 'corn', name: 'ذرت (Corn)', oil: 0.04, meal: 0.90, waste: 0.06 },
-];
+  const SEED_EXTRACTION_RATIOS = [
+    { id: 'canola', name: 'کلزا (Canola)', oil: 0.42, meal: 0.56, waste: 0.02 },
+    { id: 'soybean', name: 'سویا (Soybean)', oil: 0.18, meal: 0.78, waste: 0.04 },
+    { id: 'sunflower', name: 'آفتابگردان (Sunflower)', oil: 0.40, meal: 0.55, waste: 0.05 },
+    { id: 'corn', name: 'ذرت (Corn)', oil: 0.04, meal: 0.90, waste: 0.06 },
+  ];
 
-const MEASUREMENT_UNITS = {
-  volume: [
-    { id: 'ml', name: 'میلی‌لیتر (ml)', ratio: 1 },
-    { id: 'l', name: 'لیتر (L)', ratio: 1000 },
-    { id: 'm3', name: 'متر مکعب (m³)', ratio: 1000000 },
-    { id: 'gal', name: 'گالون (US)', ratio: 3785.41 },
-    { id: 'bbl', name: 'بشکه (159 لیتر)', ratio: 158987.3 },
-  ],
-  weight: [
-    { id: 'g', name: 'گرم (g)', ratio: 1 },
-    { id: 'kg', name: 'کیلوگرم (kg)', ratio: 1000 },
-    { id: 'ton', name: 'تن (Metric)', ratio: 1000000 },
-    { id: 'lb', name: 'پوند (lb)', ratio: 453.592 },
-  ],
-  temperature: [
-    { id: 'c', name: 'سانتی‌گراد (°C)' },
-    { id: 'f', name: 'فارنهایت (°F)' },
-    { id: 'k', name: 'کلوین (K)' },
-  ]
-};
-
-const OIL_TYPES_DENSITY = [
-  { id: 'crude-soy', name: 'روغن خام سویا', density: 0.924 },
-  { id: 'crude-sun', name: 'روغن خام آفتابگردان', density: 0.918 },
-  { id: 'crude-rape', name: 'روغن خام کلزا', density: 0.914 },
-  { id: 'refined-oil', name: 'روغن تصفیه شده', density: 0.920 },
-  { id: 'palm-oil', name: 'روغن پالم', density: 0.890 },
-  { id: 'water', name: 'آب خالص', density: 1.0 },
-];
+  const OIL_TYPES_DENSITY = [
+    { id: 'crude-soy', name: 'روغن خام سویا', density: 0.924 },
+    { id: 'crude-sun', name: 'روغن خام آفتابگردان', density: 0.918 },
+    { id: 'crude-rape', name: 'روغن خام کلزا', density: 0.914 },
+    { id: 'refined-oil', name: 'روغن تصفیه شده', density: 0.920 },
+    { id: 'palm-oil', name: 'روغن پالم', density: 0.890 },
+    { id: 'water', name: 'آب خالص', density: 1.0 },
+  ];
 
 // --- Export Helpers ---
 const exportToWord = (text: string) => {
