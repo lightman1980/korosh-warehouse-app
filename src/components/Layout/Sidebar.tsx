@@ -42,7 +42,7 @@ const menuItems = [
   { id: 'reports', name: 'گزارشات', icon: TrendingUp },
   { id: 'inventory-ledger', name: 'کاردکس موجودی', icon: Archive },
   { id: 'analytics', name: 'تحلیل و بررسی', icon: BarChart3 },
-  { id: 'complete-system', name: 'سیستم پیشرفته یکپارچه', icon: FileAudio },
+  //{ id: 'complete-system', name: 'سیستم پیشرفته یکپارچه', icon: FileAudio },
   { id: 'oil-product-creator', name: 'تحلیل محصول نهایی', icon: FlaskConical },
   { id: 'speech-to-text', name: 'امکانات ویژه', icon: Mic },
   { id: 'messaging', name: 'مکاتبات', icon: Users },
