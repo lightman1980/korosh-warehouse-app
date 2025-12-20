@@ -23,10 +23,11 @@ import { SystemManager } from './components/System/SystemManager';
 import { InventoryAdjustmentManager } from './components/InventoryAdjustment/InventoryAdjustmentManager';
 import { ProductConversionManager } from './components/ProductConversion/ProductConversionManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PermissionGuard } from './components/Common/PermissionGuard';
+import { canView } from './utils/permissionHelpers';
 
 // Import New Pages
-import CompleteAdvancedSystem from './pages/CompleteSystemPage';
-import OilProductCreator from './pages/OilProductCreatorPage';
+import CompleteAdvancedSystem from './components/CompleteAdvancedSystem/CompleteAdvancedSystem';
 
 // 🔧 وارد کردن ThemeProvider و کامپوننت جدید - مسیرهای واقعی که کاربر استفاده کرده
 import { ThemeProvider, useTheme } from './components/Contracts/ThemeProvider';
@@ -62,8 +63,7 @@ const moduleNames: Record<string, string> = {
   'speech-to-text': 'گپ متن',
   'speech-demo': 'دموی گپ متن',
   'oil-converter': 'مبدل روغن خوراکی',
-  'complete-system': 'سیستم پیشرفته یکپارچه',
-  'oil-product-creator': 'ساخت محصول جدید روغن خوراکی',
+  'product-development': 'ساخت محصول جدید',
   'messaging': 'مکاتبات',
   'users': 'مدیریت کاربران',
   'settings': 'تنظیمات'
@@ -390,115 +390,212 @@ const AppContent: React.FC = () => {
     return <LoginForm onLogin={handleLogin} />;
   }
 
+  // Mapping بین moduleId در App و permissionModuleId در سیستم دسترسی
+  const getPermissionModuleId = (moduleId: string): string => {
+    const mapping: Record<string, string> = {
+      'dashboard': 'dashboard',
+      'base-data': 'base_data',
+      'contracts': 'contracts',
+      'warehouse-receipt': 'consignment_receipt',
+      'warehouse-delivery': 'warehouse_delivery',
+      'Deduction-Addition': 'inventory_adjustment',
+      'product-conversion': 'product_conversion',
+      'invoice-generation': 'invoice',
+      'reports': 'reports',
+      'inventory-ledger': 'inventory_ledger',
+      'analytics': 'analytics',
+      'analytics-main': 'analytics',
+      'speech-to-text': 'speech-to-text',
+      'speech-demo': 'speech-to-text',
+      'oil-converter': 'speech-to-text',
+      'messaging': 'correspondence',
+      'users': 'user_management',
+      'settings': 'settings',
+      'workflow': 'workflow',
+      'server': 'settings',
+      'system': 'settings',
+      'calendar': 'dashboard'
+    };
+    return mapping[moduleId] || moduleId;
+  };
+
   const renderActiveModule = () => {
+    const permissionModuleId = getPermissionModuleId(activeModule);
+    
+    // بررسی دسترسی view قبل از رندر کردن ماژول
+    if (!canView(permissionModuleId)) {
+      return (
+        <div className="p-6">
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <div>در حال بارگذاری...</div>
+          </PermissionGuard>
+        </div>
+      );
+    }
+
     switch (activeModule) {
       case 'dashboard':
-        return <DashboardStats onLogout={handleLogout} />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <DashboardStats onLogout={handleLogout} />
+          </PermissionGuard>
+        );
       case 'base-data':
-        return <BaseDataManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <BaseDataManager />
+          </PermissionGuard>
+        );
       case 'contracts':
-        return <ContractManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <ContractManager />
+          </PermissionGuard>
+        );
       case 'warehouse-receipt':
-        return <WarehouseReceiptManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <WarehouseReceiptManager />
+          </PermissionGuard>
+        );
       case 'warehouse-delivery':
         return (
-          <WarehouseDeliveryManager
-            sharedData={sharedData}
-            updateSharedData={updateSharedData}
-            onRefresh={handleRefreshData}
-          />
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <WarehouseDeliveryManager
+              sharedData={sharedData}
+              updateSharedData={updateSharedData}
+              onRefresh={handleRefreshData}
+            />
+          </PermissionGuard>
         );
       case 'Deduction-Addition':
-        return <InventoryAdjustmentManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <InventoryAdjustmentManager />
+          </PermissionGuard>
+        );
       case 'product-conversion':
-        return <ProductConversionManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <ProductConversionManager />
+          </PermissionGuard>
+        );
       case 'invoice-generation':
         return (
-          <AccountingManager
-            lastAutoInvoiceCheck={lastCheckTime}
-            isAutoChecking={isChecking}
-          />
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <AccountingManager
+              lastAutoInvoiceCheck={lastCheckTime}
+              isAutoChecking={isChecking}
+            />
+          </PermissionGuard>
         );
       case 'reports':
-        return <ReportsManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <ReportsManager />
+          </PermissionGuard>
+        );
       case 'inventory-ledger':
-        return <InventoryLedgerManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <InventoryLedgerManager />
+          </PermissionGuard>
+        );
       case 'analytics':
-        return <AnalyticsManager />;
       case 'analytics-main':
-        return <AnalyticsManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <AnalyticsManager />
+          </PermissionGuard>
+        );
       case 'speech-to-text':
-        return <CompleteAdvancedSystem />;
       case 'speech-demo':
-        return <CompleteAdvancedSystem />;
       case 'oil-converter':
-        return <CompleteAdvancedSystem />;
-      case 'complete-system':
-        return <CompleteAdvancedSystem />;
-      case 'oil-product-creator':
-        return <OilProductCreator />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <CompleteAdvancedSystem />
+          </PermissionGuard>
+        );
       case 'messaging':
-        return <MessagingManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <MessagingManager />
+          </PermissionGuard>
+        );
       case 'users':
-        return <UserManagementManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <UserManagementManager />
+          </PermissionGuard>
+        );
       
       // ✅ تغییر اصلی: استفاده از SettingsManager به جای GeneralAppearanceAndNotificationsSettings
       case 'settings':
         return (
-          <SettingsManager
-            settings={settings}
-            setSettings={setSettings}
-            applySettings={applySettings}
-          />
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <SettingsManager
+              settings={settings}
+              setSettings={setSettings}
+              applySettings={applySettings}
+            />
+          </PermissionGuard>
         );
       
       case 'workflow':
-        return <WorkflowManager />;
-      
-      // ❌ حذف کلاس قدیمی ThemeManager - حالا در settings قرار دارد
-      /*
-      case 'theme':
         return (
-          <ThemeManager isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <WorkflowManager />
+          </PermissionGuard>
         );
-      */
       
       // 🔧 تغییر اصلی: استفاده از ServerSettings با SettingsProvider
       case 'server':
         return (
-          <div className="p-6">
-            <ServerSettings />
-          </div>
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <div className="p-6">
+              <ServerSettings />
+            </div>
+          </PermissionGuard>
         );
       case 'system':
-        return <SystemManager />;
+        return (
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <SystemManager />
+          </PermissionGuard>
+        );
       case 'calendar':
         return (
-          <div className="p-6">
-            <h1 className={`text-2xl font-bold mb-6 ${
-              isDark ? 'text-white' : 'text-gray-900'
-            }`}>
-              تقویم شمسی
-            </h1>
-            <div className="max-w-md mx-auto">
-              <DateSelectionWrapper
-                value={selectedDate}
-                onChange={handleDateSelect}
-              />
-              {selectedDate && (
-                <div className={`mt-4 p-4 rounded-lg ${
-                  isDark ? 'bg-blue-900/20 text-blue-300' : 'bg-blue-50 text-blue-800'
-                }`}>
-                  <p className="text-center">
-                    تاریخ انتخاب شده: {selectedDate.toLocaleDateString('fa-IR')}
-                  </p>
-                </div>
-              )}
+          <PermissionGuard moduleId={permissionModuleId} action="view">
+            <div className="p-6">
+              <h1 className={`text-2xl font-bold mb-6 ${
+                isDark ? 'text-white' : 'text-gray-900'
+              }`}>
+                تقویم شمسی
+              </h1>
+              <div className="max-w-md mx-auto">
+                <DateSelectionWrapper
+                  value={selectedDate}
+                  onChange={handleDateSelect}
+                />
+                {selectedDate && (
+                  <div className={`mt-4 p-4 rounded-lg ${
+                    isDark ? 'bg-blue-900/20 text-blue-300' : 'bg-blue-50 text-blue-800'
+                  }`}>
+                    <p className="text-center">
+                      تاریخ انتخاب شده: {selectedDate.toLocaleDateString('fa-IR')}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </PermissionGuard>
         );
       default:
-        return <DashboardStats onLogout={handleLogout} />;
+        return (
+          <PermissionGuard moduleId="dashboard" action="view">
+            <DashboardStats onLogout={handleLogout} />
+          </PermissionGuard>
+        );
     }
   };
 

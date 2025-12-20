@@ -7,6 +7,7 @@ import {
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface InventoryAdjustment {
   id: string;
@@ -145,6 +146,7 @@ const defaultContracts = [
 
 export const InventoryAdjustmentManager: React.FC = () => {
   const storage = DataStorage.getInstance();
+  const { canCreate, canEdit, canDelete } = usePermissions();
   const [deductionDocumentDate, setDeductionDocumentDate] = useState<Date>(new Date());
   const [additionDocumentDate, setAdditionDocumentDate] = useState<Date>(new Date());
   const [isTransactionTableMinimized, setIsTransactionTableMinimized] = useState<boolean>(false);
@@ -3073,15 +3075,17 @@ export const InventoryAdjustmentManager: React.FC = () => {
         )}
         
         <div className="mt-4">
-          <button
-            onClick={handleSubmit}
-            className={`px-4 py-2 rounded-lg text-white flex items-center gap-2 ${
-              type === 'deduction' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-            }`}
-          >
-            {icon}
-            {title}
-          </button>
+          {canCreate('inventory_adjustment') && (
+            <button
+              onClick={handleSubmit}
+              className={`px-4 py-2 rounded-lg text-white flex items-center gap-2 ${
+                type === 'deduction' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              {icon}
+              {title}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -3217,12 +3221,14 @@ export const InventoryAdjustmentManager: React.FC = () => {
           </div>
           
           <div className="mt-6 flex gap-2">
-            <button
-              onClick={() => saveAdjustment(adjustment.adjustmentType, true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              ذخیره تغییرات
-            </button>
+            {canEdit('inventory_adjustment') && (
+              <button
+                onClick={() => saveAdjustment(adjustment.adjustmentType, true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                ذخیره تغییرات
+              </button>
+            )}
             <button
               onClick={() => setEditingId(null)}
               className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
@@ -3685,20 +3691,24 @@ export const InventoryAdjustmentManager: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEdit(adjustment)}
-                        className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                        title="ویرایش"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(adjustment.id)}
-                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-                        title="حذف"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canEdit('inventory_adjustment') && (
+                        <button
+                          onClick={() => handleEdit(adjustment)}
+                          className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                          title="ویرایش"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canDelete('inventory_adjustment') && (
+                        <button
+                          onClick={() => handleDelete(adjustment.id)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                          title="حذف"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleAttach(adjustment.id)}
                         disabled={adjustment.status !== 'temporary'}

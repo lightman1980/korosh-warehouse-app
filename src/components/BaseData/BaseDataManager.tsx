@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, CreditCard as Edit2, Trash2, Save, X, CircleAlert as AlertCircle } from "lucide-react";
 import { DataStorage } from "../../utils/dataStorage";
 import { formatPersianDate, safeParseDate } from "../../utils/persian";
+import { canCreate, canEdit, canDelete } from "../../utils/permissionHelpers";
 
 interface BaseDataItem {
   id: string;
@@ -326,6 +327,11 @@ const BaseDataManager = () => {
   const [newItem, setNewItem] = useState<Partial<BaseDataItem>>({});
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  
+  // بررسی دسترسی‌ها برای ماژول base_data
+  const canCreateItem = canCreate('base_data');
+  const canEditItem = canEdit('base_data');
+  const canDeleteItem = canDelete('base_data');
 
   // تابع برای بازنشانی داده‌ها به حالت اولیه
   const resetToInitialData = () => {
@@ -792,13 +798,15 @@ const BaseDataManager = () => {
                     <h2 className="text-xl font-semibold text-gray-900">{currentCategory?.name}</h2>
                     <p className="text-gray-600 text-sm mt-1">{currentCategory?.description}</p>
                   </div>
-                  <button
-                    onClick={() => setIsAddingNew(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    افزودن جديد
-                  </button>
+                  {canCreateItem && (
+                    <button
+                      onClick={() => setIsAddingNew(true)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      افزودن جديد
+                    </button>
+                  )}
                 </div>
                 <div className="relative">
                   <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -1167,12 +1175,19 @@ const BaseDataManager = () => {
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <button onClick={() => handleEdit(item.id)} className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors">
-                                  <Edit2 className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                {canEditItem && (
+                                  <button onClick={() => handleEdit(item.id)} className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors">
+                                    <Edit2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {canDeleteItem && (
+                                  <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {!canEditItem && !canDeleteItem && (
+                                  <span className="text-xs text-gray-400">بدون دسترسی</span>
+                                )}
                               </div>
                             )}
                           </td>

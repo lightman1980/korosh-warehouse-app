@@ -7,6 +7,7 @@ import {
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
+import { usePermissions } from '../../hooks/usePermissions';
 import jalaali from 'jalaali-js';
 
 interface ProductConversion {
@@ -78,6 +79,7 @@ const defaultContracts = [
 
 export const ProductConversionManager: React.FC = () => {
   const storage = DataStorage.getInstance();
+  const { canCreate, canEdit, canDelete } = usePermissions();
   const [documentDate, setDocumentDate] = useState<Date>(new Date());
   const [conversions, setConversions] = useState<ProductConversion[]>([]);
   const [baseData, setBaseData] = useState<Record<string, any[]>>(defaultBaseData);
@@ -2167,13 +2169,24 @@ export const ProductConversionManager: React.FC = () => {
         
         {/* دکمه‌های عملیات */}
         <div className="flex gap-4 mb-8">
-          <button
-            onClick={saveConversion}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            {editingId ? 'ویرایش تبدیل کالا' : 'ثبت تبدیل کالا'}
-          </button>
+          {!editingId && canCreate('product_conversion') && (
+            <button
+              onClick={saveConversion}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              ثبت تبدیل کالا
+            </button>
+          )}
+          {editingId && canEdit('product_conversion') && (
+            <button
+              onClick={saveConversion}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              ویرایش تبدیل کالا
+            </button>
+          )}
           {editingId && (
             <button
               onClick={() => {
@@ -2507,13 +2520,15 @@ export const ProductConversionManager: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium border border-gray-200">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(conversion)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                          title="ویرایش"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
+                        {canEdit('product_conversion') && (
+                          <button
+                            onClick={() => handleEdit(conversion)}
+                            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                            title="ویرایش"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        )}
                         {conversion.status === 'temporary' && (
                           <button
                             onClick={() => handleFinalize(conversion.id)}
@@ -2530,14 +2545,16 @@ export const ProductConversionManager: React.FC = () => {
                         >
                           <Printer className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(conversion.id)}
-                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-                          title="حذف"
-                          disabled={conversion.status === 'finalized'}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canDelete('product_conversion') && (
+                          <button
+                            onClick={() => handleDelete(conversion.id)}
+                            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                            title="حذف"
+                            disabled={conversion.status === 'finalized'}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

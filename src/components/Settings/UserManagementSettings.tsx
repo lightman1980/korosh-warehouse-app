@@ -118,6 +118,13 @@ const defaultPermissionCatalog: SystemModule[] = [
     description: 'مدیریت اطلاعات پایه سیستم'
   },
   { 
+    id: 'contracts', 
+    name: 'مدیریت قراردادها', 
+    category: 'قراردادها',
+    icon: 'FileText',
+    description: 'مدیریت قراردادهای انبار'
+  },
+  { 
     id: 'consignment_receipt', 
     name: 'رسید انبار امانی', 
     category: 'انبار',
@@ -132,6 +139,13 @@ const defaultPermissionCatalog: SystemModule[] = [
     description: 'ثبت رسید کالای تملیکی'
   },
   { 
+    id: 'warehouse_delivery', 
+    name: 'حواله انبار', 
+    category: 'انبار',
+    icon: 'FileOutput',
+    description: 'صدور و مدیریت حواله انبار'
+  },
+  { 
     id: 'consignment_delivery', 
     name: 'حواله امانی', 
     category: 'انبار',
@@ -144,13 +158,6 @@ const defaultPermissionCatalog: SystemModule[] = [
     category: 'انبار',
     icon: 'Truck',
     description: 'صدور حواله کالای تملیکی'
-  },
-  { 
-    id: 'warehouse_delivery', 
-    name: 'تحویل/ارسال انبار', 
-    category: 'انبار',
-    icon: 'Package',
-    description: 'تحویل و ارسال کالا از انبار'
   },
   { 
     id: 'inventory_adjustment', 
@@ -174,6 +181,13 @@ const defaultPermissionCatalog: SystemModule[] = [
     description: 'صدور فاکتور فروش'
   },
   { 
+    id: 'reports', 
+    name: 'گزارشات', 
+    category: 'گزارش',
+    icon: 'TrendingUp',
+    description: 'گزارشات سیستم'
+  },
+  { 
     id: 'inventory_ledger', 
     name: 'کاردکس موجودی', 
     category: 'گزارش',
@@ -188,11 +202,11 @@ const defaultPermissionCatalog: SystemModule[] = [
     description: 'تحلیل و بررسی داده‌ها'
   },
   { 
-    id: 'contracts', 
-    name: 'مدیریت قراردادها', 
-    category: 'قراردادها',
-    icon: 'FileText',
-    description: 'مدیریت قراردادهای انبار'
+    id: 'speech-to-text', 
+    name: 'امکانات ویژه', 
+    category: 'سیستم',
+    icon: 'Mic',
+    description: 'امکانات ویژه سیستم (ساخت محصول جدید و ...)'
   },
   { 
     id: 'correspondence', 
@@ -332,10 +346,13 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     [userManagement.permissionCatalog]
   );
 
+  // State برای force refresh لیست کاربران
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
+  
   const availableUsers = useMemo(() => {
     const users = storage.loadData<UserProfile[]>('users') || [];
     return Array.isArray(users) ? users : [];
-  }, [storage]);
+  }, [storage, usersRefreshKey]);
 
   const normalizedGroups: UserGroup[] = useMemo(() => {
     const groups: UserGroup[] = userManagement.userGroups || [];
@@ -370,6 +387,30 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     const logs = generateActivityLogs();
     setActivityLogs(logs);
   }, [availableUsers]);
+
+  // Sync availableUsers with normalizedUserAccess - ensure all users have access entries
+  useEffect(() => {
+    if (availableUsers.length === 0) return;
+    
+    const currentAccess = userManagement.userAccess || [];
+    const missingUsers = availableUsers.filter(user => 
+      !currentAccess.find((entry: UserAccessEntry) => entry.userId === user.id)
+    );
+    
+    if (missingUsers.length > 0) {
+      const newAccessEntries: UserAccessEntry[] = missingUsers.map(user => ({
+        userId: user.id,
+        username: user.username,
+        displayName: user.fullName,
+        groups: [],
+        overrides: ensureOverrides(permissionCatalog)
+      }));
+      
+      updateUserManagement({ 
+        userAccess: [...currentAccess, ...newAccessEntries] 
+      });
+    }
+  }, [availableUsers, userManagement.userAccess, permissionCatalog]);
 
   // Helper functions
   function ensureModulePermissions(catalog: SystemModule[], current?: ModulePermission[]): ModulePermission[] {
@@ -1140,6 +1181,9 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       // Save to storage
       storage.saveData('users', updatedUsers);
       
+      // Force refresh users list
+      setUsersRefreshKey(prev => prev + 1);
+      
       // Reset form and close modal
       resetUserForm();
       setShowUserForm(false);
@@ -1283,6 +1327,14 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       }
       
       updateUserManagement({ userGroups: updatedGroups });
+      
+      // Force refresh - settings will update and normalizedGroups will refresh automatically
+      // But we also need to ensure the UI updates
+      setTimeout(() => {
+        // This will trigger a re-render
+        setSettings(prev => ({ ...prev }));
+      }, 100);
+      
       resetGroupForm();
       setShowGroupForm(false);
       setEditingGroup(null);
@@ -2084,10 +2136,20 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
   // Helper functions
   function updateUserManagement(updates: Partial<typeof userManagement>) {
-    setSettings({
+    const newSettings = {
       ...settings,
       userManagement: { ...userManagement, ...updates } as any
-    });
+    };
+    setSettings(newSettings);
+    
+    // Save to storage
+    storage.saveData('appSettings', newSettings);
+    
+    // Dispatch event to notify permission system of changes
+    // This will trigger permission recalculation in usePermissions hook
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('permissionsUpdated'));
+    }
   }
 
   function resetUserForm() {
@@ -3191,7 +3253,32 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                     {normalizedUserAccess.length} کاربر تعریف شده
                   </div>
                 </div>
-                {normalizedUserAccess.map((userAccess) => {
+                
+                {/* جستجوی کاربر */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                      type="text"
+                      placeholder="جستجوی کاربر..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                {normalizedUserAccess
+                  .filter(userAccess => {
+                    if (!searchQuery.trim()) return true;
+                    const user = availableUsers.find(u => u.id === userAccess.userId);
+                    if (!user) return false;
+                    const query = searchQuery.toLowerCase();
+                    return user.fullName.toLowerCase().includes(query) ||
+                           user.username.toLowerCase().includes(query) ||
+                           user.email.toLowerCase().includes(query);
+                  })
+                  .map((userAccess) => {
                   const user = availableUsers.find(u => u.id === userAccess.userId);
                   if (!user) return null;
                   
@@ -3200,7 +3287,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                   const permSummary = getUserPermissionSummary(userAccess.userId);
                   
                   return (
-                    <div key={userAccess.userId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div key={userAccess.userId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -3320,27 +3407,90 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                                 if (perm?.view) actions.push('مشاهده');
                                 if (perm?.delete) actions.push('حذف');
                                 
+                                // بررسی دسترسی‌های فردی (overrides)
+                                const userOverride = userAccess.overrides.find(o => o.moduleId === module.id);
+                                const hasIndividualOverride = userOverride && (
+                                  userOverride.actions.create !== undefined ||
+                                  userOverride.actions.edit !== undefined ||
+                                  userOverride.actions.view !== undefined ||
+                                  userOverride.actions.delete !== undefined
+                                );
+                                
                                 return (
-                                  <div key={module.id} className={`p-2 rounded border ${
-                                    permStatus === 'full' ? 'bg-green-50 text-green-700 border-green-200' :
-                                    permStatus === 'partial' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                  <div key={module.id} className={`p-3 rounded-lg border-2 ${
+                                    permStatus === 'full' ? 'bg-green-50 text-green-700 border-green-300' :
+                                    permStatus === 'partial' ? 'bg-yellow-50 text-yellow-700 border-yellow-300' :
                                     'bg-gray-50 text-gray-500 border-gray-200'
-                                  }`}>
-                                    <div className="flex items-start justify-between">
+                                  } ${hasIndividualOverride ? 'ring-2 ring-blue-300' : ''}`}>
+                                    <div className="flex items-start justify-between mb-2">
                                       <div className="flex-1">
-                                        <div className="font-medium text-xs">{module.name}</div>
-                                        <div className="text-xs mt-1 opacity-75">
-                                          {actions.length > 0 ? actions.join('، ') : 'بدون دسترسی'}
-                                        </div>
+                                        <div className="font-medium text-sm mb-1">{module.name}</div>
                                         {module.description && (
-                                          <div className="text-xs mt-1 opacity-60">{module.description}</div>
+                                          <div className="text-xs text-gray-500 mb-2">{module.description}</div>
+                                        )}
+                                        <div className="text-xs opacity-75 mb-2">
+                                          {actions.length > 0 ? `دسترسی فعلی: ${actions.join('، ')}` : 'بدون دسترسی'}
+                                        </div>
+                                        {hasIndividualOverride && (
+                                          <div className="text-xs text-blue-600 font-medium mb-2">
+                                            ⚠️ دسترسی فردی تعریف شده (اولویت بر گروه)
+                                          </div>
                                         )}
                                       </div>
-                                      <div className={`w-2 h-2 rounded-full ml-2 ${
+                                      <div className={`w-3 h-3 rounded-full ml-2 flex-shrink-0 ${
                                         permStatus === 'full' ? 'bg-green-500' :
                                         permStatus === 'partial' ? 'bg-yellow-500' :
                                         'bg-gray-400'
                                       }`} />
+                                    </div>
+                                    
+                                    {/* Checkbox های دسترسی جزئی */}
+                                    <div className="mt-3 pt-3 border-t border-gray-300">
+                                      <div className="text-xs font-medium text-gray-700 mb-2">تعریف دسترسی فردی:</div>
+                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {(['view', 'create', 'edit', 'delete'] as PermissionAction[]).map(action => {
+                                          const actionLabels = {
+                                            view: 'مشاهده',
+                                            create: 'ایجاد',
+                                            edit: 'ویرایش',
+                                            delete: 'حذف'
+                                          };
+                                          const actionColors = {
+                                            view: 'text-blue-600 border-blue-300',
+                                            create: 'text-green-600 border-green-300',
+                                            edit: 'text-yellow-600 border-yellow-300',
+                                            delete: 'text-red-600 border-red-300'
+                                          };
+                                          
+                                          // استفاده از override اگر وجود داشته باشد، در غیر این صورت از effective
+                                          const currentValue = userOverride?.actions[action] !== undefined 
+                                            ? userOverride.actions[action]
+                                            : perm?.[action] || false;
+                                          
+                                          return (
+                                            <label 
+                                              key={action}
+                                              className={`flex items-center gap-2 p-2 rounded border cursor-pointer hover:bg-gray-50 transition-colors ${
+                                                currentValue ? actionColors[action] : 'text-gray-500 border-gray-300'
+                                              }`}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={currentValue}
+                                                onChange={(e) => {
+                                                  toggleUserOverride(userAccess.userId, module.id, action, e.target.checked);
+                                                  showNotification('success', `دسترسی ${actionLabels[action]} برای ${module.name} ${e.target.checked ? 'فعال' : 'غیرفعال'} شد`);
+                                                }}
+                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                              />
+                                              <span className="text-xs font-medium">{actionLabels[action]}</span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-2">
+                                        💡 دسترسی فردی بر دسترسی گروهی اولویت دارد
+                                      </div>
                                     </div>
                                   </div>
                                 );

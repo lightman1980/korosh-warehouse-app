@@ -29,19 +29,46 @@ export const usePermissions = () => {
         if (user) {
           const permissions = calculateEffectivePermissions(user);
           setEffectivePermissions(permissions);
+          console.log('Permissions loaded for user:', user.username, permissions);
+        } else {
+          setEffectivePermissions({});
         }
       } catch (error) {
         console.error('Error loading permissions:', error);
+        setEffectivePermissions({});
       } finally {
         setIsLoading(false);
       }
     };
 
+    // Load immediately
     loadPermissions();
     
-    // Listen for user changes
-    const interval = setInterval(loadPermissions, 5000);
-    return () => clearInterval(interval);
+    // Listen for storage changes (when permissions are updated)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'appSettings' || e.key === 'users') {
+        console.log('Storage changed, reloading permissions...');
+        loadPermissions();
+      }
+    };
+
+    // Listen for custom events (when permissions are updated programmatically)
+    const handlePermissionUpdate = () => {
+      console.log('Permission update event received, reloading permissions...');
+      loadPermissions();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('permissionsUpdated', handlePermissionUpdate);
+    
+    // Also check periodically (every 2 seconds) for changes
+    const interval = setInterval(loadPermissions, 2000);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('permissionsUpdated', handlePermissionUpdate);
+    };
   }, []);
 
   /**
@@ -101,6 +128,7 @@ export const usePermissions = () => {
 
 /**
  * Calculate effective permissions from user groups and overrides
+ * دسترسی فردی بر دسترسی گروهی ارجحیت دارد
  */
 function calculateEffectivePermissions(user: UserProfile): EffectivePermissions {
   const storage = DataStorage.getInstance();
@@ -108,43 +136,77 @@ function calculateEffectivePermissions(user: UserProfile): EffectivePermissions 
   const userManagement = settings.userManagement || {};
   const userAccess = (userManagement.userAccess || []).find((ua: any) => ua.userId === user.id);
   const groups = userManagement.userGroups || [];
+  const permissionCatalog = userManagement.permissionCatalog || [];
 
   const effective: EffectivePermissions = {};
 
-  // Get permissions from groups
-  if (userAccess && userAccess.groups) {
+  // Step 1: Initialize all modules with default permissions (deny all)
+  permissionCatalog.forEach((module: any) => {
+    effective[module.id] = {
+      create: false,
+      edit: false,
+      view: false,
+      delete: false
+    };
+  });
+
+  // Step 2: Apply role-based default permissions (if any)
+  // This is a fallback - typically permissions come from groups or individual overrides
+  // But we can add role-based defaults here if needed
+
+  // Step 3: Apply group permissions (OR logic - if any group has permission, grant it)
+  const groupPermissions: EffectivePermissions = {};
+
+  if (userAccess && userAccess.groups && Array.isArray(userAccess.groups)) {
     userAccess.groups.forEach((groupId: string) => {
       const group = groups.find((g: any) => g.id === groupId);
-      if (group && group.permissions) {
+      if (group && group.isActive && group.permissions && Array.isArray(group.permissions)) {
         group.permissions.forEach((perm: any) => {
-          if (!effective[perm.moduleId]) {
-            effective[perm.moduleId] = {
+          if (!groupPermissions[perm.moduleId]) {
+            groupPermissions[perm.moduleId] = {
               create: false,
               edit: false,
               view: false,
               delete: false
             };
           }
-          // Merge: if any group has permission, grant it
-          effective[perm.moduleId] = {
-            create: effective[perm.moduleId].create || perm.create,
-            edit: effective[perm.moduleId].edit || perm.edit,
-            view: effective[perm.moduleId].view || perm.view,
-            delete: effective[perm.moduleId].delete || perm.delete
+          // Merge: if any group has permission, grant it (OR logic)
+          groupPermissions[perm.moduleId] = {
+            create: groupPermissions[perm.moduleId].create || perm.create,
+            edit: groupPermissions[perm.moduleId].edit || perm.edit,
+            view: groupPermissions[perm.moduleId].view || perm.view,
+            delete: groupPermissions[perm.moduleId].delete || perm.delete
           };
         });
       }
     });
   }
 
-  // Apply individual overrides (priority)
-  if (userAccess && userAccess.overrides) {
+  // Step 4: Apply group permissions to effective
+  Object.keys(groupPermissions).forEach(moduleId => {
+    if (effective[moduleId]) {
+      effective[moduleId] = { ...groupPermissions[moduleId] };
+    }
+  });
+
+  // Step 5: Apply individual overrides (highest priority - completely replaces group permissions)
+  if (userAccess && userAccess.overrides && Array.isArray(userAccess.overrides)) {
     userAccess.overrides.forEach((override: any) => {
-      const hasOverride = override.actions.create || override.actions.edit || 
-                         override.actions.view || override.actions.delete;
+      const hasAnyOverride = override.actions && (
+        override.actions.create !== undefined || 
+        override.actions.edit !== undefined || 
+        override.actions.view !== undefined || 
+        override.actions.delete !== undefined
+      );
       
-      if (hasOverride) {
-        effective[override.moduleId] = { ...override.actions };
+      if (hasAnyOverride && effective[override.moduleId]) {
+        // Individual override completely replaces group permissions for this module
+        effective[override.moduleId] = {
+          create: override.actions.create ?? false,
+          edit: override.actions.edit ?? false,
+          view: override.actions.view ?? false,
+          delete: override.actions.delete ?? false
+        };
       }
     });
   }

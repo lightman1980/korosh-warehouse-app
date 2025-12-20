@@ -3,6 +3,7 @@ import { Plus, Search, Download, RefreshCw, Edit2, Trash2, AlertCircle, Printer,
 import { WarehouseDelivery } from '../../types/WarehouseDeliveryTypes';
 import { formatPersianNumber, formatPersianDate } from "../../utils/persian";
 import { DataStorage } from '../../utils/dataStorage';
+import { usePermissions } from '../../hooks/usePermissions';
 // Removed unused imports: DeliveryTypeSelector, CompanySelector, ContractSelector, PermitSelector, DeliveryForm, DeliveriesTable
 import DeliverySlipTypeSelector from './DeliverySlipTypeSelector';
 import ConsignmentDeliverySlip from './ConsignmentDeliverySlip';
@@ -32,6 +33,7 @@ const WarehouseDeliveryManager: React.FC<WarehouseDeliveryManagerProps> = ({
 }) => {
   // Initialize storage first before any hooks that use it
   const storage = DataStorage.getInstance();
+  const { canCreate, canEdit, canDelete } = usePermissions();
   
   // Helper function for type-safe data loading (currently unused but kept for future use)
   // const loadDataSafe = <T,>(key: string, defaultValue: T): T => {
@@ -3142,24 +3144,28 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex flex-col gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCreateDeliveryFromPermit(permit);
-                              }}
-                              className="text-green-600 hover:text-green-800"
-                            >
-                              ايجاد حواله
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditFromParent(permit);
-                              }}
-                              className="text-purple-600 hover:text-purple-800"
-                            >
-                              ويرايش
-                            </button>
+                            {canCreate('warehouse_delivery') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreateDeliveryFromPermit(permit);
+                                }}
+                                className="text-green-600 hover:text-green-800"
+                              >
+                                ايجاد حواله
+                              </button>
+                            )}
+                            {canEdit('warehouse_delivery') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditFromParent(permit);
+                                }}
+                                className="text-purple-600 hover:text-purple-800"
+                              >
+                                ويرايش
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -3677,16 +3683,18 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                             <div className="flex gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditTransaction(slip);
-                                }}
-                                className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                                title="ويرايش"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
+                              {canEdit('warehouse_delivery') && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditTransaction(slip);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                                  title="ويرايش"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -3724,16 +3732,18 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
                                   <AlertCircle className="h-4 w-4" />
                                 </button>
                               ) : null}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteTransaction(slip);
-                                }}
-                                className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-                                title="حذف"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {canDelete('warehouse_delivery') && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTransaction(slip);
+                                  }}
+                                  className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

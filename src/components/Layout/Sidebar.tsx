@@ -18,6 +18,7 @@ import {
   FlaskConical
 } from 'lucide-react';
 import { checkAndFocusTab } from '../../utils/tabManager';
+import { canView } from '../../utils/permissionHelpers';
 
 interface SidebarProps {
   activeModule: string;
@@ -29,25 +30,23 @@ interface SidebarProps {
   settings?: any;
 }
 
-// منوهای اصلی
+// منوهای اصلی با mapping به moduleId در سیستم دسترسی
 const menuItems = [
-  { id: 'dashboard', name: 'داشبورد', icon: Home },
-  { id: 'base-data', name: 'اطلاعات پایه', icon: Database },
-  { id: 'contracts', name: 'قرارداد ها', icon: FileText },
-  { id: 'warehouse-receipt', name: 'رسید انبار', icon: Package },
-  { id: 'warehouse-delivery', name: 'حواله انبار', icon: FileOutput },
-  { id: 'Deduction-Addition', name: 'کسر/اضافه انبار', icon: MinusCircle },
-  { id: 'product-conversion', name: 'تبدیل کالا', icon: RefreshCw },
-  { id: 'invoice-generation', name: 'صدور فاکتور', icon: CreditCard },
-  { id: 'reports', name: 'گزارشات', icon: TrendingUp },
-  { id: 'inventory-ledger', name: 'کاردکس موجودی', icon: Archive },
-  { id: 'analytics', name: 'تحلیل و بررسی', icon: BarChart3 },
-  { id: 'complete-system', name: 'سیستم پیشرفته یکپارچه', icon: FileAudio },
-  { id: 'oil-product-creator', name: 'تحلیل محصول نهایی', icon: FlaskConical },
-  { id: 'speech-to-text', name: 'امکانات ویژه', icon: Mic },
-  { id: 'messaging', name: 'مکاتبات', icon: Users },
-  { id: 'users', name: 'مدیریت کاربران', icon: Users },
-  { id: 'settings', name: 'تنظیمات', icon: Settings },
+  { id: 'dashboard', name: 'داشبورد', icon: Home, permissionModuleId: 'dashboard' },
+  { id: 'base-data', name: 'اطلاعات پایه', icon: Database, permissionModuleId: 'base_data' },
+  { id: 'contracts', name: 'قرارداد ها', icon: FileText, permissionModuleId: 'contracts' },
+  { id: 'warehouse-receipt', name: 'رسید انبار', icon: Package, permissionModuleId: 'consignment_receipt' },
+  { id: 'warehouse-delivery', name: 'حواله انبار', icon: FileOutput, permissionModuleId: 'warehouse_delivery' },
+  { id: 'Deduction-Addition', name: 'کسر/اضافه انبار', icon: MinusCircle, permissionModuleId: 'inventory_adjustment' },
+  { id: 'product-conversion', name: 'تبدیل کالا', icon: RefreshCw, permissionModuleId: 'product_conversion' },
+  { id: 'invoice-generation', name: 'صدور فاکتور', icon: CreditCard, permissionModuleId: 'invoice' },
+  { id: 'reports', name: 'گزارشات', icon: TrendingUp, permissionModuleId: 'reports' },
+  { id: 'inventory-ledger', name: 'کاردکس موجودی', icon: Archive, permissionModuleId: 'inventory_ledger' },
+  { id: 'analytics', name: 'تحلیل و بررسی', icon: BarChart3, permissionModuleId: 'analytics' },
+  { id: 'speech-to-text', name: 'امکانات ویژه', icon: Mic, permissionModuleId: 'speech-to-text' },
+  { id: 'messaging', name: 'مکاتبات', icon: Users, permissionModuleId: 'correspondence' },
+  { id: 'users', name: 'مدیریت کاربران', icon: Users, permissionModuleId: 'user_management' },
+  { id: 'settings', name: 'تنظیمات', icon: Settings, permissionModuleId: 'settings' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -112,6 +111,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeModule === item.id;
+            
+            // بررسی دسترسی view برای این ماژول
+            // اگر permissionModuleId تعریف نشده باشد، دسترسی داده می‌شود (برای سازگاری)
+            const hasAccess = item.permissionModuleId 
+              ? canView(item.permissionModuleId) 
+              : true;
+            
+            // اگر دسترسی نداشته باشد، منو را نمایش نده
+            if (!hasAccess) {
+              return null;
+            }
             
             return (
               <button

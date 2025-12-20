@@ -14,6 +14,7 @@ export interface ModulePermissions {
 
 /**
  * Get effective permissions for current user on a module
+ * دسترسی فردی بر دسترسی گروهی ارجحیت دارد
  */
 export function getModulePermissions(moduleId: string): ModulePermissions {
   const user = authService.getCurrentUser();
@@ -32,42 +33,54 @@ export function getModulePermissions(moduleId: string): ModulePermissions {
   const userAccess = (userManagement.userAccess || []).find((ua: any) => ua.userId === user.id);
   const groups = userManagement.userGroups || [];
 
-  const effective: ModulePermissions = {
+  // Step 1: Start with default permissions (deny all)
+  let groupPermissions: ModulePermissions = {
     create: false,
     edit: false,
     view: false,
     delete: false
   };
 
-  // Get permissions from groups
-  if (userAccess && userAccess.groups) {
+  // Step 2: Collect group permissions (OR logic - if any group has permission, grant it)
+  if (userAccess && userAccess.groups && Array.isArray(userAccess.groups)) {
     userAccess.groups.forEach((groupId: string) => {
       const group = groups.find((g: any) => g.id === groupId);
-      if (group && group.permissions) {
+      if (group && group.isActive && group.permissions && Array.isArray(group.permissions)) {
         const groupPerm = group.permissions.find((p: any) => p.moduleId === moduleId);
         if (groupPerm) {
-          effective.create = effective.create || groupPerm.create;
-          effective.edit = effective.edit || groupPerm.edit;
-          effective.view = effective.view || groupPerm.view;
-          effective.delete = effective.delete || groupPerm.delete;
+          // اگر هر گروهی دسترسی داشت، اعطا می‌شود (OR logic)
+          groupPermissions.create = groupPermissions.create || groupPerm.create;
+          groupPermissions.edit = groupPermissions.edit || groupPerm.edit;
+          groupPermissions.view = groupPermissions.view || groupPerm.view;
+          groupPermissions.delete = groupPermissions.delete || groupPerm.delete;
         }
       }
     });
   }
 
-  // Apply individual overrides (priority)
-  if (userAccess && userAccess.overrides) {
+  // Step 3: Check individual overrides (highest priority - completely replaces group permissions)
+  if (userAccess && userAccess.overrides && Array.isArray(userAccess.overrides)) {
     const override = userAccess.overrides.find((o: any) => o.moduleId === moduleId);
     if (override && override.actions) {
-      const hasOverride = override.actions.create || override.actions.edit || 
-                         override.actions.view || override.actions.delete;
-      if (hasOverride) {
-        return { ...override.actions };
+      const hasAnyOverride = override.actions.create !== undefined || 
+                            override.actions.edit !== undefined || 
+                            override.actions.view !== undefined || 
+                            override.actions.delete !== undefined;
+      
+      if (hasAnyOverride) {
+        // دسترسی فردی تعریف شده - اولویت کامل دارد و دسترسی گروهی را نادیده می‌گیرد
+        return {
+          create: override.actions.create ?? false,
+          edit: override.actions.edit ?? false,
+          view: override.actions.view ?? false,
+          delete: override.actions.delete ?? false
+        };
       }
     }
   }
 
-  return effective;
+  // Step 4: If no individual override, return group permissions
+  return groupPermissions;
 }
 
 /**
