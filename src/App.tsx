@@ -24,11 +24,11 @@ import { InventoryAdjustmentManager } from './components/InventoryAdjustment/Inv
 import { ProductConversionManager } from './components/ProductConversion/ProductConversionManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Import Speech-to-Text components
-import SpeechToTextConverter from './components/Speech/AdvancedTools';
+// Import Complete Advanced System
+import CompleteAdvancedSystem from './components/CompleteAdvanced/CompleteAdvancedSystem';
 
-// Import Oil Converter Enhanced
-import OilConverter from './components/Speech/OilConverter_Enhanced';
+// Import Oil Product Creator
+import OilProductCreator from './components/CompleteAdvanced/OilProductCreator_Final';
 
 // 🔧 وارد کردن ThemeProvider و کامپوننت جدید - مسیرهای واقعی که کاربر استفاده کرده
 import { ThemeProvider, useTheme } from './components/Contracts/ThemeProvider';
@@ -64,6 +64,8 @@ const moduleNames: Record<string, string> = {
   'speech-to-text': 'گپ متن',
   'speech-demo': 'دموی گپ متن',
   'oil-converter': 'مبدل روغن خوراکی',
+  'complete-system': 'سیستم پیشرفته یکپارچه',
+  'oil-product-creator': 'ساخت محصول جدید روغن خوراکی',
   'messaging': 'مکاتبات',
   'users': 'مدیریت کاربران',
   'settings': 'تنظیمات'
@@ -428,12 +430,15 @@ const AppContent: React.FC = () => {
       case 'analytics-main':
         return <AnalyticsManager />;
       case 'speech-to-text':
-        return <SpeechToTextConverter />;
+        return <CompleteAdvancedSystem />;
       case 'speech-demo':
-        // return <SpeechToTextDemo />;
-        return <div>Speech Demo not available</div>;
+        return <CompleteAdvancedSystem />;
       case 'oil-converter':
-        return <OilConverter />;
+        return <CompleteAdvancedSystem />;
+      case 'complete-system':
+        return <CompleteAdvancedSystem />;
+      case 'oil-product-creator':
+        return <OilProductCreator />;
       case 'messaging':
         return <MessagingManager />;
       case 'users':
@@ -521,11 +526,11 @@ const AppContent: React.FC = () => {
             {/* Header */}
             <Header
               currentUser={currentUser}
-              activeModule={activeModule}
-              isDark={isDark}
               onLogout={handleLogout}
-              isFloatingCalendarOpen={isFloatingCalendarOpen}
-              setIsFloatingCalendarOpen={setIsFloatingCalendarOpen}
+              isDarkMode={isDark}
+              setIsDarkMode={() => {}}
+              onCalendarClick={() => {}}
+              activeModule={activeModule}
             />
             
             {/* Floating Calendar */}

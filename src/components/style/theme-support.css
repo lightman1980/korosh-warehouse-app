@@ -521,3 +521,435 @@ html[data-theme],
 body[data-theme] {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* === ENHANCED PRODUCT DEVELOPMENT STYLES === */
+
+/* Live Prices Animation */
+@keyframes slideInFromRight {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.live-price-item {
+  animation: slideInFromRight 0.8s ease-out;
+}
+
+.live-price-item.jihad {
+  animation: slideInFromLeft 0.8s ease-out;
+}
+
+/* Price Trend Indicators */
+.price-trend-up {
+  color: #10b981;
+  animation: pulse-green 2s infinite;
+}
+
+.price-trend-down {
+  color: #ef4444;
+  animation: pulse-red 2s infinite;
+}
+
+.price-trend-stable {
+  color: #6b7280;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+/* Real-time Composition Analysis */
+.composition-analysis-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  transition: all 0.3s ease;
+}
+
+.composition-analysis-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(251, 191, 36, 0.2);
+}
+
+.health-score-bar {
+  background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+  transition: width 0.5s ease-in-out;
+}
+
+.standard-compliance-bar {
+  transition: width 0.8s ease-in-out;
+}
+
+/* Professional Oil Table */
+.oil-selection-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.oil-selection-table th {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.oil-selection-table td {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background-color 0.2s ease;
+}
+
+.oil-selection-table tr:hover td {
+  background-color: rgba(139, 92, 246, 0.05);
+}
+
+.oil-category-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.oil-category-vegetable {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #15803d;
+  border: 1px solid #16a34a;
+}
+
+.oil-category-animal {
+  background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+  color: #c2410c;
+  border: 1px solid #ea580c;
+}
+
+.oil-category-specialty {
+  background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
+  color: #7c3aed;
+  border: 1px solid #9333ea;
+}
+
+.smoke-point-indicator {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.smoke-point-high {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #15803d;
+}
+
+.smoke-point-medium {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1d4ed8;
+}
+
+.smoke-point-low {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #d97706;
+}
+
+.smoke-point-very-low {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #dc2626;
+}
+
+/* Target Selection Buttons */
+.target-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.target-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.target-button:hover::before {
+  left: 100%;
+}
+
+.target-button.cooking {
+  background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+  border-color: #ea580c;
+}
+
+.target-button.industrial {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-color: #6b7280;
+}
+
+.target-button.cosmetics {
+  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  border-color: #ec4899;
+}
+
+.target-button.pharmaceutical {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #16a34a;
+}
+
+/* Enhanced Slider */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #e2e8f0 0%, #cbd5e1 100%);
+  outline: none;
+  border-radius: 8px;
+  height: 8px;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  cursor: pointer;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+  transition: all 0.2s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  cursor: pointer;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+/* Notification System */
+.notification-item {
+  position: relative;
+  overflow: hidden;
+  animation: slideInDown 0.5s ease-out;
+}
+
+@keyframes slideInDown {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.notification-benefit {
+  border-left: 4px solid #10b981;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.notification-risk {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+.notification-warning {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.notification-info {
+  border-left: 4px solid #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+/* Auto-blend Toggle */
+.auto-blend-toggle {
+  position: relative;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.auto-blend-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.auto-blend-toggle.active::before {
+  transform: translateX(24px);
+}
+
+/* Health Analysis Cards */
+.health-benefit-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #16a34a;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.health-risk-card {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1px solid #dc2626;
+  animation: fadeInUp 0.6s ease-out 0.1s both;
+}
+
+.health-warning-card {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #d97706;
+  animation: fadeInUp 0.6s ease-out 0.2s both;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Standard Compliance Indicators */
+.compliance-indicator {
+  position: relative;
+  overflow: hidden;
+}
+
+.compliance-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.compliance-excellent {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.compliance-good {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.compliance-fair {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.compliance-poor {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* Responsive Design for Product Development */
+@media (max-width: 1280px) {
+  .oil-selection-table {
+    font-size: 12px;
+  }
+  
+  .oil-selection-table th,
+  .oil-selection-table td {
+    padding: 8px 4px;
+  }
+}
+
+@media (max-width: 768px) {
+  .live-price-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .composition-analysis-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .target-selection-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Dark Theme Enhancements */
+.dark .oil-selection-table th {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-bottom-color: #334155;
+}
+
+.dark .oil-selection-table td {
+  border-bottom-color: #334155;
+}
+
+.dark .slider {
+  background: linear-gradient(to right, #374151 0%, #4b5563 100%);
+}
+
+.dark .notification-item {
+  backdrop-filter: blur(8px);
+}

@@ -11,6 +11,7 @@ interface HeaderProps {
   onCalendarClick: () => void;
   onRefresh?: () => void;
   lastAutoInvoiceCheck?: Date | null;
+  activeModule?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -20,10 +21,34 @@ const Header: React.FC<HeaderProps> = ({
   setIsDarkMode,
   onCalendarClick,
   onRefresh,
-  lastAutoInvoiceCheck
+  lastAutoInvoiceCheck,
+  activeModule
 }) => {
   const [showFloatingCalendar, setShowFloatingCalendar] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(new Date());
+
+  // Function برای دریافت عنوان صفحه
+  const getModuleTitle = (module?: string): string => {
+    const titles: Record<string, string> = {
+      'dashboard': 'داشبورد',
+      'base-data': 'اطلاعات پایه',
+      'contracts': 'قراردادها',
+      'warehouse-receipt': 'رسید انبار',
+      'warehouse-delivery': 'حواله انبار',
+      'Deduction-Addition': 'کسر/اضافه انبار',
+      'product-conversion': 'تبدیل کالا',
+      'invoice-generation': 'صدور فاکتور',
+      'reports': 'گزارشات',
+      'inventory-ledger': 'کاردکس موجودی',
+      'analytics': 'تحلیل و بررسی',
+      'complete-system': 'سیستم پیشرفته یکپارچه',
+      'oil-product-creator': 'تحلیل محصول نهایی',
+      'messaging': 'مکاتبات',
+      'users': 'مدیریت کاربران',
+      'settings': 'تنظیمات'
+    };
+    return titles[module || ''] || 'سیستم مدیریت انبار';
+  };
 
   const handleCalendarDateChange = (date: Date | null) => {
     if (date) {
@@ -39,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({
     <header className="bg-white dark:bg-gray-800 shadow-md z-10 relative">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center space-x-reverse space-x-4">
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">سیستم مدیریت انبار</h1>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white">{getModuleTitle(activeModule)}</h1>
         </div>
         
         <div className="flex items-center space-x-reverse space-x-4">

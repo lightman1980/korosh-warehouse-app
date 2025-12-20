@@ -20,6 +20,8 @@ interface BaseDataItem {
   plateNumber?: string;
   homeAddress?: string;
   capacity?: string; // فیلد جدید برای مخازن
+  minimumStock?: string; // فیلد جدید برای حداقل موجودی مخزن
+  unit?: string; // فیلد جدید برای واحد سنجش
 }
 
 interface BaseDataCategory {
@@ -30,7 +32,7 @@ interface BaseDataCategory {
   description: string;
 }
 
-// داده‌های اولیه — شامل 10 مخزن با ظرفیت 5,000,000 کیلوگرم
+// داده‌های اولیه — شامل 10 مخزن با ظرفیت 5,000,000
 const initialCategories: BaseDataCategory[] = [
   {
     id: "owned-products",
@@ -107,16 +109,16 @@ const initialCategories: BaseDataCategory[] = [
     hasCode: false,
     description: "ليست مخازن",
     items: [
-      { id: "tankA", name: "مخزن A", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankB", name: "مخزن B", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankC", name: "مخزن C", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankD", name: "مخزن D", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankE", name: "مخزن E", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankF", name: "مخزن F", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankG", name: "مخزن G", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankH", name: "مخزن H", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankI", name: "مخزن I", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankJ", name: "مخزن J", capacity: "5,000,000 کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankA", name: "مخزن A-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankB", name: "مخزن B-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankC", name: "مخزن C-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankD", name: "مخزن D-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankE", name: "مخزن E-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankF", name: "مخزن F-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankG", name: "مخزن G-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankH", name: "مخزن H-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankI", name: "مخزن I-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankJ", name: "مخزن J-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
     ],
   },
   {
@@ -293,6 +295,26 @@ const initialCategories: BaseDataCategory[] = [
     ],
   },
 ];
+
+// تابع کمکی برای فرمت کردن اعداد با جداکننده
+const formatNumber = (num: string | number | undefined): string => {
+  if (!num) return "";
+  const numStr = String(num);
+  const cleaned = numStr.replace(/[^0-9.]/g, '');
+  if (!cleaned) return numStr;
+  
+  const parts = cleaned.split('.');
+  const integerPart = parts[0];
+  const formatted = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  return parts.length > 1 ? `${formatted}.${parts.slice(1).join('')}` : formatted;
+};
+
+// تابع کمکی برای پاک کردن کاماها از ورودی کاربر
+const cleanNumber = (num: string | undefined): string => {
+  if (!num) return "";
+  return num.replace(/,/g, '');
+};
 
 // --- تابع اصلی کامپوننت ---
 const BaseDataManager = () => {
@@ -526,6 +548,52 @@ const BaseDataManager = () => {
 
   const handleSave = () => {
     if (!currentCategory || !newItem.name?.trim()) return;
+    
+    // اعتبارسنجی برای مخازن
+    if (isTanksCategory) {
+      const capacity = newItem.capacity || "5000000";
+      const minimumStock = newItem.minimumStock || capacity;
+      
+      // بررسی اینکه حداقل موجودی خالی نباشد
+      if (!minimumStock.trim()) {
+        alert("حداقل موجودی نمی‌تواند خالی باشد.");
+        return;
+      }
+      
+      // بررسی اینکه ظرفیت خالی نباشد
+      if (!capacity.trim()) {
+        alert("ظرفیت مخزن نمی‌تواند خالی باشد.");
+        return;
+      }
+      
+      // تبدیل به عدد برای مقایسه
+      const capacityNumber = parseFloat(capacity.replace(/,/g, ''));
+      const minimumStockNumber = parseFloat(minimumStock.replace(/,/g, ''));
+      
+      // بررسی اینکه مقادیر معتبر باشند
+      if (isNaN(capacityNumber) || capacityNumber <= 0) {
+        alert("ظرفیت مخزن باید عدد مثبت باشد.");
+        return;
+      }
+      
+      if (isNaN(minimumStockNumber) || minimumStockNumber <= 0) {
+        alert("حداقل موجودی باید عدد مثبت باشد.");
+        return;
+      }
+      
+      // بررسی اینکه حداقل موجودی حداقل 1 باشد
+      if (minimumStockNumber < 1) {
+        alert("حداقل موجودی باید حداقل 1 باشد.");
+        return;
+      }
+      
+      // بررسی اینکه حداقل موجودی از ظرفیت بیشتر نباشد
+      if (minimumStockNumber > capacityNumber) {
+        alert("حداقل موجودی نمی‌تواند از ظرفیت مخزن بیشتر باشد.");
+        return;
+      }
+    }
+    
     const newId = `custom_${Date.now()}`;
     setCategories((prev) =>
       prev.map((cat) => {
@@ -541,6 +609,11 @@ const BaseDataManager = () => {
             };
           }
         } else if (isAddingNew) {
+          // تنظیم مقدار پیش‌فرض برای حداقل موجودی
+          const capacity = newItem.capacity || "5000000";
+          const minimumStock = newItem.minimumStock || capacity;
+          const unit = newItem.unit || "کیلوگرم";
+          
           updatedItems.push({
             id: newId,
             name: newItem.name!,
@@ -556,7 +629,9 @@ const BaseDataManager = () => {
             nationalId: newItem.nationalId,
             plateNumber: newItem.plateNumber,
             homeAddress: newItem.homeAddress,
-            capacity: newItem.capacity,
+            capacity: capacity,
+            minimumStock: minimumStock,
+            unit: unit,
           });
         }
         return { ...cat, items: updatedItems };
@@ -775,15 +850,41 @@ const BaseDataManager = () => {
                       />
                     </div>
                     {isTanksCategory && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">ظرفیت مخزن</label>
-                        <input
-                          type="text"
-                          value={newItem.capacity || "5,000,000 کیلوگرم"}
-                          onChange={(e) => setNewItem({ ...newItem, capacity: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">ظرفیت مخزن</label>
+                          <input
+                            type="text"
+                            value={formatNumber(newItem.capacity) || formatNumber("5000000") || "5,000,000"}
+                            onChange={(e) => setNewItem({ ...newItem, capacity: cleanNumber(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="مقدار عددی"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">حداقل موجودی</label>
+                          <input
+                            type="text"
+                            value={formatNumber(newItem.minimumStock) || formatNumber(newItem.capacity) || formatNumber("5000000") || "5,000,000"}
+                            onChange={(e) => setNewItem({ ...newItem, minimumStock: cleanNumber(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="مقدار عددی"
+                            min="1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">حداقل: 1 | حداکثر: برابر ظرفیت مخزن</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">واحد سنجش</label>
+                          <input
+                            type="text"
+                            value={newItem.unit || "کیلوگرم"}
+                            onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            readOnly
+                          />
+                          <p className="text-xs text-gray-500 mt-1">واحد سنجش: کیلوگرم</p>
+                        </div>
+                      </>
                     )}
                     {isLocationCategory && (
                       <>
@@ -905,7 +1006,11 @@ const BaseDataManager = () => {
                       )}
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نام</th>
                       {isTanksCategory && (
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ظرفیت مخزن</th>
+                        <>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ظرفیت مخزن</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">حداقل موجودی</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">واحد سنجش</th>
+                        </>
                       )}
                       {isLocationCategory && (
                         <>
@@ -936,7 +1041,7 @@ const BaseDataManager = () => {
                           colSpan={
                             (currentCategory?.hasCode ? 1 : 0) + 
                             1 + // name
-                            (isTanksCategory ? 1 : 0) +
+                            (isTanksCategory ? 3 : 0) + // capacity + minimumStock + unit
                             (isLocationCategory ? 4 : 0) +
                             (isDriverCategory ? 4 : 0) +
                             3 // status, createdAt, updatedAt, actions
@@ -987,18 +1092,36 @@ const BaseDataManager = () => {
                             )}
                           </td>
                           {isTanksCategory && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {editingItem === item.id ? (
-                                <input
-                                  type="text"
-                                  value={newItem.capacity || "5,000,000 کیلوگرم"}
-                                  onChange={(e) => setNewItem({ ...newItem, capacity: e.target.value })}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                              ) : (
-                                <span className="text-sm text-gray-900">{item.capacity || "5,000,000 کیلوگرم"}</span>
-                              )}
-                            </td>
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {editingItem === item.id ? (
+                                  <input
+                                    type="text"
+                                    value={formatNumber(newItem.capacity) || formatNumber("5000000") || "5,000,000"}
+                                    onChange={(e) => setNewItem({ ...newItem, capacity: cleanNumber(e.target.value) })}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-900">{formatNumber(item.capacity) || formatNumber("5000000") || "5,000,000"}</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {editingItem === item.id ? (
+                                  <input
+                                    type="text"
+                                    value={formatNumber(newItem.minimumStock) || formatNumber(item.minimumStock) || "5,000,000"}
+                                    onChange={(e) => setNewItem({ ...newItem, minimumStock: cleanNumber(e.target.value) })}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="حداقل 1"
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-900">{formatNumber(item.minimumStock) || formatNumber("5000000") || "5,000,000"}</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="text-sm text-gray-900">{item.unit || "کیلوگرم"}</span>
+                              </td>
+                            </>
                           )}
                           {isLocationCategory && (
                             <>
