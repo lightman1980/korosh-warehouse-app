@@ -3,9 +3,9 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { 
   Mic, MicOff, Upload, Image, Languages, Calculator,
-  Play, Copy, Trash2, Loader2,
-  FileAudio, Camera, Globe, Scale, Droplets, FlaskConical
-} from 'lucide-react';
+    Play, Copy, Trash2, Loader2,
+    Camera, Globe, Scale, Droplets, FlaskConical
+  } from 'lucide-react';
 
 const OIL_LIST = [
   { id: 'crude-soy', name: 'روغن خام سویا', density: 0.924 },
@@ -28,18 +28,13 @@ const SEED_LIST = [
 ];
 
 const AdvancedTools: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'speech' | 'audio' | 'ocr' | 'translate' | 'calculator'>('speech');
+  const [activeTab, setActiveTab] = useState<'speech' | 'ocr' | 'translate' | 'calculator'>('speech');
   
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [speechLang, setSpeechLang] = useState('fa-IR');
   const recognitionRef = useRef<any>(null);
-  
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioTranscript, setAudioTranscript] = useState('');
-  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
-  const audioInputRef = useRef<HTMLInputElement>(null);
   
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -144,75 +139,6 @@ const AdvancedTools: React.FC = () => {
     setIsRecording(false);
     setInterimTranscript('');
   }, []);
-
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAudioFile(file);
-      setAudioTranscript('');
-    }
-  };
-
-  const processAudioFile = async () => {
-    if (!audioFile) return;
-    
-    setIsProcessingAudio(true);
-    setAudioTranscript('در حال آماده‌سازی...');
-    
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const arrayBuffer = await audioFile.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (!SpeechRecognition) {
-        setAudioTranscript('⚠️ برای تبدیل فایل صوتی، مرورگر Chrome لازم است.\n\nروش جایگزین: فایل را پخش کنید و از "ضبط زنده" استفاده کنید.');
-        setIsProcessingAudio(false);
-        return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'fa-IR';
-      
-      let fullTranscript = '';
-      
-      recognition.onresult = (event: any) => {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            fullTranscript += event.results[i][0].transcript + ' ';
-            setAudioTranscript(fullTranscript);
-          }
-        }
-      };
-
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      
-      setAudioTranscript('🎧 در حال پخش و تشخیص صدا...');
-      
-      recognition.start();
-      source.start(0);
-      
-      source.onended = () => {
-        setTimeout(() => {
-          recognition.stop();
-          setIsProcessingAudio(false);
-          if (!fullTranscript) {
-            setAudioTranscript('متنی شناسایی نشد.\n\n💡 راهنما: فایل صوتی را با اسپیکر پخش کنید و همزمان از "ضبط زنده" استفاده کنید.');
-          }
-        }, 2000);
-      };
-      
-    } catch (error) {
-      console.error('Audio processing error:', error);
-      setAudioTranscript('خطا در پردازش فایل.\n\n💡 راهنما: فایل صوتی را با اسپیکر پخش کنید و همزمان از "ضبط زنده" استفاده کنید.');
-      setIsProcessingAudio(false);
-    }
-  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -370,14 +296,13 @@ const AdvancedTools: React.FC = () => {
           <p className="text-purple-300">ابزارهای هوشمند پردازش صوت، تصویر و محاسبات</p>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {[
-            { id: 'speech', label: 'ضبط زنده', icon: Mic },
-            { id: 'audio', label: 'فایل صوتی', icon: FileAudio },
-            { id: 'ocr', label: 'استخراج متن', icon: Camera },
-            { id: 'translate', label: 'ترجمه', icon: Globe },
-            { id: 'calculator', label: 'محاسبات', icon: Calculator },
-          ].map(tab => (
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            {[
+              { id: 'speech', label: 'ضبط زنده', icon: Mic },
+              { id: 'ocr', label: 'استخراج متن', icon: Camera },
+              { id: 'translate', label: 'ترجمه', icon: Globe },
+              { id: 'calculator', label: 'محاسبات', icon: Calculator },
+            ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
@@ -464,79 +389,7 @@ const AdvancedTools: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'audio' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <FileAudio className="w-6 h-6 text-purple-400" />
-                تبدیل فایل صوتی به متن
-              </h2>
-
-              <div
-                onClick={() => audioInputRef.current?.click()}
-                className="border-2 border-dashed border-white/30 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 transition"
-              >
-                <Upload className="w-12 h-12 text-white/50 mx-auto mb-4" />
-                <p className="text-white/70">
-                  {audioFile ? audioFile.name : 'فایل صوتی را اینجا بکشید یا کلیک کنید'}
-                </p>
-                <p className="text-white/50 text-sm mt-2">MP3, WAV, OGG, M4A</p>
-                <input
-                  ref={audioInputRef}
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleAudioUpload}
-                  className="hidden"
-                />
-              </div>
-
-              {audioFile && (
-                <>
-                  <div className="flex justify-center gap-4">
-                    <button
-                      onClick={processAudioFile}
-                      disabled={isProcessingAudio}
-                      className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl transition disabled:opacity-50"
-                    >
-                      {isProcessingAudio ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          در حال پردازش...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-5 h-5" />
-                          شروع تبدیل
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <audio
-                    src={URL.createObjectURL(audioFile)}
-                    controls
-                    className="w-full rounded-lg"
-                  />
-                </>
-              )}
-
-              {audioTranscript && (
-                <div className="bg-black/30 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-purple-300 text-sm">متن استخراج شده:</span>
-                    <button
-                      onClick={() => copyToClipboard(audioTranscript)}
-                      className="p-2 hover:bg-white/10 rounded-lg transition"
-                    >
-                      <Copy className="w-4 h-4 text-white/70" />
-                    </button>
-                  </div>
-                  <p className="text-white leading-relaxed whitespace-pre-wrap">{audioTranscript}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'ocr' && (
+            {activeTab === 'ocr' && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Camera className="w-6 h-6 text-purple-400" />

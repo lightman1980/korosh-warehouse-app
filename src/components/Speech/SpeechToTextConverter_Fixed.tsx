@@ -2,9 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { 
-  Mic, MicOff, Upload, Image, Languages, Calculator,
-  Play, Copy, Trash2, Loader2,
-  FileAudio, Camera, Globe, Scale, Droplets, FlaskConical
+  Mic, MicOff
 } from 'lucide-react';
 
 const OIL_TYPES_DENSITY = [
@@ -28,18 +26,13 @@ const SEED_LIST = [
 ];
 
 const SpeechToTextConverter: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'speech' | 'audio' | 'ocr' | 'translate' | 'calculator'>('speech');
+  const [activeTab, setActiveTab] = useState<'speech' | 'ocr' | 'translate' | 'calculator'>('speech');
   
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [speechLang, setSpeechLang] = useState('fa-IR');
   const recognitionRef = useRef<any>(null);
-  
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioTranscript, setAudioTranscript] = useState('');
-  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
-  const audioInputRef = useRef<HTMLInputElement>(null);
   
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -170,17 +163,17 @@ const SpeechToTextConverter: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-8 text-center">مبدل هوشمند و ابزارهای پیشرفته</h1>
         
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {['speech', 'audio', 'ocr', 'translate', 'calculator'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`px-6 py-2 rounded-xl transition ${activeTab === tab ? 'bg-purple-600' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              {tab === 'speech' ? 'ضبط زنده' : tab === 'audio' ? 'فایل صوتی' : tab === 'ocr' ? 'OCR' : tab === 'translate' ? 'ترجمه' : 'محاسبات'}
-            </button>
-          ))}
-        </div>
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            {['speech', 'ocr', 'translate', 'calculator'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`px-6 py-2 rounded-xl transition ${activeTab === tab ? 'bg-purple-600' : 'bg-white/10 hover:bg-white/20'}`}
+              >
+                {tab === 'speech' ? 'ضبط زنده' : tab === 'ocr' ? 'OCR' : tab === 'translate' ? 'ترجمه' : 'محاسبات'}
+              </button>
+            ))}
+          </div>
 
         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-xl border border-white/20">
           {activeTab === 'speech' && (
