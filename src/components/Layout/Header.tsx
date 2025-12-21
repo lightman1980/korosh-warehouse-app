@@ -41,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({
       'reports': 'گزارشات',
       'inventory-ledger': 'کاردکس موجودی',
       'analytics': 'تحلیل و بررسی',
-      //'complete-system': 'سیستم پیشرفته یکپارچه',
+      'complete-system': 'سیستم پیشرفته یکپارچه',
       'oil-product-creator': 'تحلیل محصول نهایی',
       'messaging': 'مکاتبات',
       'users': 'مدیریت کاربران',
