@@ -24,11 +24,9 @@ import { InventoryAdjustmentManager } from './components/InventoryAdjustment/Inv
 import { ProductConversionManager } from './components/ProductConversion/ProductConversionManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Import Complete Advanced System
-import CompleteAdvancedSystem from './components/CompleteAdvancedSystem/CompleteAdvancedSystem';
-
-// Import Oil Product Creator
-import OilProductCreator from './components/CompleteAdvancedSystem/OilProductCreator_Final';
+// Import New Pages
+import CompleteAdvancedSystem from './pages/CompleteSystemPage';
+import OilProductCreator from './pages/OilProductCreatorPage';
 
 // 🔧 وارد کردن ThemeProvider و کامپوننت جدید - مسیرهای واقعی که کاربر استفاده کرده
 import { ThemeProvider, useTheme } from './components/Contracts/ThemeProvider';
