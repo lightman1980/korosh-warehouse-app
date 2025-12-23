@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Filter, Download, BarChart3, FileText, Calculator, X, Calendar, RefreshCw, Package, Warehouse, Database, Clock, Truck, Scale, Droplets, FlaskConical, AlertTriangle, AlertOctagon, Info } from 'lucide-react';
-import { formatPersianDate, formatPersianNumber, convertUnit } from '../../utils/persian';
+import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { safeParseDate } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
@@ -123,22 +123,27 @@ export const InventoryLedgerManager: React.FC = () => {
   const [upToDate, setUpToDate] = useState<Date>(new Date());
   const [showInventoryPackage, setShowInventoryPackage] = useState<boolean>(true);
 
-  // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها
-  const uniqueTanks = useMemo(() => {
-    const tankMap = new Map();
-    const allData = [
-      ...(storage.loadData('receipts') || []),
-      ...(storage.loadData('deliveries') || []),
-      ...(storage.loadData('consignment-delivery-slips') || []),
-      ...(storage.loadData('ownership-delivery-slips') || [])
-    ];
-    allData.forEach((item: any) => {
-      if (item.tankId && item.tankName && !item.isVoided) {
-        tankMap.set(item.tankId, item.tankName);
-      }
-    });
-    return Array.from(tankMap.entries());
-  }, [storage]);
+    // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها
+    const uniqueTanks = useMemo(() => {
+      const tankMap = new Map();
+      const allData = [
+        ...(storage.loadData('receipts') || []),
+        ...(storage.loadData('deliveries') || []),
+        ...(storage.loadData('consignment-delivery-slips') || []),
+        ...(storage.loadData('ownership-delivery-slips') || [])
+      ];
+      
+      // ابتدا مخازن فعال از داده‌های پایه را می‌گیریم
+      const baseTanks = (storage.loadData('category_tanks')?.items || storage.loadData('baseDataCategories')?.find((c: any) => c.id === 'tanks')?.items || []);
+      const activeTankIds = new Set(baseTanks.filter((t: any) => t.isActive !== false).map((t: any) => t.id));
+
+      allData.forEach((item: any) => {
+        if (item.tankId && item.tankName && !item.isVoided && activeTankIds.has(item.tankId)) {
+          tankMap.set(item.tankId, item.tankName);
+        }
+      });
+      return Array.from(tankMap.entries());
+    }, [storage]);
 
   const uniqueSites = useMemo(() => {
     const siteMap = new Map();
@@ -519,31 +524,31 @@ export const InventoryLedgerManager: React.FC = () => {
     return result;
   }, [calculateOwnedTanksInventory, calculateConsignmentTanksInventory]);
 
-    // Helper function to calculate total tank capacity based on filters
-    const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
-      const tanks = baseData.tanks || [];
-      let totalCapacity = 0;
-      // استفاده از فیلترهای ارسالی یا فیلترهای انتخاب شده در پکیج موجودی
-      const currentSiteId = siteId || selectedSiteForFilter;
-      const currentTankId = tankId || selectedTankForFilter;
-      
-      tanks.forEach((tank: any) => {
-        // اگر فیلتر مخزن داریم، فقط همان مخزن
-        if (currentTankId && tank.id !== currentTankId) return;
+      // Helper function to calculate total tank capacity based on filters
+      const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
+        const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
+        let totalCapacity = 0;
+        // استفاده از فیلترهای ارسالی یا فیلترهای انتخاب شده در پکیج موجودی
+        const currentSiteId = siteId || selectedSiteForFilter;
+        const currentTankId = tankId || selectedTankForFilter;
         
-        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
-        if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
-        
-        const capacityStr = tank.capacity || "0";
-        const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
-        const capacity = capacityMatch 
-          ? parseInt(capacityMatch[0].replace(/,/g, '')) 
-          : (typeof capacityStr === 'number' ? capacityStr : 0);
-        
-        totalCapacity += capacity;
-      });
-      return totalCapacity;
-    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter]);
+        tanks.forEach((tank: any) => {
+          // اگر فیلتر مخزن داریم، فقط همان مخزن
+          if (currentTankId && tank.id !== currentTankId) return;
+          
+          // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+          if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
+          
+          const capacityStr = tank.capacity || "0";
+          const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
+          const capacity = capacityMatch 
+            ? parseInt(capacityMatch[0].replace(/,/g, '')) 
+            : (typeof capacityStr === 'number' ? capacityStr : 0);
+          
+          totalCapacity += capacity;
+        });
+        return totalCapacity;
+      }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter]);
 
     // Helper function to calculate empty tank capacity
     const calculateEmptyTankCapacity = useCallback(() => {
@@ -552,55 +557,58 @@ export const InventoryLedgerManager: React.FC = () => {
       return Math.max(0, totalCapacity - finalInventory);
     }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, selectedSiteForFilter, selectedTankForFilter]);
 
-      // Helper function to calculate tank counts and low inventory alert
-      const calculateTankStatusCounts = useCallback(() => {
-        const tanks = baseData.tanks || [];
-        const currentSiteId = selectedSiteForFilter;
-        const currentTankId = selectedTankForFilter;
+        // Helper function to calculate tank counts and low inventory alert
+        const calculateTankStatusCounts = useCallback(() => {
+          const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
+          const currentSiteId = selectedSiteForFilter;
+          const currentTankId = selectedTankForFilter;
 
-        let totalTanks = 0;
-        let withInventoryCount = 0;
-        let withoutInventoryCount = 0;
-        let lowInventoryAlert = false;
-        let lowInventoryTanks: any[] = [];
+          let totalTanks = 0;
+          let withInventoryCount = 0;
+          let withoutInventoryCount = 0;
+          let lowInventoryAlert = false;
+          let lowInventoryTanks: any[] = [];
+          let totalShortageSum = 0;
 
-        tanks.forEach((tank: any) => {
-          // اعمال فیلتر سایت و مخزن
-          if (currentTankId && tank.id !== currentTankId) return;
-          if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
+          tanks.forEach((tank: any) => {
+            // اعمال فیلتر سایت و مخزن
+            if (currentTankId && tank.id !== currentTankId) return;
+            if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
 
-          totalTanks++;
+            totalTanks++;
 
-          // استفاده از تابع محاسباتی مرکزی برای اطمینان از صحت و یکپارچگی فرمول‌ها
-          const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
-          const inventory = inventoryData.finalInventory || 0;
+            // استفاده از تابع محاسباتی مرکزی برای اطمینان از صحت و یکپارچگی فرمول‌ها
+            const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
+            const inventory = inventoryData.finalInventory || 0;
 
-          if (inventory > 0) {
-            withInventoryCount++;
-          } else {
-            withoutInventoryCount++;
-          }
+            if (inventory > 0) {
+              withInventoryCount++;
+            } else {
+              withoutInventoryCount++;
+            }
 
-          // هشدار حداقل موجودی
-          const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
-          const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
-          const minInventory = minInventoryMatch 
-            ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
-            : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
+            // هشدار حداقل موجودی
+            const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
+            const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
+            const minInventory = minInventoryMatch 
+              ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
+              : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
 
-          if (minInventory > 0 && inventory <= minInventory) {
-            lowInventoryAlert = true;
-            lowInventoryTanks.push({
-              name: tank.name || tank.id,
-              inventory: inventory,
-              minInventory: minInventory,
-              deficit: inventory - minInventory
-            });
-          }
-        });
+            if (minInventory > 0 && inventory <= minInventory) {
+              lowInventoryAlert = true;
+              const deficit = minInventory - inventory;
+              totalShortageSum += deficit;
+              lowInventoryTanks.push({
+                name: tank.name || tank.id,
+                inventory: inventory,
+                minInventory: minInventory,
+                deficit: deficit
+              });
+            }
+          });
 
-        return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks };
-      }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, upToDate, calculateConsignmentOwnedTanksInventory]);
+          return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum };
+        }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, upToDate, calculateConsignmentOwnedTanksInventory]);
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
   const loadBaseData = () => {
@@ -2999,63 +3007,159 @@ export const InventoryLedgerManager: React.FC = () => {
                                   <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
                                     <Warehouse className="w-20 h-20" />
                                   </div>
-                                </div>
-
-                                  {/* باکس هشدار موجودی بحرانی */}
-                                  {(() => {
-                                    const { lowInventoryAlert, lowInventoryTanks } = calculateTankStatusCounts();
-                                    return (
-                                      <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden group transition-all col-span-full mt-2`}>
-                                        <div className="flex justify-between items-center mb-4 border-b pb-4 border-red-100">
-                                          <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${lowInventoryAlert ? 'bg-red-100' : 'bg-gray-100'}`}>
-                                              <AlertTriangle className={`w-6 h-6 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'}`} />
-                                            </div>
-                                            <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>وضعیت هشدار موجودی</span>
-                                          </div>
-                                          <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
-                                            <span className="font-bold">تعداد بحرانی:</span>
-                                            <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
-                                          </div>
+                                  </div>
+  
+                                  {/* Table 2: موجودی مخازن امانی */}
+                                  <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-green-200">
+                                    <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
+                                      <h2 className="text-xl font-semibold">موجودی مخازن امانی</h2>
+                                    </div>
+                                    <div className="p-4">
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                          <span>رسیدهای امانی:</span>
+                                          <span className="font-semibold">{formatPersianNumber(calculateConsignmentTanksInventory().consignmentReceiptsAmount)}</span>
                                         </div>
-                                      
-                                      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
-                                            {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
-                                              lowInventoryTanks.map((t: any, i: number) => (
-                                                <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow">
-                                                  <div className="font-black text-red-900 text-lg mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
-                                                    <span>{t.name}</span>
-                                                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                                  </div>
-                                                  <div className="space-y-3 text-sm">
-                                                    <div className="flex justify-between items-center p-2 bg-red-50/50 rounded-lg">
-                                                      <span className="font-medium opacity-80">موجودي فعلي:</span>
-                                                      <span className="font-bold text-base">{formatPersianNumber(t.inventory)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
-                                                      <span className="font-medium opacity-80">حداقل تعریف شده:</span>
-                                                      <span className="font-bold text-base">{formatPersianNumber(t.minInventory)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center p-3 bg-red-600 text-white rounded-lg font-black shadow-inner">
-                                                      <span>کسری موجودی:</span>
-                                                      <span className="text-lg">{formatPersianNumber(t.deficit)}</span>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ))
-                                            ) : (
-                                              <div className="col-span-full py-8 text-center bg-green-50 rounded-xl border border-green-100">
-                                                <div className="text-green-600 font-bold text-xl">وضعیت تمام مخازن در شرایط نرمال قرار دارد ✅</div>
-                                              </div>
-                                            )}
-                                      </div>
-                                      <div className="absolute -right-8 -bottom-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
-                                        <AlertOctagon className="w-48 h-48" />
+                                        <div className="flex justify-between">
+                                          <span>سند اضافه امانی:</span>
+                                          <span className="font-semibold">{formatPersianNumber(calculateConsignmentTanksInventory().consignmentAdditions)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>حواله‌های امانی:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateConsignmentTanksInventory().consignmentDeliveries)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>کسر از امانی از محل افت:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateConsignmentTanksInventory().consignmentDeductionAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>سند کسر امانی:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateConsignmentTanksInventory().consignmentDeductionDocuments)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>کالای مصرفی امانی:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateConsignmentTanksInventory().consignmentConsumedProducts || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-green-600">
+                                          <span>کالای تولیدی امانی:</span>
+                                          <span className="font-semibold">+{formatPersianNumber(calculateConsignmentTanksInventory().consignmentProducedProducts || 0)}</span>
+                                        </div>
+                                        <hr className="border-green-300" />
+                                        <div className="flex justify-between text-lg font-bold text-green-900">
+                                          <span>موجودی نهایی (امانی):</span>
+                                          <span>{formatPersianNumber(calculateConsignmentTanksInventory().finalInventory)}</span>
+                                        </div>
                                       </div>
                                     </div>
-                                    );
-                                  })()}
-                                </div>
+                                  </div>
+
+                                  {/* Table 3: موجودی مخازن تملیکی */}
+                                  <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-purple-200">
+                                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4">
+                                      <h2 className="text-xl font-semibold">موجودی مخازن تملیکی</h2>
+                                    </div>
+                                    <div className="p-4">
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                          <span>رسیدهای تملیکی:</span>
+                                          <span className="font-semibold">{formatPersianNumber(calculateOwnedTanksInventory().ownedReceiptsAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span>سند اضافه تملیکی:</span>
+                                          <span className="font-semibold">{formatPersianNumber(calculateOwnedTanksInventory().ownedAdditionDocuments)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>حواله‌های تملیکی:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateOwnedTanksInventory().ownedDeliveries)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span>افزودن به تملیکی از محل افت:</span>
+                                          <span className="font-semibold">{formatPersianNumber(calculateOwnedTanksInventory().ownedGainedAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>سند کسر تملیکی:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateOwnedTanksInventory().ownedDeductionDocuments)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-red-600">
+                                          <span>کالای مصرفی تملیکی:</span>
+                                          <span className="font-semibold">-{formatPersianNumber(calculateOwnedTanksInventory().ownedConsumedProducts || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-green-600">
+                                          <span>کالای تولیدی تملیکی:</span>
+                                          <span className="font-semibold">+{formatPersianNumber(calculateOwnedTanksInventory().ownedProducedProducts || 0)}</span>
+                                        </div>
+                                        <hr className="border-purple-300" />
+                                        <div className="flex justify-between text-lg font-bold text-purple-900">
+                                          <span>موجودی نهایی (تملیکی):</span>
+                                          <span>{formatPersianNumber(calculateOwnedTanksInventory().finalInventory)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                    {/* باکس هشدار موجودی بحرانی */}
+                                    {(() => {
+                                      const { lowInventoryAlert, lowInventoryTanks, totalShortageSum } = calculateTankStatusCounts();
+                                      return (
+                                        <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden group transition-all col-span-full mt-2`}>
+                                          <div className="flex justify-between items-center mb-4 border-b pb-4 border-red-100">
+                                            <div className="flex items-center gap-3">
+                                              <div className={`p-2 rounded-lg ${lowInventoryAlert ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                                <AlertTriangle className={`w-6 h-6 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'}`} />
+                                              </div>
+                                              <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخزن</span>
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                              <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
+                                                <span className="font-bold">تعداد مخزن:</span>
+                                                <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
+                                              </div>
+                                              {lowInventoryAlert && (
+                                                <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-700 text-white shadow-lg">
+                                                  <span className="font-bold text-xs">جمع کل کسر موجودی ها:</span>
+                                                  <span className="text-lg font-black">{formatPersianNumber(totalShortageSum)}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        
+                                        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
+                                              {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
+                                                lowInventoryTanks.map((t: any, i: number) => (
+                                                  <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow">
+                                                    <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
+                                                      <span>{t.name}</span>
+                                                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                      <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
+                                                        <span className="font-bold text-black opacity-80">حداقل تعریف شده:</span>
+                                                        <span className="font-black text-xl text-black">{formatPersianNumber(t.minInventory)}</span>
+                                                      </div>
+                                                      <div className="flex justify-between items-center p-2 bg-green-50/50 rounded-lg">
+                                                        <span className="font-bold text-green-700 opacity-80">موجودي فعلي:</span>
+                                                        <span className="font-black text-xl text-green-600">{formatPersianNumber(t.inventory)}</span>
+                                                      </div>
+                                                      <div className="flex justify-between items-center p-3 bg-red-600 text-white rounded-lg font-black shadow-inner">
+                                                        <span className="text-lg">کسری موجودی:</span>
+                                                        <span className="text-2xl">{formatPersianNumber(t.deficit)}</span>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ))
+                                              ) : (
+                                                <div className="col-span-full py-8 text-center bg-green-50 rounded-xl border border-green-100">
+                                                  <div className="text-green-600 font-bold text-xl">وضعیت تمام مخازن در شرایط نرمال قرار دارد ✅</div>
+                                                </div>
+                                              )}
+                                        </div>
+                                        <div className="absolute -right-8 -bottom-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+                                          <AlertOctagon className="w-48 h-48" />
+                                        </div>
+                                      </div>
+                                      );
+                                    })()}
+                                  </div>
                         </div>
                       </div>
                     );
