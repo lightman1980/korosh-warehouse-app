@@ -2952,104 +2952,110 @@ export const InventoryLedgerManager: React.FC = () => {
                           <span className="font-semibold text-green-600">+{formatPersianNumber(inventory.ownedProducedProducts || 0)}</span>
                         </div>
                         <div className="col-span-full py-4 mt-2">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                              {/* ظرفیت مخازن */}
-                              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm relative overflow-hidden group">
-                                <div className="flex justify-between items-center mb-2">
-                                  <span className="text-blue-800 font-bold text-lg">ظرفیت مخازن:</span>
-                                  <span className="text-2xl font-black text-blue-900">{formatPersianNumber(totalCapacity)}</span>
+                              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
+                                {/* ظرفیت مخازن */}
+                                <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm relative overflow-hidden group">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-blue-800 font-bold text-lg">ظرفیت مخازن:</span>
+                                    <span className="text-3xl font-black text-blue-900">{formatPersianNumber(totalCapacity)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-blue-600 text-sm">
+                                    <Database className="w-4 h-4" />
+                                    <span>تعداد مخازن خام:</span>
+                                    <span className="font-bold bg-blue-200 px-2 py-0.5 rounded-full">{formatPersianNumber(totalTanks)}</span>
+                                  </div>
+                                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                                    <Scale className="w-20 h-20" />
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-blue-600 text-sm">
-                                  <Database className="w-4 h-4" />
-                                  <span>تعداد مخازن خام:</span>
-                                  <span className="font-bold bg-blue-200 px-2 py-0.5 rounded-full">{formatPersianNumber(totalTanks)}</span>
-                                </div>
-                                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                                  <Scale className="w-20 h-20" />
-                                </div>
-                              </div>
 
-                              {/* موجودی نهایی */}
-                              <div className="bg-green-50 p-4 rounded-xl border border-green-100 shadow-sm relative overflow-hidden group">
-                                <div className="flex justify-between items-center mb-2">
-                                  <span className="text-green-800 font-bold text-lg">موجودی نهایی:</span>
-                                  <span className="text-2xl font-black text-green-900">{formatPersianNumber(inventory.finalInventory || 0)}</span>
+                                {/* موجودی نهایی */}
+                                <div className="bg-green-50 p-6 rounded-xl border border-green-100 shadow-sm relative overflow-hidden group">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-green-800 font-bold text-lg">موجودی نهایی:</span>
+                                    <span className="text-3xl font-black text-green-900">{formatPersianNumber(inventory.finalInventory || 0)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-green-600 text-sm">
+                                    <Package className="w-4 h-4" />
+                                    <span>مخازن دارای موجودی:</span>
+                                    <span className="font-bold bg-green-200 px-2 py-0.5 rounded-full">{formatPersianNumber(withInventoryCount)}</span>
+                                  </div>
+                                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                                    <Droplets className="w-20 h-20" />
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-green-600 text-sm">
-                                  <Package className="w-4 h-4" />
-                                  <span>مخازن دارای موجودی:</span>
-                                  <span className="font-bold bg-green-200 px-2 py-0.5 rounded-full">{formatPersianNumber(withInventoryCount)}</span>
-                                </div>
-                                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                                  <Droplets className="w-20 h-20" />
-                                </div>
-                              </div>
 
-                              {/* ظرفیت خالی مخازن */}
-                              <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm relative overflow-hidden group">
-                                <div className="flex justify-between items-center mb-2">
-                                  <span className="text-orange-800 font-bold text-lg">ظرفیت خالی:</span>
-                                  <span className="text-2xl font-black text-orange-900">{formatPersianNumber(emptyCapacity)}</span>
+                                {/* ظرفیت خالی مخازن */}
+                                <div className="bg-orange-50 p-6 rounded-xl border border-orange-100 shadow-sm relative overflow-hidden group">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-orange-800 font-bold text-lg">ظرفیت خالی:</span>
+                                    <span className="text-3xl font-black text-orange-900">{formatPersianNumber(emptyCapacity)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-orange-600 text-sm">
+                                    <FlaskConical className="w-4 h-4" />
+                                    <span>مخازن فاقد موجودی:</span>
+                                    <span className="font-bold bg-orange-200 px-2 py-0.5 rounded-full">{formatPersianNumber(withoutInventoryCount)}</span>
+                                  </div>
+                                  <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                                    <Warehouse className="w-20 h-20" />
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-orange-600 text-sm">
-                                  <FlaskConical className="w-4 h-4" />
-                                  <span>مخازن فاقد موجودی:</span>
-                                  <span className="font-bold bg-orange-200 px-2 py-0.5 rounded-full">{formatPersianNumber(withoutInventoryCount)}</span>
-                                </div>
-                                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                                  <Warehouse className="w-20 h-20" />
-                                </div>
-                              </div>
 
-                                {/* باکس هشدار موجودی بحرانی */}
-                                {(() => {
-                                  const { lowInventoryAlert, lowInventoryTanks } = calculateTankStatusCounts();
-                                  return (
-                                    <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-200 animate-[pulse_2s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-4 rounded-xl border shadow-sm relative overflow-hidden group transition-all col-span-full`}>
-                                      <div className="flex justify-between items-center mb-2">
-                                        <span className={`${lowInventoryAlert ? 'text-red-800' : 'text-gray-800'} font-bold text-lg`}>وضعیت هشدار:</span>
-                                        <div className={`w-4 h-4 rounded-full ${lowInventoryAlert ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]' : 'bg-gray-400'}`}></div>
-                                      </div>
-                                    <div className={`flex flex-col gap-1 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'} text-xs`}>
-                                      <div className="flex items-center gap-2">
-                                        <AlertTriangle className="w-4 h-4" />
-                                        <span>تعداد مخازن بحرانی:</span>
-                                        <span className={`font-bold ${lowInventoryAlert ? 'bg-red-200' : 'bg-gray-200'} px-2 py-0.5 rounded-full`}>
-                                          {formatPersianNumber(lowInventoryTanks?.length || 0)}
-                                        </span>
-                                      </div>
-                                          {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 && (
-                                            <div className="mt-2 max-h-40 overflow-y-auto font-medium scrollbar-thin scrollbar-thumb-red-200 space-y-2">
-                                              {lowInventoryTanks.map((t: any, i: number) => (
-                                                <div key={i} className="p-2 bg-red-100/50 rounded-lg border border-red-200/50 text-[10px] leading-relaxed">
-                                                  <div className="font-bold text-red-800 mb-1">• {t.name}</div>
-                                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                                                    <div className="flex justify-between">
-                                                      <span className="opacity-80">موجودي فعلي:</span>
-                                                      <span>{formatPersianNumber(t.inventory)}</span>
+                                  {/* باکس هشدار موجودی بحرانی */}
+                                  {(() => {
+                                    const { lowInventoryAlert, lowInventoryTanks } = calculateTankStatusCounts();
+                                    return (
+                                      <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden group transition-all col-span-full mt-2`}>
+                                        <div className="flex justify-between items-center mb-4 border-b pb-4 border-red-100">
+                                          <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${lowInventoryAlert ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                              <AlertTriangle className={`w-6 h-6 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'}`} />
+                                            </div>
+                                            <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>وضعیت هشدار موجودی</span>
+                                          </div>
+                                          <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
+                                            <span className="font-bold">تعداد بحرانی:</span>
+                                            <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
+                                          </div>
+                                        </div>
+                                      
+                                      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
+                                            {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
+                                              lowInventoryTanks.map((t: any, i: number) => (
+                                                <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow">
+                                                  <div className="font-black text-red-900 text-lg mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
+                                                    <span>{t.name}</span>
+                                                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                                  </div>
+                                                  <div className="space-y-3 text-sm">
+                                                    <div className="flex justify-between items-center p-2 bg-red-50/50 rounded-lg">
+                                                      <span className="font-medium opacity-80">موجودي فعلي:</span>
+                                                      <span className="font-bold text-base">{formatPersianNumber(t.inventory)}</span>
                                                     </div>
-                                                    <div className="flex justify-between">
-                                                      <span className="opacity-80">حداقل تعریف شده:</span>
-                                                      <span>{formatPersianNumber(t.minInventory)}</span>
+                                                    <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
+                                                      <span className="font-medium opacity-80">حداقل تعریف شده:</span>
+                                                      <span className="font-bold text-base">{formatPersianNumber(t.minInventory)}</span>
                                                     </div>
-                                                    <div className="flex justify-between col-span-2 pt-1 border-t border-red-200/50 font-black">
+                                                    <div className="flex justify-between items-center p-3 bg-red-600 text-white rounded-lg font-black shadow-inner">
                                                       <span>کسری موجودی:</span>
-                                                      <span>{formatPersianNumber(t.deficit)}</span>
+                                                      <span className="text-lg">{formatPersianNumber(t.deficit)}</span>
                                                     </div>
                                                   </div>
                                                 </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                      {!lowInventoryAlert && <span>وضعیت موجودی نرمال است</span>}
+                                              ))
+                                            ) : (
+                                              <div className="col-span-full py-8 text-center bg-green-50 rounded-xl border border-green-100">
+                                                <div className="text-green-600 font-bold text-xl">وضعیت تمام مخازن در شرایط نرمال قرار دارد ✅</div>
+                                              </div>
+                                            )}
+                                      </div>
+                                      <div className="absolute -right-8 -bottom-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+                                        <AlertOctagon className="w-48 h-48" />
+                                      </div>
                                     </div>
-                                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                                      <AlertOctagon className="w-20 h-20" />
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
+                                    );
+                                  })()}
+                                </div>
                         </div>
                       </div>
                     );
