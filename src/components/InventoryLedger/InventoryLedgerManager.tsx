@@ -226,37 +226,31 @@ export const InventoryLedgerManager: React.FC = () => {
 
     // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها
     const uniqueTanks = useMemo(() => {
-      const tankMap = new Map();
-      const allData = [
-        ...(storage.loadData('receipts') || []),
-        ...(storage.loadData('deliveries') || []),
-        ...(storage.loadData('consignment-delivery-slips') || []),
-        ...(storage.loadData('ownership-delivery-slips') || [])
-      ];
+      const tankMap = new Map<string, string>();
+      // مشابه ProductConversionManager: فقط از رسیدها استخراج می‌کنیم
+      const allReceipts = storage.loadData('receipts');
+      const receiptsArray = Array.isArray(allReceipts) ? allReceipts : [];
       
       // ابتدا مخازن فعال از داده‌های پایه را می‌گیریم
       const baseTanks = (storage.loadData('category_tanks')?.items || storage.loadData('baseDataCategories')?.find((c: any) => c.id === 'tanks')?.items || []);
       const activeTankIds = new Set(baseTanks.filter((t: any) => t.isActive !== false).map((t: any) => t.id));
-
-      allData.forEach((item: any) => {
-        if (item.tankId && item.tankName && !item.isVoided && activeTankIds.has(item.tankId)) {
-          tankMap.set(item.tankId, item.tankName);
+      
+      receiptsArray.forEach((receipt: any) => {
+        if (receipt && receipt.tankId && receipt.tankName && !receipt.isVoided && activeTankIds.has(receipt.tankId)) {
+          tankMap.set(receipt.tankId, receipt.tankName);
         }
       });
       return Array.from(tankMap.entries());
     }, [storage]);
 
     const uniqueSites = useMemo(() => {
-      const siteMap = new Map();
-      const allData = [
-        ...(storage.loadData('receipts') || []),
-        ...(storage.loadData('deliveries') || []),
-        ...(storage.loadData('consignment-delivery-slips') || []),
-        ...(storage.loadData('ownership-delivery-slips') || [])
-      ];
-      allData.forEach((item: any) => {
-        if (item.siteId && item.siteName && !item.isVoided) {
-          siteMap.set(item.siteId, item.siteName);
+      const siteMap = new Map<string, string>();
+      // مشابه ProductConversionManager: فقط از رسیدها استخراج می‌کنیم
+      const allReceipts = storage.loadData('receipts');
+      const receiptsArray = Array.isArray(allReceipts) ? allReceipts : [];
+      receiptsArray.forEach((receipt: any) => {
+        if (receipt && receipt.siteId && receipt.siteName && !receipt.isVoided) {
+          siteMap.set(receipt.siteId, receipt.siteName);
         }
       });
       return Array.from(siteMap.entries());
@@ -332,14 +326,7 @@ export const InventoryLedgerManager: React.FC = () => {
       let ownedConsumedProducts = 0;
       let ownedProducedProducts = 0;
 
-      const tanksToProcess = memoizedInventoryData.activeTanks
-          .filter(t => {
-            const tankSiteId = String(t.siteId || t.locationId || '');
-            const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
-            const tankMatch = !currentTankId || String(t.id) === currentTankId;
-            return siteMatch && tankMatch;
-          })
-          .map(t => t.id);
+      const tanksToProcess = memoizedInventoryData.activeTanks.map(t => t.id);
 
       tanksToProcess.forEach(tankId => {
         const data = memoizedInventoryData.tankData[tankId];
@@ -347,6 +334,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Receipts
         data.receipts.forEach((r: any) => {
+          if (currentSiteId && r.siteId !== currentSiteId) return;
+          if (currentTankId && r.tankId !== currentTankId) return;
           if (r.userType === 'owned') {
             ownedReceiptsAmount += safeNumber(r.amount || r.receiptBasisAmount, 0);
           }
@@ -354,6 +343,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Adjustments
         data.adjustments.forEach((adj: any) => {
+          if (currentSiteId && adj.siteId !== currentSiteId) return;
+          if (currentTankId && adj.tankId !== currentTankId) return;
           if (adj.productType === 'owned') {
             if (adj.adjustmentType === 'addition') ownedAdditionDocuments += safeNumber(adj.quantity, 0);
             else if (adj.adjustmentType === 'deduction') ownedDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -362,11 +353,15 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Deliveries
         data.deliveries.forEach((d: any) => {
+          if (currentSiteId && d.siteId !== currentSiteId) return;
+          if (currentTankId && d.tankId !== currentTankId) return;
           ownedDeliveries += safeNumber(d.amount, 0);
         });
 
         // Wastage
         data.wastage.forEach((t: any) => {
+          if (currentSiteId && t.siteId !== currentSiteId) return;
+          if (currentTankId && t.tankId !== currentTankId) return;
           if (t.transactionType === 'owned') {
             ownedGainedAmount += Math.abs(safeNumber(t.amount, 0));
           }
@@ -374,6 +369,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Conversions
         data.conversions.forEach((c: any) => {
+          if (currentSiteId && c.siteId !== currentSiteId) return;
+          if (currentTankId && c.tankId !== currentTankId) return;
           if (c.consumedProductType === 'owned') ownedConsumedProducts += safeNumber(c.consumedQuantity, 0);
           if (c.producedProductType === 'owned') ownedProducedProducts += safeNumber(c.producedQuantity, 0);
         });
@@ -400,14 +397,7 @@ export const InventoryLedgerManager: React.FC = () => {
       let consignmentConsumedProducts = 0;
       let consignmentProducedProducts = 0;
 
-      const tanksToProcess = memoizedInventoryData.activeTanks
-          .filter(t => {
-            const tankSiteId = String(t.siteId || t.locationId || '');
-            const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
-            const tankMatch = !currentTankId || String(t.id) === currentTankId;
-            return siteMatch && tankMatch;
-          })
-          .map(t => t.id);
+      const tanksToProcess = memoizedInventoryData.activeTanks.map(t => t.id);
 
       tanksToProcess.forEach(tankId => {
         const data = memoizedInventoryData.tankData[tankId];
@@ -415,6 +405,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Receipts
         data.receipts.forEach((r: any) => {
+          if (currentSiteId && r.siteId !== currentSiteId) return;
+          if (currentTankId && r.tankId !== currentTankId) return;
           if (r.userType === 'consignment') {
             const baseAmount = r.receiptBasisAmount || r.finalAmount || r.amount || 
                              (safeNumber(r.shipUnloadingAmount, 0) + safeNumber(r.tankShoreAmount, 0) + 
@@ -425,6 +417,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Adjustments
         data.adjustments.forEach((adj: any) => {
+          if (currentSiteId && adj.siteId !== currentSiteId) return;
+          if (currentTankId && adj.tankId !== currentTankId) return;
           if (adj.productType === 'consignment') {
             if (adj.adjustmentType === 'addition') consignmentAdditions += safeNumber(adj.quantity, 0);
             else if (adj.adjustmentType === 'deduction') consignmentDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -433,6 +427,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Consignment Deliveries (Slips + General)
         const processDelivery = (d: any, isConsignmentCheck: boolean) => {
+          if (currentSiteId && d.siteId !== currentSiteId) return;
+          if (currentTankId && d.tankId !== currentTankId) return;
           if (!isConsignmentCheck || (d.contractNumber || d.permitId || d.userType === 'consignment' || d.type === 'امانی' || d.nature === 'consignment')) {
             consignmentDeliveries += safeNumber(d.amount, 0);
           }
@@ -442,6 +438,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Wastage
         data.wastage.forEach((t: any) => {
+          if (currentSiteId && t.siteId !== currentSiteId) return;
+          if (currentTankId && t.tankId !== currentTankId) return;
           if (t.transactionType === 'consignment') {
             consignmentDeductionAmount += Math.abs(safeNumber(t.amount, 0));
           }
@@ -449,6 +447,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Conversions
         data.conversions.forEach((c: any) => {
+          if (currentSiteId && c.siteId !== currentSiteId) return;
+          if (currentTankId && c.tankId !== currentTankId) return;
           if (c.consumedProductType === 'consignment') consignmentConsumedProducts += safeNumber(c.consumedQuantity, 0);
           if (c.producedProductType === 'consignment') consignmentProducedProducts += safeNumber(c.producedQuantity, 0);
         });
@@ -501,10 +501,10 @@ export const InventoryLedgerManager: React.FC = () => {
 
     // Helper function to calculate empty tank capacity
     const calculateEmptyTankCapacity = useCallback(() => {
-      const totalCapacity = calculateTotalTankCapacity();
-      const finalInventory = calculateConsignmentOwnedTanksInventory().finalInventory || 0;
+      const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter || undefined, selectedTankForFilter || undefined);
+      const finalInventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter || undefined, selectedTankForFilter || undefined).finalInventory || 0;
       return Math.max(0, totalCapacity - finalInventory);
-    }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory]);
+    }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, selectedSiteForFilter, selectedTankForFilter]);
 
     // Helper function to calculate tank counts and low inventory alert
     const calculateTankStatusCounts = useCallback(() => {
@@ -993,7 +993,7 @@ export const InventoryLedgerManager: React.FC = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig]);
+  }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig, selectedSiteForFilter, selectedTankForFilter]);
 
   const applyFilters = () => {
     // Get real data from storage
