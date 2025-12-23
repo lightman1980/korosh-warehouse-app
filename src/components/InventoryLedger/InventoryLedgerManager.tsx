@@ -2906,11 +2906,11 @@ export const InventoryLedgerManager: React.FC = () => {
                 <div className="p-4 space-y-4">
                   {/* نتایج محاسبات */}
                   <div className="bg-gray-50 rounded-lg p-4">
-                    {(() => {
-                      const inventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
-                      const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter, selectedTankForFilter);
-                      const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
-                      const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
+                      {(() => {
+                        const inventory = calculateConsignmentOwnedTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
+                        const totalCapacity = calculateTotalTankCapacity(selectedSitesForFilter, selectedTanksForFilter);
+                        const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
+                        const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
                       
                       return (
                         <>
@@ -3033,18 +3033,18 @@ export const InventoryLedgerManager: React.FC = () => {
                           </div>
                           <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخزن</span>
                         </div>
-                          <div className="flex flex-col gap-2">
-                            <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
-                              <span className="font-bold">تعداد مخزن:</span>
-                              <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
-                            </div>
-                            {lowInventoryAlert && (
-                              <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-600 text-white shadow-lg">
-                                <span className="font-bold text-xs">جمع کل کسر موجودی ها:</span>
-                                <span className="text-lg font-black">{formatPersianNumber(totalShortageSum)}</span>
+                            <div className="flex flex-col gap-2">
+                              <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-400 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
+                                <span className="font-bold">تعداد مخزن:</span>
+                                <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
                               </div>
-                            )}
-                          </div>
+                              {lowInventoryAlert && (
+                                <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-500 text-white shadow-lg">
+                                  <span className="font-bold text-xs">جمع کل کسر موجودی ها:</span>
+                                  <span className="text-lg font-black">{formatPersianNumber(totalShortageSum)}</span>
+                                </div>
+                              )}
+                            </div>
                         </div>
                       
                         <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
@@ -3064,10 +3064,10 @@ export const InventoryLedgerManager: React.FC = () => {
                                     <span className="font-bold text-green-700 opacity-80">موجودي فعلي:</span>
                                     <span className="font-black text-xl text-green-600">{formatPersianNumber(t.inventory)}</span>
                                   </div>
-                                  <div className="flex justify-between items-center p-3 bg-red-500 text-white rounded-lg font-black shadow-inner">
-                                    <span className="text-lg">کسری موجودی:</span>
-                                    <span className="text-2xl">{formatPersianNumber(t.deficit)}</span>
-                                  </div>
+                                    <div className="flex justify-between items-center p-3 bg-red-400 text-white rounded-lg font-black shadow-inner">
+                                      <span className="text-lg">کسری موجودی:</span>
+                                      <span className="text-2xl">{formatPersianNumber(t.deficit)}</span>
+                                    </div>
                                 </div>
                               </div>
                             ))
