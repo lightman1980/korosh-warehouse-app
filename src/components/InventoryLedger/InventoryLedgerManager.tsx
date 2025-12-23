@@ -144,10 +144,21 @@ export const InventoryLedgerManager: React.FC = () => {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const toggleOption = (value: string) => {
-      const newValues = selectedValues.includes(value)
-        ? selectedValues.filter(v => v !== value)
-        : [...selectedValues, value];
+    const toggleOption = (value: string, event?: React.MouseEvent) => {
+      let newValues;
+      if (event?.ctrlKey) {
+        // Ctrl + Click: Toggle
+        newValues = selectedValues.includes(value)
+          ? selectedValues.filter(v => v !== value)
+          : [...selectedValues, value];
+      } else {
+        // Normal Click: Select only this one (or toggle if it's already selected and alone)
+        if (selectedValues.length === 1 && selectedValues[0] === value) {
+          newValues = [];
+        } else {
+          newValues = [value];
+        }
+      }
       onChange(newValues);
     };
 
@@ -191,19 +202,22 @@ export const InventoryLedgerManager: React.FC = () => {
                 <span className="text-sm font-medium text-gray-700">انتخاب همه</span>
               </label>
             </div>
-            <div className="p-1">
-              {options.map(([id, name]) => (
-                <label key={id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedValues.includes(id)}
-                    onChange={() => toggleOption(id)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ml-2"
-                  />
-                  <span className="text-sm text-gray-700">{name}</span>
-                </label>
-              ))}
-            </div>
+              <div className="p-1">
+                {options.map(([id, name]) => (
+                  <label key={id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer" onClick={(e) => {
+                    e.preventDefault();
+                    toggleOption(id, e);
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedValues.includes(id)}
+                      readOnly
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ml-2"
+                    />
+                    <span className="text-sm text-gray-700">{name}</span>
+                  </label>
+                ))}
+              </div>
           </div>
         )}
       </div>
@@ -2796,7 +2810,7 @@ export const InventoryLedgerManager: React.FC = () => {
                 </div>
                 <div className="p-4">
                   {(() => {
-                    const inventory = calculateOwnedTanksInventory();
+                          const inventory = calculateOwnedTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
                     return (
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between items-center">
@@ -2845,9 +2859,9 @@ export const InventoryLedgerManager: React.FC = () => {
                   <h2 className="text-xl font-semibold text-center">موجودی مخازن امانی</h2>
                 </div>
                 <div className="p-4">
-                  {(() => {
-                    const inventory = calculateConsignmentTanksInventory();
-                    return (
+                    {(() => {
+                      const inventory = calculateConsignmentTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
+                      return (
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between items-center">
                           <span className="text-gray-700 font-medium">رسیدهای امانی:</span>
