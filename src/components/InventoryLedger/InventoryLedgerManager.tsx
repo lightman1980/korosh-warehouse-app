@@ -519,130 +519,137 @@ export const InventoryLedgerManager: React.FC = () => {
     return result;
   }, [calculateOwnedTanksInventory, calculateConsignmentTanksInventory]);
 
-  // Helper function to calculate total tank capacity based on filters
-  const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
-    const tanks = baseData.tanks || [];
-    let totalCapacity = 0;
-    // فقط از فیلترهای جداول موجودی استفاده می‌کنیم، نه از form.siteId و form.tankId
-    const currentSiteId = siteId || filters.siteId;
-    const currentTankId = tankId || filters.tankId;
-    
-    tanks.forEach((tank: any) => {
-      // اگر فیلتر مخزن داریم، فقط همان مخزن
-      if (currentTankId && tank.id !== currentTankId) return;
+    // Helper function to calculate total tank capacity based on filters
+    const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
+      const tanks = baseData.tanks || [];
+      let totalCapacity = 0;
+      // استفاده از فیلترهای ارسالی یا فیلترهای انتخاب شده در پکیج موجودی
+      const currentSiteId = siteId || selectedSiteForFilter;
+      const currentTankId = tankId || selectedTankForFilter;
       
-      // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
-      if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
-      
-      // اگر سایت فیلتر شده اما siteId مخزن خالی است، آن را رد نکن تا ظرفیت صفر نشود
-      const capacityStr = tank.capacity || "5,000,000 کیلوگرم";
-      const capacityMatch = capacityStr.match(/[\d,]+/);
-      const capacity = capacityMatch ? parseInt(capacityMatch[0].replace(/,/g, '')) : 5000000;
-      totalCapacity += capacity;
-    });
-    return totalCapacity;
-  }, [baseData.tanks, filters.siteId, filters.tankId]);
-
-  // Helper function to calculate empty tank capacity
-  const calculateEmptyTankCapacity = useCallback(() => {
-    const totalCapacity = calculateTotalTankCapacity();
-    const finalInventory = calculateConsignmentOwnedTanksInventory().finalInventory || 0;
-    return Math.max(0, totalCapacity - finalInventory);
-  }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory]);
-
-  // Helper function to calculate tank counts and low inventory alert
-  const calculateTankStatusCounts = useCallback(() => {
-    const tanks = baseData.tanks || [];
-    // استفاده از همان فیلترهایی که جداول موجودی از آن‌ها استفاده می‌کنند
-    const currentSiteId = selectedSiteForFilter || filters.siteId;
-    const currentTankId = selectedTankForFilter || filters.tankId;
-
-    let totalTanks = 0;
-    let withInventoryCount = 0;
-    let withoutInventoryCount = 0;
-    let lowInventoryAlert = false;
-    let lowInventoryTanks: any[] = [];
-
-    // بارگذاری داده‌ها یک بار برای افزایش سرعت
-    const allReceipts = storage.loadData('receipts') || [];
-    const allDeliveries = storage.loadData('deliveries') || [];
-    const allAdjustments = storage.loadData('inventoryAdjustments') || [];
-    const consignmentSlips = storage.loadData('consignment-delivery-slips') || [];
-    const ownershipSlips = storage.loadData('ownership-delivery-slips') || [];
-    const wastageTransactions = storage.loadData('wastageTransactions') || [];
-    const productConversions = storage.loadData('productConversions') || [];
-
       tanks.forEach((tank: any) => {
-        // اعمال فیلتر سایت و مخزن
+        // اگر فیلتر مخزن داریم، فقط همان مخزن
         if (currentTankId && tank.id !== currentTankId) return;
+        
+        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
         if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
-
-        totalTanks++;
-
-        // محاسبه موجودی برای این مخزن خاص (مشابه منطق توابع اصلی اما بهینه شده برای لوپ)
-        const tankId = tank.id;
         
-        // رسیدهای تملیکی
-        const ownedReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'owned' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
-          .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || 0), 0);
+        const capacityStr = tank.capacity || "0";
+        const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
+        const capacity = capacityMatch 
+          ? parseInt(capacityMatch[0].replace(/,/g, '')) 
+          : (typeof capacityStr === 'number' ? capacityStr : 0);
         
-        // رسیدهای امانی
-        const consignmentReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'consignment' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
-          .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || r.finalAmount || 0), 0);
-
-        // حواله‌های تملیکی
-        const ownedDeliveries = [
-          ...allDeliveries.filter((d: any) => d.tankId === tankId && d.userType === 'owned' && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
-          ...ownershipSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
-        ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
-
-        // حواله‌های امانی
-        const consignmentDeliveries = [
-          ...allDeliveries.filter((d: any) => d.tankId === tankId && (d.userType === 'consignment' || d.contractNumber || d.type === 'امانی') && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
-          ...consignmentSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
-        ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
-
-        // اصلاحات انبار
-        const additions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'addition' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
-          .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
-        
-        const deductions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'deduction' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
-          .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
-
-        // افت و تبدیل (خلاصه شده برای سرعت)
-        const wastage = wastageTransactions.filter((t: any) => t.tankId === tankId && !t.isVoided && new Date(t.transactionDate) <= upToDate)
-          .reduce((sum: number, t: any) => sum + (t.transactionType === 'owned' ? Math.abs(safeNumber(t.amount, 0)) : -Math.abs(safeNumber(t.amount, 0))), 0);
-
-        const conversion = productConversions.filter((c: any) => c.tankId === tankId && !c.isVoided && new Date(c.documentDate) <= upToDate)
-          .reduce((sum: number, c: any) => sum + safeNumber(c.producedQuantity, 0) - safeNumber(c.consumedQuantity, 0), 0);
-
-        const inventory = ownedReceipts + consignmentReceipts + additions + wastage + conversion - ownedDeliveries - consignmentDeliveries - deductions;
-
-        if (inventory > 0) {
-          withInventoryCount++;
-        } else {
-          withoutInventoryCount++;
-        }
-
-        // هشدار حداقل موجودی - اصلاح فیلد و نحوه پارس کردن
-        const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
-        const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
-        const minInventory = minInventoryMatch 
-          ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
-          : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
-
-        if (minInventory > 0 && inventory <= minInventory) {
-          lowInventoryAlert = true;
-          lowInventoryTanks.push({
-            name: tank.name || tank.id,
-            inventory: inventory,
-            minInventory: minInventory
-          });
-        }
+        totalCapacity += capacity;
       });
+      return totalCapacity;
+    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter]);
 
-    return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks };
-  }, [baseData.tanks, filters, selectedSiteForFilter, selectedTankForFilter, upToDate, storage]);
+    // Helper function to calculate empty tank capacity
+    const calculateEmptyTankCapacity = useCallback(() => {
+      const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter, selectedTankForFilter);
+      const finalInventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter).finalInventory || 0;
+      return Math.max(0, totalCapacity - finalInventory);
+    }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, selectedSiteForFilter, selectedTankForFilter]);
+
+    // Helper function to calculate tank counts and low inventory alert
+    const calculateTankStatusCounts = useCallback(() => {
+      const tanks = baseData.tanks || [];
+      const currentSiteId = selectedSiteForFilter;
+      const currentTankId = selectedTankForFilter;
+
+      let totalTanks = 0;
+      let withInventoryCount = 0;
+      let withoutInventoryCount = 0;
+      let lowInventoryAlert = false;
+      let lowInventoryTanks: any[] = [];
+
+      // بارگذاری داده‌ها یک بار برای افزایش سرعت
+      const allReceipts = storage.loadData('receipts') || [];
+      const allDeliveries = storage.loadData('deliveries') || [];
+      const allAdjustments = storage.loadData('inventoryAdjustments') || [];
+      const consignmentSlips = storage.loadData('consignment-delivery-slips') || [];
+      const ownershipSlips = storage.loadData('ownership-delivery-slips') || [];
+      const wastageTransactions = storage.loadData('wastageTransactions') || [];
+      const productConversions = storage.loadData('productConversions') || [];
+
+        tanks.forEach((tank: any) => {
+          // اعمال فیلتر سایت و مخزن
+          if (currentTankId && tank.id !== currentTankId) return;
+          if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
+
+          totalTanks++;
+
+          // محاسبه موجودی برای این مخزن خاص
+          const tankId = tank.id;
+          
+          // رسیدهای تملیکی
+          const ownedReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'owned' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
+            .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || 0), 0);
+          
+          // رسیدهای امانی
+          const consignmentReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'consignment' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
+            .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || r.finalAmount || 0), 0);
+
+          // حواله‌های تملیکی
+          const ownedDeliveries = [
+            ...allDeliveries.filter((d: any) => d.tankId === tankId && d.userType === 'owned' && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
+            ...ownershipSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
+          ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
+
+          // حواله‌های امانی - تشخیص پیشرفته مشابه توابع اصلی
+          const consignmentDeliveries = [
+            ...allDeliveries.filter((d: any) => 
+              d.tankId === tankId && 
+              !d.isVoided && 
+              new Date(d.deliveryDate || d.createdAt) <= upToDate &&
+              (d.userType === 'consignment' || d.contractNumber || d.permitId || d.type === 'امانی' || d.nature === 'consignment')
+            ),
+            ...consignmentSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
+          ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
+
+          // اصلاحات انبار
+          const additions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'addition' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
+            .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
+          
+          const deductions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'deduction' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
+            .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
+
+          // افت و تبدیل
+          const wastage = wastageTransactions.filter((t: any) => t.tankId === tankId && !t.isVoided && new Date(t.transactionDate) <= upToDate)
+            .reduce((sum: number, t: any) => sum + (t.transactionType === 'owned' ? Math.abs(safeNumber(t.amount, 0)) : -Math.abs(safeNumber(t.amount, 0))), 0);
+
+          const conversion = productConversions.filter((c: any) => c.tankId === tankId && !c.isVoided && new Date(c.documentDate) <= upToDate)
+            .reduce((sum: number, c: any) => sum + safeNumber(c.producedQuantity, 0) - safeNumber(c.consumedQuantity, 0), 0);
+
+          const inventory = ownedReceipts + consignmentReceipts + additions + wastage + conversion - ownedDeliveries - consignmentDeliveries - deductions;
+
+          if (inventory > 0) {
+            withInventoryCount++;
+          } else {
+            withoutInventoryCount++;
+          }
+
+          // هشدار حداقل موجودی
+          const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
+          const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
+          const minInventory = minInventoryMatch 
+            ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
+            : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
+
+          if (minInventory > 0 && inventory <= minInventory) {
+            lowInventoryAlert = true;
+            lowInventoryTanks.push({
+              name: tank.name || tank.id,
+              inventory: inventory,
+              minInventory: minInventory,
+              deficit: inventory - minInventory
+            });
+          }
+        });
+
+      return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks };
+    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, upToDate, storage]);
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
   const loadBaseData = () => {
@@ -2924,16 +2931,16 @@ export const InventoryLedgerManager: React.FC = () => {
               <div className="p-4 space-y-4">
                 {/* نتایج محاسبات */}
                 <div className="bg-gray-50 rounded-lg p-4">
-                  {(() => {
-                    // استفاده از فیلترهای انتخاب شده برای محاسبه موجودی
-                    const inventory = calculateConsignmentOwnedTanksInventory(filters.siteId, filters.tankId);
-                    // محاسبه ظرفیت کل بر اساس فیلترهای انتخاب شده
-                    const totalCapacity = calculateTotalTankCapacity(filters.siteId, filters.tankId);
-                    // محاسبه ظرفیت خالی: ظرفیت - موجودی نهایی
-                    const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
-                    
-                    // محاسبه تعداد مخازن
-                    const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
+                    {(() => {
+                      // استفاده از فیلترهای انتخاب شده برای محاسبه موجودی
+                      const inventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
+                      // محاسبه ظرفیت کل بر اساس فیلترهای انتخاب شده
+                      const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter, selectedTankForFilter);
+                      // محاسبه ظرفیت خالی: ظرفیت - موجودی نهایی
+                      const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
+                      
+                      // محاسبه تعداد مخازن
+                      const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
                     
                     return (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -3060,13 +3067,29 @@ export const InventoryLedgerManager: React.FC = () => {
                                           {formatPersianNumber(lowInventoryTanks?.length || 0)}
                                         </span>
                                       </div>
-                                        {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 && (
-                                          <div className="mt-1 max-h-24 overflow-y-auto font-medium scrollbar-thin scrollbar-thumb-red-200">
-                                            {lowInventoryTanks.map((t: any, i: number) => (
-                                              <div key={i} className="truncate">• {t.name} ({formatPersianNumber(t.inventory)})</div>
-                                            ))}
-                                          </div>
-                                        )}
+                                          {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 && (
+                                            <div className="mt-2 max-h-40 overflow-y-auto font-medium scrollbar-thin scrollbar-thumb-red-200 space-y-2">
+                                              {lowInventoryTanks.map((t: any, i: number) => (
+                                                <div key={i} className="p-2 bg-red-100/50 rounded-lg border border-red-200/50 text-[10px] leading-relaxed">
+                                                  <div className="font-bold text-red-800 mb-1">• {t.name}</div>
+                                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                                                    <div className="flex justify-between">
+                                                      <span className="opacity-80">موجودي فعلي:</span>
+                                                      <span>{formatPersianNumber(t.inventory)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                      <span className="opacity-80">حداقل تعریف شده:</span>
+                                                      <span>{formatPersianNumber(t.minInventory)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between col-span-2 pt-1 border-t border-red-200/50 font-black">
+                                                      <span>کسری موجودی:</span>
+                                                      <span>{formatPersianNumber(t.deficit)}</span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
                                       {!lowInventoryAlert && <span>وضعیت موجودی نرمال است</span>}
                                     </div>
                                     <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
