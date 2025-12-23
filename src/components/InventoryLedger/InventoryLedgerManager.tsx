@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Filter, Download, BarChart3, FileText, Calculator, X, Calendar, RefreshCw, Package, Warehouse, Database, Clock, Truck } from 'lucide-react';
+import { Search, Filter, Download, BarChart3, FileText, Calculator, X, Calendar, RefreshCw, Package, Warehouse, Database, Clock, Truck, Scale, Droplets, FlaskConical, AlertTriangle, Info } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber, convertUnit } from '../../utils/persian';
 import { safeParseDate } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
