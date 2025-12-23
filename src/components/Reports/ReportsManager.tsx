@@ -222,57 +222,6 @@ export const ReportsManager = () => {
   const [upToDate, setUpToDate] = useState<Date>(new Date());
   const [showInventoryPackage, setShowInventoryPackage] = useState<boolean>(true);
 
-  // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها
-  const uniqueTanks = useMemo(() => {
-    const tankMap = new Map();
-    const allData = [
-      ...(storage.loadData('receipts') || []),
-      ...(storage.loadData('deliveries') || []),
-      ...(storage.loadData('consignment-delivery-slips') || []),
-      ...(storage.loadData('ownership-delivery-slips') || [])
-    ];
-    
-    // ابتدا مخازن فعال از داده‌های پایه را می‌گیریم
-    const baseTanks = (storage.loadData('category_tanks')?.items || storage.loadData('baseDataCategories')?.find((c: any) => c.id === 'tanks')?.items || []);
-    baseTanks.forEach((t: any) => {
-      if (t.id && t.name && t.isActive !== false) {
-        tankMap.set(t.id, t.name);
-      }
-    });
-
-    allData.forEach((item: any) => {
-      if (item.tankId && item.tankName && !item.isVoided) {
-        tankMap.set(item.tankId, item.tankName);
-      }
-    });
-    return Array.from(tankMap.entries());
-  }, [storage, inventoryRefreshKey, baseData.tanks]);
-
-  const uniqueSites = useMemo(() => {
-    const siteMap = new Map();
-    const allData = [
-      ...(storage.loadData('receipts') || []),
-      ...(storage.loadData('deliveries') || []),
-      ...(storage.loadData('consignment-delivery-slips') || []),
-      ...(storage.loadData('ownership-delivery-slips') || [])
-    ];
-
-    // ابتدا سایت‌ها از داده‌های پایه را می‌گیریم
-    const baseSites = (storage.loadData('category_sites')?.items || storage.loadData('baseDataCategories')?.find((c: any) => c.id === 'sites')?.items || []);
-    baseSites.forEach((s: any) => {
-      if (s.id && s.name && s.isActive !== false) {
-        siteMap.set(s.id, s.name);
-      }
-    });
-
-    allData.forEach((item: any) => {
-      if (item.siteId && item.siteName && !item.isVoided) {
-        siteMap.set(item.siteId, item.siteName);
-      }
-    });
-    return Array.from(siteMap.entries());
-  }, [storage, inventoryRefreshKey, baseData.sites]);
-
   // Pre-calculated inventory data for all tanks to improve performance
   const memoizedInventoryData = useMemo(() => {
     console.log('🚀 Pre-calculating all inventory data for Reports...');
@@ -330,13 +279,87 @@ export const ReportsManager = () => {
     return { tankData, activeTanks };
   }, [storage, upToDate, baseData.tanks, inventoryRefreshKey]);
 
+  // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها - فیلتر شده بر اساس موجودی و تراکنش‌ها
+  const uniqueTanks = useMemo(() => {
+    console.log('🔍 Filtering unique tanks with inventory...');
+    const tanksWithInventory = memoizedInventoryData.activeTanks.filter(tank => {
+      const data = memoizedInventoryData.tankData[tank.id];
+      if (!data) return false;
+      
+      let total = 0;
+      //Owned Receipts
+      data.receipts.forEach((r: any) => {
+        if (r.userType === 'owned') total += safeNumber(r.amount || r.receiptBasisAmount, 0);
+        else total += safeNumber(r.receiptBasisAmount || r.finalAmount || r.amount || 0);
+      });
+      // Adjustments
+      data.adjustments.forEach((adj: any) => {
+          if (adj.adjustmentType === 'addition') total += safeNumber(adj.quantity, 0);
+          else if (adj.adjustmentType === 'deduction') total -= safeNumber(adj.quantity, 0);
+      });
+      // Deliveries
+      data.deliveries.forEach((d: any) => total -= safeNumber(d.amount, 0));
+      data.consignmentSlips.forEach((s: any) => total -= safeNumber(s.amount, 0));
+      data.generalDeliveries.forEach((d: any) => total -= safeNumber(d.amount, 0));
+      // Wastage
+      data.wastage.forEach((t: any) => {
+          if (t.transactionType === 'owned') total += Math.abs(safeNumber(t.amount, 0));
+          else if (t.transactionType === 'consignment') total -= Math.abs(safeNumber(t.amount, 0));
+      });
+      // Conversions
+      data.conversions.forEach((c: any) => {
+          total -= safeNumber(c.consumedQuantity, 0);
+          total += safeNumber(c.producedQuantity, 0);
+      });
+      
+      return total > 0;
+    });
+
+    return tanksWithInventory.map(t => [t.id, t.name] as [string, string]);
+  }, [memoizedInventoryData]);
+
+  const uniqueSites = useMemo(() => {
+    console.log('🔍 Filtering unique sites with transactions...');
+    const siteMap = new Map();
+    const allData = [
+      ...(storage.loadData('receipts') || []),
+      ...(storage.loadData('deliveries') || []),
+      ...(storage.loadData('consignment-delivery-slips') || []),
+      ...(storage.loadData('ownership-delivery-slips') || []),
+      ...(storage.loadData('inventoryAdjustments') || []),
+      ...(storage.loadData('wastageTransactions') || []),
+      ...(storage.loadData('productConversions') || [])
+    ];
+
+    allData.forEach((item: any) => {
+      if (item.siteId && item.siteName && !item.isVoided) {
+        const dateValue = item.receiptDate || item.deliveryDate || item.documentDate || item.transactionDate || item.slipDate || item.createdAt;
+        const itemDate = new Date(dateValue);
+        if (!isNaN(itemDate.getTime()) && itemDate <= upToDate) {
+          siteMap.set(item.siteId, item.siteName);
+        }
+      }
+    });
+
+    // اضافه کردن سایت‌های مربوط به مخازن دارای موجودی
+    uniqueTanks.forEach(([tankId]) => {
+      const tank = memoizedInventoryData.activeTanks.find(t => t.id === tankId);
+      if (tank && tank.siteId && tank.siteName) {
+        siteMap.set(tank.siteId, tank.siteName);
+      }
+    });
+
+    return Array.from(siteMap.entries());
+  }, [storage, upToDate, inventoryRefreshKey, uniqueTanks, memoizedInventoryData.activeTanks]);
+
+
   // Calculate owned tanks inventory based on user formula
   const calculateOwnedTanksInventory = useCallback((siteIds?: string[], tankIds?: string[]) => {
     const currentSiteIds = siteIds || selectedSitesForFilter;
     const currentTankIds = tankIds || selectedTanksForFilter;
     
-    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
-    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+    const isAllSites = currentSiteIds.length === 0 || (uniqueSites.length > 0 && currentSiteIds.length === uniqueSites.length);
+    const isAllTanks = currentTankIds.length === 0 || (uniqueTanks.length > 0 && currentTankIds.length === uniqueTanks.length);
 
     let ownedReceiptsAmount = 0;
     let ownedAdditionDocuments = 0;
@@ -348,8 +371,9 @@ export const ReportsManager = () => {
 
     const tanksToProcess = memoizedInventoryData.activeTanks
         .filter(t => {
-          const siteMatch = isAllSites || currentSiteIds.includes(t.siteId);
-          const tankMatch = isAllTanks || currentTankIds.includes(t.id);
+          const tankSiteId = String(t.siteId || t.locationId || '');
+          const siteMatch = isAllSites || currentSiteIds.includes(tankSiteId);
+          const tankMatch = isAllTanks || currentTankIds.includes(String(t.id));
           return siteMatch && tankMatch;
         })
         .map(t => t.id);
@@ -405,8 +429,8 @@ export const ReportsManager = () => {
     const currentSiteIds = siteIds || selectedSitesForFilter;
     const currentTankIds = tankIds || selectedTanksForFilter;
     
-    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
-    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+    const isAllSites = currentSiteIds.length === 0 || (uniqueSites.length > 0 && currentSiteIds.length === uniqueSites.length);
+    const isAllTanks = currentTankIds.length === 0 || (uniqueTanks.length > 0 && currentTankIds.length === uniqueTanks.length);
 
     let consignmentReceiptsAmount = 0;
     let consignmentAdditions = 0;
@@ -418,8 +442,9 @@ export const ReportsManager = () => {
 
     const tanksToProcess = memoizedInventoryData.activeTanks
         .filter(t => {
-          const siteMatch = isAllSites || currentSiteIds.includes(t.siteId);
-          const tankMatch = isAllTanks || currentTankIds.includes(t.id);
+          const tankSiteId = String(t.siteId || t.locationId || '');
+          const siteMatch = isAllSites || currentSiteIds.includes(tankSiteId);
+          const tankMatch = isAllTanks || currentTankIds.includes(String(t.id));
           return siteMatch && tankMatch;
         })
         .map(t => t.id);
@@ -497,12 +522,13 @@ export const ReportsManager = () => {
     const currentSiteIds = siteIds || selectedSitesForFilter;
     const currentTankIds = tankIds || selectedTanksForFilter;
     
-    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
-    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+    const isAllSites = currentSiteIds.length === 0 || (uniqueSites.length > 0 && currentSiteIds.length === uniqueSites.length);
+    const isAllTanks = currentTankIds.length === 0 || (uniqueTanks.length > 0 && currentTankIds.length === uniqueTanks.length);
 
     tanks.forEach((tank: any) => {
-      const siteMatch = isAllSites || currentSiteIds.includes(tank.siteId);
-      const tankMatch = isAllTanks || currentTankIds.includes(tank.id);
+      const tankSiteId = String(tank.siteId || tank.locationId || '');
+      const siteMatch = isAllSites || currentSiteIds.includes(tankSiteId);
+      const tankMatch = isAllTanks || currentTankIds.includes(String(tank.id));
       if (!siteMatch || !tankMatch) return;
       
       const capacityStr = tank.capacity || "0";
@@ -529,8 +555,8 @@ export const ReportsManager = () => {
     const currentSiteIds = selectedSitesForFilter;
     const currentTankIds = selectedTanksForFilter;
 
-    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
-    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+    const isAllSites = currentSiteIds.length === 0 || (uniqueSites.length > 0 && currentSiteIds.length === uniqueSites.length);
+    const isAllTanks = currentTankIds.length === 0 || (uniqueTanks.length > 0 && currentTankIds.length === uniqueTanks.length);
 
     let totalTanks = 0;
     let withInventoryCount = 0;
@@ -540,8 +566,9 @@ export const ReportsManager = () => {
     let totalShortageSum = 0;
 
     tanks.forEach((tank: any) => {
-      const siteMatch = isAllSites || currentSiteIds.includes(tank.siteId);
-      const tankMatch = isAllTanks || currentTankIds.includes(tank.id);
+      const tankSiteId = String(tank.siteId || tank.locationId || '');
+      const siteMatch = isAllSites || currentSiteIds.includes(tankSiteId);
+      const tankMatch = isAllTanks || currentTankIds.includes(String(tank.id));
       if (!siteMatch || !tankMatch) return;
 
       totalTanks++;
@@ -1829,16 +1856,19 @@ export const ReportsManager = () => {
           if (!item.productName || item.productName !== filters.productName) return false;
         }
         
-        // فیلتر سایت و مخزن (استفاده از مقادیر انتخاب شده در بخش پکیج موجودی)
-        const isAllSitesSelected = selectedSitesForFilter.length === 0 || selectedSitesForFilter.length === uniqueSites.length;
-        const isAllTanksSelected = selectedTanksForFilter.length === 0 || selectedTanksForFilter.length === uniqueTanks.length;
+          // فیلتر سایت و مخزن (استفاده از مقادیر انتخاب شده در بخش پکیج موجودی)
+          const isAllSitesSelected = selectedSitesForFilter.length === 0 || (uniqueSites.length > 0 && selectedSitesForFilter.length === uniqueSites.length);
+          const isAllTanksSelected = selectedTanksForFilter.length === 0 || (uniqueTanks.length > 0 && selectedTanksForFilter.length === uniqueTanks.length);
 
-        if (!isAllSitesSelected) {
-          if (!item.siteId || !selectedSitesForFilter.includes(item.siteId)) return false;
-        }
-        if (!isAllTanksSelected) {
-          if (!item.tankId || !selectedTanksForFilter.includes(item.tankId)) return false;
-        }
+          if (!isAllSitesSelected) {
+            const itemSiteId = String(item.siteId || item.locationId || '');
+            if (!selectedSitesForFilter.includes(itemSiteId)) return false;
+          }
+          if (!isAllTanksSelected) {
+            const itemTankId = String(item.tankId || '');
+            if (!selectedTanksForFilter.includes(itemTankId)) return false;
+          }
+
       if (filters.locationName) {
         if (!item.locationName || item.locationName !== filters.locationName) return false;
       }
