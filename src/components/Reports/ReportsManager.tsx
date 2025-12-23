@@ -234,15 +234,19 @@ export const ReportsManager = () => {
     
     // ابتدا مخازن فعال از داده‌های پایه را می‌گیریم
     const baseTanks = (storage.loadData('category_tanks')?.items || storage.loadData('baseDataCategories')?.find((c: any) => c.id === 'tanks')?.items || []);
-    const activeTankIds = new Set(baseTanks.filter((t: any) => t.isActive !== false).map((t: any) => t.id));
+    baseTanks.forEach((t: any) => {
+      if (t.id && t.name && t.isActive !== false) {
+        tankMap.set(t.id, t.name);
+      }
+    });
 
     allData.forEach((item: any) => {
-      if (item.tankId && item.tankName && !item.isVoided && activeTankIds.has(item.tankId)) {
+      if (item.tankId && item.tankName && !item.isVoided) {
         tankMap.set(item.tankId, item.tankName);
       }
     });
     return Array.from(tankMap.entries());
-  }, [storage, baseData.tanks]);
+  }, [storage, inventoryRefreshKey, baseData.tanks]);
 
   const uniqueSites = useMemo(() => {
     const siteMap = new Map();
@@ -252,13 +256,22 @@ export const ReportsManager = () => {
       ...(storage.loadData('consignment-delivery-slips') || []),
       ...(storage.loadData('ownership-delivery-slips') || [])
     ];
+
+    // ابتدا سایت‌ها از داده‌های پایه را می‌گیریم
+    const baseSites = (storage.loadData('category_sites')?.items || storage.loadData('baseDataCategories')?.find((c: any) => c.id === 'sites')?.items || []);
+    baseSites.forEach((s: any) => {
+      if (s.id && s.name && s.isActive !== false) {
+        siteMap.set(s.id, s.name);
+      }
+    });
+
     allData.forEach((item: any) => {
       if (item.siteId && item.siteName && !item.isVoided) {
         siteMap.set(item.siteId, item.siteName);
       }
     });
     return Array.from(siteMap.entries());
-  }, [storage, inventoryRefreshKey]);
+  }, [storage, inventoryRefreshKey, baseData.sites]);
 
   // Pre-calculated inventory data for all tanks to improve performance
   const memoizedInventoryData = useMemo(() => {
@@ -322,6 +335,9 @@ export const ReportsManager = () => {
     const currentSiteIds = siteIds || selectedSitesForFilter;
     const currentTankIds = tankIds || selectedTanksForFilter;
     
+    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
+    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+
     let ownedReceiptsAmount = 0;
     let ownedAdditionDocuments = 0;
     let ownedDeliveries = 0;
@@ -330,11 +346,13 @@ export const ReportsManager = () => {
     let ownedConsumedProducts = 0;
     let ownedProducedProducts = 0;
 
-    const tanksToProcess = currentTankIds.length > 0 
-      ? currentTankIds 
-      : memoizedInventoryData.activeTanks
-          .filter(t => currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))
-          .map(t => t.id);
+    const tanksToProcess = memoizedInventoryData.activeTanks
+        .filter(t => {
+          const siteMatch = isAllSites || currentSiteIds.includes(t.siteId);
+          const tankMatch = isAllTanks || currentTankIds.includes(t.id);
+          return siteMatch && tankMatch;
+        })
+        .map(t => t.id);
 
     tanksToProcess.forEach(tankId => {
       const data = memoizedInventoryData.tankData[tankId];
@@ -342,14 +360,13 @@ export const ReportsManager = () => {
 
       // Receipts
       data.receipts.forEach((r: any) => {
-        if (r.userType === 'owned' && (currentSiteIds.length === 0 || currentSiteIds.includes(r.siteId))) {
+        if (r.userType === 'owned') {
           ownedReceiptsAmount += safeNumber(r.amount || r.receiptBasisAmount, 0);
         }
       });
 
       // Adjustments
       data.adjustments.forEach((adj: any) => {
-        if (currentSiteIds.length > 0 && !currentSiteIds.includes(adj.siteId)) return;
         if (adj.productType === 'owned') {
           if (adj.adjustmentType === 'addition') ownedAdditionDocuments += safeNumber(adj.quantity, 0);
           else if (adj.adjustmentType === 'deduction') ownedDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -358,21 +375,18 @@ export const ReportsManager = () => {
 
       // Deliveries
       data.deliveries.forEach((d: any) => {
-        if (currentSiteIds.length === 0 || currentSiteIds.includes(d.siteId)) {
-          ownedDeliveries += safeNumber(d.amount, 0);
-        }
+        ownedDeliveries += safeNumber(d.amount, 0);
       });
 
       // Wastage
       data.wastage.forEach((t: any) => {
-        if (t.transactionType === 'owned' && (currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))) {
+        if (t.transactionType === 'owned') {
           ownedGainedAmount += Math.abs(safeNumber(t.amount, 0));
         }
       });
 
       // Conversions
       data.conversions.forEach((c: any) => {
-        if (currentSiteIds.length > 0 && !currentSiteIds.includes(c.siteId)) return;
         if (c.consumedProductType === 'owned') ownedConsumedProducts += safeNumber(c.consumedQuantity, 0);
         if (c.producedProductType === 'owned') ownedProducedProducts += safeNumber(c.producedQuantity, 0);
       });
@@ -384,13 +398,16 @@ export const ReportsManager = () => {
       ownedReceiptsAmount, ownedAdditionDocuments, ownedDeliveries, ownedGainedAmount,
       ownedDeductionDocuments, ownedConsumedProducts, ownedProducedProducts, finalInventory: totalOwnedValue
     };
-  }, [memoizedInventoryData, selectedSitesForFilter, selectedTanksForFilter]);
+  }, [memoizedInventoryData, selectedSitesForFilter, selectedTanksForFilter, uniqueSites.length, uniqueTanks.length]);
 
   // Calculate consignment tanks inventory
   const calculateConsignmentTanksInventory = useCallback((siteIds?: string[], tankIds?: string[]) => {
     const currentSiteIds = siteIds || selectedSitesForFilter;
     const currentTankIds = tankIds || selectedTanksForFilter;
     
+    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
+    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+
     let consignmentReceiptsAmount = 0;
     let consignmentAdditions = 0;
     let consignmentDeliveries = 0;
@@ -399,11 +416,13 @@ export const ReportsManager = () => {
     let consignmentConsumedProducts = 0;
     let consignmentProducedProducts = 0;
 
-    const tanksToProcess = currentTankIds.length > 0 
-      ? currentTankIds 
-      : memoizedInventoryData.activeTanks
-          .filter(t => currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))
-          .map(t => t.id);
+    const tanksToProcess = memoizedInventoryData.activeTanks
+        .filter(t => {
+          const siteMatch = isAllSites || currentSiteIds.includes(t.siteId);
+          const tankMatch = isAllTanks || currentTankIds.includes(t.id);
+          return siteMatch && tankMatch;
+        })
+        .map(t => t.id);
 
     tanksToProcess.forEach(tankId => {
       const data = memoizedInventoryData.tankData[tankId];
@@ -411,7 +430,7 @@ export const ReportsManager = () => {
 
       // Receipts
       data.receipts.forEach((r: any) => {
-        if (r.userType === 'consignment' && (currentSiteIds.length === 0 || currentSiteIds.includes(r.siteId))) {
+        if (r.userType === 'consignment') {
           const baseAmount = r.receiptBasisAmount || r.finalAmount || r.amount || 
                            (safeNumber(r.shipUnloadingAmount, 0) + safeNumber(r.tankShoreAmount, 0) + 
                             safeNumber(r.shipBillOfLadingAmount, 0) + safeNumber(r.weightGross, 0));
@@ -421,7 +440,6 @@ export const ReportsManager = () => {
 
       // Adjustments
       data.adjustments.forEach((adj: any) => {
-        if (currentSiteIds.length > 0 && !currentSiteIds.includes(adj.siteId)) return;
         if (adj.productType === 'consignment') {
           if (adj.adjustmentType === 'addition') consignmentAdditions += safeNumber(adj.quantity, 0);
           else if (adj.adjustmentType === 'deduction') consignmentDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -430,7 +448,6 @@ export const ReportsManager = () => {
 
       // Consignment Deliveries (Slips + General)
       const processDelivery = (d: any, isConsignmentCheck: boolean) => {
-        if (currentSiteIds.length > 0 && !currentSiteIds.includes(d.siteId)) return;
         if (!isConsignmentCheck || (d.contractNumber || d.permitId || d.userType === 'consignment' || d.type === 'امانی' || d.nature === 'consignment')) {
           consignmentDeliveries += safeNumber(d.amount, 0);
         }
@@ -440,14 +457,13 @@ export const ReportsManager = () => {
 
       // Wastage
       data.wastage.forEach((t: any) => {
-        if (t.transactionType === 'consignment' && (currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))) {
+        if (t.transactionType === 'consignment') {
           consignmentDeductionAmount += Math.abs(safeNumber(t.amount, 0));
         }
       });
 
       // Conversions
       data.conversions.forEach((c: any) => {
-        if (currentSiteIds.length > 0 && !currentSiteIds.includes(c.siteId)) return;
         if (c.consumedProductType === 'consignment') consignmentConsumedProducts += safeNumber(c.consumedQuantity, 0);
         if (c.producedProductType === 'consignment') consignmentProducedProducts += safeNumber(c.producedQuantity, 0);
       });
@@ -460,7 +476,7 @@ export const ReportsManager = () => {
       consignmentDeductionAmount, consignmentDeductionDocuments, consignmentConsumedProducts,
       consignmentProducedProducts, finalInventory: totalConsignmentValue
     };
-  }, [memoizedInventoryData, selectedSitesForFilter, selectedTanksForFilter]);
+  }, [memoizedInventoryData, selectedSitesForFilter, selectedTanksForFilter, uniqueSites.length, uniqueTanks.length]);
 
   // Calculate consignment+owned tanks inventory
   const calculateConsignmentOwnedTanksInventory = useCallback((siteIds?: string[], tankIds?: string[]) => {
@@ -481,9 +497,13 @@ export const ReportsManager = () => {
     const currentSiteIds = siteIds || selectedSitesForFilter;
     const currentTankIds = tankIds || selectedTanksForFilter;
     
+    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
+    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+
     tanks.forEach((tank: any) => {
-      if (currentTankIds.length > 0 && !currentTankIds.includes(tank.id)) return;
-      if (currentSiteIds.length > 0 && tank.siteId && !currentSiteIds.includes(tank.siteId)) return;
+      const siteMatch = isAllSites || currentSiteIds.includes(tank.siteId);
+      const tankMatch = isAllTanks || currentTankIds.includes(tank.id);
+      if (!siteMatch || !tankMatch) return;
       
       const capacityStr = tank.capacity || "0";
       const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
@@ -494,7 +514,7 @@ export const ReportsManager = () => {
       totalCapacity += capacity;
     });
     return totalCapacity;
-  }, [baseData.tanks, selectedSitesForFilter, selectedTanksForFilter]);
+  }, [baseData.tanks, selectedSitesForFilter, selectedTanksForFilter, uniqueSites.length, uniqueTanks.length]);
 
   // Helper function to calculate empty tank capacity
   const calculateEmptyTankCapacity = useCallback(() => {
@@ -509,6 +529,9 @@ export const ReportsManager = () => {
     const currentSiteIds = selectedSitesForFilter;
     const currentTankIds = selectedTanksForFilter;
 
+    const isAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
+    const isAllTanks = currentTankIds.length === 0 || currentTankIds.length === uniqueTanks.length;
+
     let totalTanks = 0;
     let withInventoryCount = 0;
     let withoutInventoryCount = 0;
@@ -517,8 +540,9 @@ export const ReportsManager = () => {
     let totalShortageSum = 0;
 
     tanks.forEach((tank: any) => {
-      if (currentTankIds.length > 0 && !currentTankIds.includes(tank.id)) return;
-      if (currentSiteIds.length > 0 && tank.siteId && !currentSiteIds.includes(tank.siteId)) return;
+      const siteMatch = isAllSites || currentSiteIds.includes(tank.siteId);
+      const tankMatch = isAllTanks || currentTankIds.includes(tank.id);
+      if (!siteMatch || !tankMatch) return;
 
       totalTanks++;
 
@@ -548,7 +572,7 @@ export const ReportsManager = () => {
     });
 
     return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum };
-  }, [baseData.tanks, selectedSitesForFilter, selectedTanksForFilter, calculateConsignmentOwnedTanksInventory]);
+  }, [baseData.tanks, selectedSitesForFilter, selectedTanksForFilter, calculateConsignmentOwnedTanksInventory, uniqueSites.length, uniqueTanks.length]);
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
   const loadBaseData = () => {
@@ -1806,10 +1830,13 @@ export const ReportsManager = () => {
         }
         
         // فیلتر سایت و مخزن (استفاده از مقادیر انتخاب شده در بخش پکیج موجودی)
-        if (selectedSitesForFilter.length > 0) {
+        const isAllSitesSelected = selectedSitesForFilter.length === 0 || selectedSitesForFilter.length === uniqueSites.length;
+        const isAllTanksSelected = selectedTanksForFilter.length === 0 || selectedTanksForFilter.length === uniqueTanks.length;
+
+        if (!isAllSitesSelected) {
           if (!item.siteId || !selectedSitesForFilter.includes(item.siteId)) return false;
         }
-        if (selectedTanksForFilter.length > 0) {
+        if (!isAllTanksSelected) {
           if (!item.tankId || !selectedTanksForFilter.includes(item.tankId)) return false;
         }
       if (filters.locationName) {
@@ -2277,11 +2304,28 @@ export const ReportsManager = () => {
   const activeFilters = getActiveFilters();
   const tableColumns = getTableColumns();
   
-  // رندر کردن فیلتر بر اساس نوع آن - بهبود یافته
-  const renderFilter = (filterConfig: any) => {
-    const { id, label, type, options, dataKey, valueField, labelField, formatLabel, combine, static: isStatic } = filterConfig;
-    
-    if (type === 'select') {
+    // رندر کردن فیلتر بر اساس نوع آن - بهبود یافته
+    const renderFilter = (filterConfig: any) => {
+      const { id, label, type, options, dataKey, valueField, labelField, formatLabel, combine, static: isStatic } = filterConfig;
+      
+      if (type === 'multiSelect') {
+        const isSiteFilter = id === 'siteName';
+        const isTankFilter = id === 'tankName';
+        
+        return (
+          <div key={id} className="mb-4">
+            <MultiSelectDropdown
+              label={label}
+              placeholder={`تمام ${label}ها`}
+              options={isSiteFilter ? uniqueSites : (isTankFilter ? uniqueTanks : [])}
+              selectedValues={isSiteFilter ? selectedSitesForFilter : (isTankFilter ? selectedTanksForFilter : [])}
+              onChange={isSiteFilter ? setSelectedSitesForFilter : (isTankFilter ? setSelectedTanksForFilter : () => {})}
+            />
+          </div>
+        );
+      }
+
+      if (type === 'select') {
       let selectOptions = options || [];
       
       // اگر گزینه‌ها از پیش تعریف نشده‌اند، از داده‌های پایه استفاده کن
