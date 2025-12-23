@@ -572,69 +572,74 @@ export const InventoryLedgerManager: React.FC = () => {
     const wastageTransactions = storage.loadData('wastageTransactions') || [];
     const productConversions = storage.loadData('productConversions') || [];
 
-    tanks.forEach((tank: any) => {
-      // اعمال فیلتر سایت و مخزن
-      if (currentTankId && tank.id !== currentTankId) return;
-      if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
+      tanks.forEach((tank: any) => {
+        // اعمال فیلتر سایت و مخزن
+        if (currentTankId && tank.id !== currentTankId) return;
+        if (currentSiteId && tank.siteId && tank.siteId !== currentSiteId) return;
 
-      totalTanks++;
+        totalTanks++;
 
-      // محاسبه موجودی برای این مخزن خاص (مشابه منطق توابع اصلی اما بهینه شده برای لوپ)
-      const tankId = tank.id;
-      
-      // رسیدهای تملیکی
-      const ownedReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'owned' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
-        .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || 0), 0);
-      
-      // رسیدهای امانی
-      const consignmentReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'consignment' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
-        .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || r.finalAmount || 0), 0);
+        // محاسبه موجودی برای این مخزن خاص (مشابه منطق توابع اصلی اما بهینه شده برای لوپ)
+        const tankId = tank.id;
+        
+        // رسیدهای تملیکی
+        const ownedReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'owned' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
+          .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || 0), 0);
+        
+        // رسیدهای امانی
+        const consignmentReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'consignment' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
+          .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || r.finalAmount || 0), 0);
 
-      // حواله‌های تملیکی
-      const ownedDeliveries = [
-        ...allDeliveries.filter((d: any) => d.tankId === tankId && d.userType === 'owned' && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
-        ...ownershipSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
-      ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
+        // حواله‌های تملیکی
+        const ownedDeliveries = [
+          ...allDeliveries.filter((d: any) => d.tankId === tankId && d.userType === 'owned' && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
+          ...ownershipSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
+        ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
 
-      // حواله‌های امانی
-      const consignmentDeliveries = [
-        ...allDeliveries.filter((d: any) => d.tankId === tankId && (d.userType === 'consignment' || d.contractNumber || d.type === 'امانی') && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
-        ...consignmentSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
-      ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
+        // حواله‌های امانی
+        const consignmentDeliveries = [
+          ...allDeliveries.filter((d: any) => d.tankId === tankId && (d.userType === 'consignment' || d.contractNumber || d.type === 'امانی') && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
+          ...consignmentSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
+        ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
 
-      // اصلاحات انبار
-      const additions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'addition' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
-        .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
-      
-      const deductions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'deduction' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
-        .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
+        // اصلاحات انبار
+        const additions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'addition' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
+          .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
+        
+        const deductions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'deduction' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
+          .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
 
-      // افت و تبدیل (خلاصه شده برای سرعت)
-      const wastage = wastageTransactions.filter((t: any) => t.tankId === tankId && !t.isVoided && new Date(t.transactionDate) <= upToDate)
-        .reduce((sum: number, t: any) => sum + (t.transactionType === 'owned' ? Math.abs(safeNumber(t.amount, 0)) : -Math.abs(safeNumber(t.amount, 0))), 0);
+        // افت و تبدیل (خلاصه شده برای سرعت)
+        const wastage = wastageTransactions.filter((t: any) => t.tankId === tankId && !t.isVoided && new Date(t.transactionDate) <= upToDate)
+          .reduce((sum: number, t: any) => sum + (t.transactionType === 'owned' ? Math.abs(safeNumber(t.amount, 0)) : -Math.abs(safeNumber(t.amount, 0))), 0);
 
-      const conversion = productConversions.filter((c: any) => c.tankId === tankId && !c.isVoided && new Date(c.documentDate) <= upToDate)
-        .reduce((sum: number, c: any) => sum + safeNumber(c.producedQuantity, 0) - safeNumber(c.consumedQuantity, 0), 0);
+        const conversion = productConversions.filter((c: any) => c.tankId === tankId && !c.isVoided && new Date(c.documentDate) <= upToDate)
+          .reduce((sum: number, c: any) => sum + safeNumber(c.producedQuantity, 0) - safeNumber(c.consumedQuantity, 0), 0);
 
-      const inventory = ownedReceipts + consignmentReceipts + additions + wastage + conversion - ownedDeliveries - consignmentDeliveries - deductions;
+        const inventory = ownedReceipts + consignmentReceipts + additions + wastage + conversion - ownedDeliveries - consignmentDeliveries - deductions;
 
-      if (inventory > 0) {
-        withInventoryCount++;
-      } else {
-        withoutInventoryCount++;
-      }
+        if (inventory > 0) {
+          withInventoryCount++;
+        } else {
+          withoutInventoryCount++;
+        }
 
-      // هشدار حداقل موجودی
-      const minInventory = safeNumber(tank.minInventory || tank.minimumInventory, 0);
-      if (inventory > 0 && inventory <= minInventory) {
-        lowInventoryAlert = true;
-        lowInventoryTanks.push({
-          name: tank.name || tank.id,
-          inventory: inventory,
-          minInventory: minInventory
-        });
-      }
-    });
+        // هشدار حداقل موجودی - اصلاح فیلد و نحوه پارس کردن
+        const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
+        const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
+        const minInventory = minInventoryMatch 
+          ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
+          : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
+
+        if (minInventory > 0 && inventory <= minInventory) {
+          lowInventoryAlert = true;
+          lowInventoryTanks.push({
+            name: tank.name || tank.id,
+            inventory: inventory,
+            minInventory: minInventory
+          });
+        }
+      });
 
     return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks };
   }, [baseData.tanks, filters, selectedSiteForFilter, selectedTankForFilter, upToDate, storage]);
@@ -3055,13 +3060,13 @@ export const InventoryLedgerManager: React.FC = () => {
                                           {formatPersianNumber(lowInventoryTanks?.length || 0)}
                                         </span>
                                       </div>
-                                      {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 && (
-                                        <div className="mt-1 max-h-12 overflow-y-auto font-medium">
-                                          {lowInventoryTanks.map((t: any, i: number) => (
-                                            <div key={i} className="truncate">• {t.name} ({formatPersianNumber(t.inventory)})</div>
-                                          ))}
-                                        </div>
-                                      )}
+                                        {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 && (
+                                          <div className="mt-1 max-h-24 overflow-y-auto font-medium scrollbar-thin scrollbar-thumb-red-200">
+                                            {lowInventoryTanks.map((t: any, i: number) => (
+                                              <div key={i} className="truncate">• {t.name} ({formatPersianNumber(t.inventory)})</div>
+                                            ))}
+                                          </div>
+                                        )}
                                       {!lowInventoryAlert && <span>وضعیت موجودی نرمال است</span>}
                                     </div>
                                     <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
