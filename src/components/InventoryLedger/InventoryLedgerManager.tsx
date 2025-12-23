@@ -716,7 +716,7 @@ export const InventoryLedgerManager: React.FC = () => {
       {
         id: 'siteName',
         label: 'سایت مخازن',
-        type: 'select',
+        type: 'multiSelect',
         dataKey: 'sites',
         valueField: 'name',
         labelField: 'name'
@@ -724,7 +724,7 @@ export const InventoryLedgerManager: React.FC = () => {
       {
         id: 'tankName',
         label: 'مخزن',
-        type: 'select',
+        type: 'multiSelect',
         dataKey: 'tanks',
         valueField: 'name',
         labelField: 'name'
@@ -1841,16 +1841,16 @@ export const InventoryLedgerManager: React.FC = () => {
         if (!referenceNumber.includes(filters.referenceNumber.toLowerCase())) return false;
       }
       
-      // فیلترهای انتخاب از dropdown
-      if (filters.productName) {
-        if (!item.productName || item.productName !== filters.productName) return false;
-      }
-      if (filters.siteName) {
-        if (!item.siteName || item.siteName !== filters.siteName) return false;
-      }
-      if (filters.tankName) {
-        if (!item.tankName || item.tankName !== filters.tankName) return false;
-      }
+        // فیلترهای انتخاب از dropdown
+        if (filters.productName) {
+          if (!item.productName || item.productName !== filters.productName) return false;
+        }
+        if (filters.siteName && filters.siteName.length > 0) {
+          if (!item.siteName || !filters.siteName.includes(item.siteName)) return false;
+        }
+        if (filters.tankName && filters.tankName.length > 0) {
+          if (!item.tankName || !filters.tankName.includes(item.tankName)) return false;
+        }
       if (filters.locationName) {
         if (!item.locationName || item.locationName !== filters.locationName) return false;
       }
@@ -2326,10 +2326,49 @@ export const InventoryLedgerManager: React.FC = () => {
   const tableColumns = getTableColumns();
   
   // رندر کردن فیلتر بر اساس نوع آن - بهبود یافته
-  const renderFilter = (filterConfig: any) => {
-    const { id, label, type, options, dataKey, valueField, labelField, formatLabel, combine, static: isStatic } = filterConfig;
-    
-    if (type === 'select') {
+    const renderFilter = (filterConfig: any) => {
+      const { id, label, type, options, dataKey, valueField, labelField, formatLabel, combine, static: isStatic } = filterConfig;
+      
+      if (type === 'multiSelect') {
+        let selectOptions = options || [];
+        
+        if (!options && dataKey) {
+          if (Array.isArray(dataKey) && combine) {
+            selectOptions = dataKey.flatMap(key => 
+              (baseData[key] || []).map((item: BaseDataItem) => ({
+                value: item[valueField as keyof BaseDataItem],
+                label: formatLabel ? formatLabel(item) : item[labelField as keyof BaseDataItem]
+              }))
+            );
+          } else {
+            const key = Array.isArray(dataKey) ? dataKey[0] : dataKey;
+            selectOptions = (baseData[key] || []).map((item: BaseDataItem) => ({
+              value: item[valueField as keyof BaseDataItem],
+              label: formatLabel ? formatLabel(item) : item[labelField as keyof BaseDataItem]
+            }));
+          }
+        }
+        
+        const uniqueOptionsMap = new Map();
+        selectOptions.forEach((opt: any) => {
+          if (opt.value) uniqueOptionsMap.set(opt.value, opt.label);
+        });
+        const uniqueOptionsArray: [string, string][] = Array.from(uniqueOptionsMap.entries());
+
+        return (
+          <div key={id} className="mb-4">
+            <MultiSelectDropdown
+              label={label}
+              placeholder={`انتخاب ${label}...`}
+              options={uniqueOptionsArray}
+              selectedValues={filters[id] || []}
+              onChange={(values) => setFilters({ ...filters, [id]: values })}
+            />
+          </div>
+        );
+      }
+      
+      if (type === 'select') {
       let selectOptions = options || [];
       
       // اگر گزینه‌ها از پیش تعریف نشده‌اند، از داده‌های پایه استفاده کن
@@ -2541,11 +2580,17 @@ export const InventoryLedgerManager: React.FC = () => {
                   const filterConfig = dynamicFilters.find(f => f.id === key);
                   const label = filterConfig?.label || key;
                   
-                  // تبدیل مقدار به متن قابل فهم
-                  let displayValue = value;
-                  if (value instanceof Date) {
-                    displayValue = formatPersianDate(value);
-                  } else if (typeof value === 'string' && value.length > 20) {
+                    // تبدیل مقدار به متن قابل فهم
+                    let displayValue = value;
+                    if (value instanceof Date) {
+                      displayValue = formatPersianDate(value);
+                    } else if (Array.isArray(value)) {
+                      displayValue = value.length === 0 
+                        ? 'همه' 
+                        : value.length > 3 
+                          ? `${value.length} مورد انتخاب شده` 
+                          : value.join('، ');
+                    } else if (typeof value === 'string' && value.length > 20) {
                     displayValue = value.substring(0, 20) + '...';
                   } else if (key.includes('Min') || key.includes('Max')) {
                     // برای فیلترهای محدوده مقدار
@@ -2912,7 +2957,7 @@ export const InventoryLedgerManager: React.FC = () => {
                     return lowInventoryAlert && (
                       <div className="flex items-center gap-2 bg-red-100 text-red-700 px-3 py-1 rounded-lg animate-pulse border border-red-200">
                         <div className="w-2 h-2 bg-red-600 rounded-full"></div>
-                        <span className="text-xs font-bold">هشدار: موجودی بحرانی</span>
+                        <span className="text-xs font-bold">هشدار: حداقل موجودی مخازن</span>
                       </div>
                     );
                   })()}
@@ -2992,7 +3037,7 @@ export const InventoryLedgerManager: React.FC = () => {
                             <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm relative overflow-hidden group">
                               <div className="flex justify-between items-center mb-2">
                                 <span className="text-blue-800 font-bold text-lg">ظرفیت مخازن:</span>
-                                <span className="text-3xl font-black text-blue-900">{formatPersianNumber(totalCapacity)}</span>
+                                <span className="text-2xl font-black text-blue-900">{formatPersianNumber(totalCapacity)}</span>
                               </div>
                               <div className="flex items-center gap-2 text-blue-600 text-sm">
                                 <Database className="w-4 h-4" />
@@ -3004,8 +3049,8 @@ export const InventoryLedgerManager: React.FC = () => {
                             {/* موجودی نهایی */}
                             <div className="bg-green-50 p-6 rounded-xl border border-green-100 shadow-sm relative overflow-hidden group">
                               <div className="flex justify-between items-center mb-2">
-                                <span className="text-green-800 font-bold text-lg">موجودی نهایی (امانی + تملیکی):</span>
-                                <span className="text-3xl font-black text-green-900">{formatPersianNumber(inventory.finalInventory || 0)}</span>
+                                <span className="text-green-800 font-bold text-lg">موجودی نهایی:</span>
+                                <span className="text-2xl font-black text-green-900">{formatPersianNumber(inventory.finalInventory || 0)}</span>
                               </div>
                               <div className="flex items-center gap-2 text-green-600 text-sm">
                                 <Package className="w-4 h-4" />
@@ -3017,8 +3062,8 @@ export const InventoryLedgerManager: React.FC = () => {
                             {/* ظرفیت خالی مخازن */}
                             <div className="bg-orange-50 p-6 rounded-xl border border-orange-100 shadow-sm relative overflow-hidden group">
                               <div className="flex justify-between items-center mb-2">
-                                <span className="text-orange-800 font-bold text-lg">ظرفیت خالی مخزن (کیلوگرم):</span>
-                                <span className="text-3xl font-black text-orange-900">{formatPersianNumber(emptyCapacity)}</span>
+                                <span className="text-orange-800 font-bold text-lg">ظرفیت خالی مخزن:</span>
+                                <span className="text-2xl font-black text-orange-900">{formatPersianNumber(emptyCapacity)}</span>
                               </div>
                               <div className="flex items-center gap-2 text-orange-600 text-sm">
                                 <FlaskConical className="w-4 h-4" />
@@ -3053,7 +3098,7 @@ export const InventoryLedgerManager: React.FC = () => {
                                 <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
                               </div>
                               {lowInventoryAlert && (
-                                <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-500 text-white shadow-lg">
+                                <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-400 text-white shadow-lg">
                                   <span className="font-bold text-xs">جمع کل کسر موجودی ها:</span>
                                   <span className="text-lg font-black">{formatPersianNumber(totalShortageSum)}</span>
                                 </div>
