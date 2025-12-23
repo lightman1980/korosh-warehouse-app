@@ -17,22 +17,24 @@ interface LedgerFilters {
   amountMax?: string;
 }
 
-interface LedgerEntry {
-  id: string;
-  date: Date;
-  transactionNumber: string;
-  type: 'receipt' | 'delivery' | 'adjustment';
-  transactionType?: 'receipt' | 'delivery' | 'adjustment-addition' | 'adjustment-deduction' | 'conversion-produced' | 'conversion-consumed';
-  description: string;
-  amount: number;
-  unit: 'kg' | 'ton';
-  userType: 'owned' | 'consignment';
-  runningBalance?: number; // محاسبه شده به صورت پویا
-  companyName?: string;
-  productName: string;
-  siteName: string;
-  tankName: string;
-  status?: string;
+  interface LedgerEntry {
+    id: string;
+    date: Date;
+    transactionNumber: string;
+    type: 'receipt' | 'delivery' | 'adjustment';
+    transactionType?: 'receipt' | 'delivery' | 'adjustment-addition' | 'adjustment-deduction' | 'conversion-produced' | 'conversion-consumed';
+    description: string;
+    amount: number;
+    unit: 'kg' | 'ton';
+    userType: 'owned' | 'consignment';
+    runningBalance?: number; // محاسبه شده به صورت پویا
+    companyName?: string;
+    productName: string;
+    siteName: string;
+    siteId?: string;
+    tankName: string;
+    tankId?: string;
+    status?: string;
   // فیلدهای اضافی برای پشتیبانی از تمام فیلترها
   customerCompanyId?: string;
   customerCompanyName?: string;
@@ -983,9 +985,9 @@ export const ReportsManager = () => {
     setUnitToggle(newUnit);
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig]);
+    useEffect(() => {
+      applyFilters();
+    }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig, selectedSitesForFilter, selectedTanksForFilter, upToDate]);
 
   const applyFilters = () => {
     // Get real data from storage
@@ -1172,10 +1174,12 @@ export const ReportsManager = () => {
         unit: r.unit,
         userType: isConsignmentReceipt ? 'consignment' as const : 'owned' as const,
         companyName: normalizeFieldName('companyName', r),
-        productName: r.productName,
-        siteName: r.siteName,
-        tankName: r.tankName,
-        status: r.status,
+          productName: r.productName,
+          siteName: r.siteName,
+          siteId: r.siteId,
+          tankName: r.tankName,
+          tankId: r.tankId,
+          status: r.status,
         // فیلدهای اضافی با تطبیق نام‌ها
         customerCompanyId: normalizeFieldId('customerCompanyId', r),
         customerCompanyName: normalizeFieldName('customerCompanyName', r),
@@ -1226,8 +1230,10 @@ export const ReportsManager = () => {
         userType: 'consignment' as const,
         companyName: normalizeFieldName('counterpartyName', s) || '',
         productName: s.productName || '',
-        siteName: s.siteName || '',
-        tankName: s.tankName || '',
+          siteName: s.siteName || '',
+          siteId: s.siteId,
+          tankName: s.tankName || '',
+          tankId: s.tankId,
         status: s.status || 'printed',
         // فیلدهای اضافی
         customerCompanyId: normalizeFieldId('customerCompanyId', s),
@@ -1278,8 +1284,10 @@ export const ReportsManager = () => {
         userType: 'owned' as const,
         companyName: normalizeFieldName('counterpartyName', s) || 'شرکت صنعت غذایی کورش',
         productName: s.productName || '',
-        siteName: s.siteName || '',
-        tankName: s.tankName || '',
+          siteName: s.siteName || '',
+          siteId: s.siteId,
+          tankName: s.tankName || '',
+          tankId: s.tankId,
         status: s.status || 'printed',
         // فیلدهای اضافی
         customerCompanyId: normalizeFieldId('customerCompanyId', s),
@@ -1792,16 +1800,18 @@ export const ReportsManager = () => {
         if (!referenceNumber.includes(filters.referenceNumber.toLowerCase())) return false;
       }
       
-      // فیلترهای انتخاب از dropdown
-      if (filters.productName) {
-        if (!item.productName || item.productName !== filters.productName) return false;
-      }
-      if (filters.siteName) {
-        if (!item.siteName || item.siteName !== filters.siteName) return false;
-      }
-      if (filters.tankName) {
-        if (!item.tankName || item.tankName !== filters.tankName) return false;
-      }
+        // فیلترهای انتخاب از dropdown
+        if (filters.productName) {
+          if (!item.productName || item.productName !== filters.productName) return false;
+        }
+        
+        // فیلتر سایت و مخزن (استفاده از مقادیر انتخاب شده در بخش پکیج موجودی)
+        if (selectedSitesForFilter.length > 0) {
+          if (!item.siteId || !selectedSitesForFilter.includes(item.siteId)) return false;
+        }
+        if (selectedTanksForFilter.length > 0) {
+          if (!item.tankId || !selectedTanksForFilter.includes(item.tankId)) return false;
+        }
       if (filters.locationName) {
         if (!item.locationName || item.locationName !== filters.locationName) return false;
       }
