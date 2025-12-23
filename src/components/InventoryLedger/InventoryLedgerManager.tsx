@@ -1848,12 +1848,14 @@ export const InventoryLedgerManager: React.FC = () => {
         if (filters.productName) {
           if (!item.productName || item.productName !== filters.productName) return false;
         }
-        if (filters.siteName && filters.siteName.length > 0) {
-          if (!item.siteName || !filters.siteName.includes(item.siteName)) return false;
-        }
-        if (filters.tankName && filters.tankName.length > 0) {
-          if (!item.tankName || !filters.tankName.includes(item.tankName)) return false;
-        }
+          if (selectedSiteForFilter) {
+            const itemSiteId = String(item.siteId || item.locationId || '');
+            if (itemSiteId !== selectedSiteForFilter) return false;
+          }
+          if (selectedTankForFilter) {
+            const itemTankId = String(item.tankId || '');
+            if (itemTankId !== selectedTankForFilter) return false;
+          }
       if (filters.locationName) {
         if (!item.locationName || item.locationName !== filters.locationName) return false;
       }
@@ -2872,7 +2874,7 @@ export const InventoryLedgerManager: React.FC = () => {
                 </div>
                 <div className="p-4">
                   {(() => {
-                          const inventory = calculateOwnedTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
+                          const inventory = calculateOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
                     return (
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between items-center">
@@ -2922,7 +2924,7 @@ export const InventoryLedgerManager: React.FC = () => {
                 </div>
                 <div className="p-4">
                     {(() => {
-                      const inventory = calculateConsignmentTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
+                      const inventory = calculateConsignmentTanksInventory(selectedSiteForFilter, selectedTankForFilter);
                       return (
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between items-center">
@@ -2983,8 +2985,8 @@ export const InventoryLedgerManager: React.FC = () => {
                   {/* نتایج محاسبات */}
                   <div className="bg-gray-50 rounded-lg p-4">
                       {(() => {
-                        const inventory = calculateConsignmentOwnedTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
-                        const totalCapacity = calculateTotalTankCapacity(selectedSitesForFilter, selectedTanksForFilter);
+                        const inventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
+                        const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter, selectedTankForFilter);
                         const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
                         const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
                       

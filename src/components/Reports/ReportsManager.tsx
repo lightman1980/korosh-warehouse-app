@@ -1026,7 +1026,7 @@ export const ReportsManager = () => {
 
     useEffect(() => {
       applyFilters();
-    }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig, selectedSitesForFilter, selectedTanksForFilter, upToDate]);
+    }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig, selectedSiteForFilter, selectedTankForFilter, upToDate]);
 
   const applyFilters = () => {
     // Get real data from storage
@@ -1845,16 +1845,13 @@ export const ReportsManager = () => {
         }
         
           // فیلتر سایت و مخزن (استفاده از مقادیر انتخاب شده در بخش پکیج موجودی)
-          const isAllSitesSelected = selectedSitesForFilter.length === 0 || (uniqueSites.length > 0 && selectedSitesForFilter.length === uniqueSites.length);
-          const isAllTanksSelected = selectedTanksForFilter.length === 0 || (uniqueTanks.length > 0 && selectedTanksForFilter.length === uniqueTanks.length);
-
-          if (!isAllSitesSelected) {
+          if (selectedSiteForFilter) {
             const itemSiteId = String(item.siteId || item.locationId || '');
-            if (!selectedSitesForFilter.includes(itemSiteId)) return false;
+            if (itemSiteId !== selectedSiteForFilter) return false;
           }
-          if (!isAllTanksSelected) {
+          if (selectedTankForFilter) {
             const itemTankId = String(item.tankId || '');
-            if (!selectedTanksForFilter.includes(itemTankId)) return false;
+            if (itemTankId !== selectedTankForFilter) return false;
           }
 
       if (filters.locationName) {
@@ -2336,8 +2333,8 @@ export const ReportsManager = () => {
               label={label}
               placeholder={`تمام ${label}ها`}
               options={isSiteFilter ? uniqueSites : (isTankFilter ? uniqueTanks : [])}
-              selectedValues={isSiteFilter ? selectedSitesForFilter : (isTankFilter ? selectedTanksForFilter : [])}
-              onChange={isSiteFilter ? setSelectedSitesForFilter : (isTankFilter ? setSelectedTanksForFilter : () => {})}
+              selectedValues={isSiteFilter ? selectedSiteForFilter : (isTankFilter ? selectedTankForFilter : [])}
+              onChange={isSiteFilter ? setSelectedSiteForFilter : (isTankFilter ? setSelectedTankForFilter : () => {})}
             />
           </div>
         );
@@ -2837,7 +2834,7 @@ export const ReportsManager = () => {
               </div>
               <div className="p-4">
                 {(() => {
-                  const inventory = calculateOwnedTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
+                  const inventory = calculateOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
                   return (
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between items-center">
@@ -2886,7 +2883,7 @@ export const ReportsManager = () => {
               </div>
               <div className="p-4">
                 {(() => {
-                  const inventory = calculateConsignmentTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
+                  const inventory = calculateConsignmentTanksInventory(selectedSiteForFilter, selectedTankForFilter);
                   return (
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between items-center">
@@ -2946,8 +2943,8 @@ export const ReportsManager = () => {
                 {/* نتایج محاسبات */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   {(() => {
-                    const inventory = calculateConsignmentOwnedTanksInventory(selectedSitesForFilter, selectedTanksForFilter);
-                    const totalCapacity = calculateTotalTankCapacity(selectedSitesForFilter, selectedTanksForFilter);
+                    const inventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
+                    const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter, selectedTankForFilter);
                     const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
                     const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
                     
