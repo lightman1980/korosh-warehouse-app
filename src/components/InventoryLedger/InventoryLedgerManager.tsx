@@ -552,26 +552,17 @@ export const InventoryLedgerManager: React.FC = () => {
       return Math.max(0, totalCapacity - finalInventory);
     }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, selectedSiteForFilter, selectedTankForFilter]);
 
-    // Helper function to calculate tank counts and low inventory alert
-    const calculateTankStatusCounts = useCallback(() => {
-      const tanks = baseData.tanks || [];
-      const currentSiteId = selectedSiteForFilter;
-      const currentTankId = selectedTankForFilter;
+      // Helper function to calculate tank counts and low inventory alert
+      const calculateTankStatusCounts = useCallback(() => {
+        const tanks = baseData.tanks || [];
+        const currentSiteId = selectedSiteForFilter;
+        const currentTankId = selectedTankForFilter;
 
-      let totalTanks = 0;
-      let withInventoryCount = 0;
-      let withoutInventoryCount = 0;
-      let lowInventoryAlert = false;
-      let lowInventoryTanks: any[] = [];
-
-      // بارگذاری داده‌ها یک بار برای افزایش سرعت
-      const allReceipts = storage.loadData('receipts') || [];
-      const allDeliveries = storage.loadData('deliveries') || [];
-      const allAdjustments = storage.loadData('inventoryAdjustments') || [];
-      const consignmentSlips = storage.loadData('consignment-delivery-slips') || [];
-      const ownershipSlips = storage.loadData('ownership-delivery-slips') || [];
-      const wastageTransactions = storage.loadData('wastageTransactions') || [];
-      const productConversions = storage.loadData('productConversions') || [];
+        let totalTanks = 0;
+        let withInventoryCount = 0;
+        let withoutInventoryCount = 0;
+        let lowInventoryAlert = false;
+        let lowInventoryTanks: any[] = [];
 
         tanks.forEach((tank: any) => {
           // اعمال فیلتر سایت و مخزن
@@ -580,49 +571,9 @@ export const InventoryLedgerManager: React.FC = () => {
 
           totalTanks++;
 
-          // محاسبه موجودی برای این مخزن خاص
-          const tankId = tank.id;
-          
-          // رسیدهای تملیکی
-          const ownedReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'owned' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
-            .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || 0), 0);
-          
-          // رسیدهای امانی
-          const consignmentReceipts = allReceipts.filter((r: any) => r.tankId === tankId && r.userType === 'consignment' && !r.isVoided && new Date(r.receiptDate) <= upToDate)
-            .reduce((sum: number, r: any) => sum + safeNumber(r.amount || r.receiptBasisAmount || r.finalAmount || 0), 0);
-
-          // حواله‌های تملیکی
-          const ownedDeliveries = [
-            ...allDeliveries.filter((d: any) => d.tankId === tankId && d.userType === 'owned' && !d.isVoided && new Date(d.deliveryDate || d.createdAt) <= upToDate),
-            ...ownershipSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
-          ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
-
-          // حواله‌های امانی - تشخیص پیشرفته مشابه توابع اصلی
-          const consignmentDeliveries = [
-            ...allDeliveries.filter((d: any) => 
-              d.tankId === tankId && 
-              !d.isVoided && 
-              new Date(d.deliveryDate || d.createdAt) <= upToDate &&
-              (d.userType === 'consignment' || d.contractNumber || d.permitId || d.type === 'امانی' || d.nature === 'consignment')
-            ),
-            ...consignmentSlips.filter((s: any) => s.tankId === tankId && !s.isVoided && new Date(s.deliveryDate || s.createdAt) <= upToDate)
-          ].reduce((sum: number, d: any) => sum + safeNumber(d.amount, 0), 0);
-
-          // اصلاحات انبار
-          const additions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'addition' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
-            .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
-          
-          const deductions = allAdjustments.filter((adj: any) => adj.tankId === tankId && adj.adjustmentType === 'deduction' && !adj.isVoided && new Date(adj.documentDate) <= upToDate)
-            .reduce((sum: number, adj: any) => sum + safeNumber(adj.quantity, 0), 0);
-
-          // افت و تبدیل
-          const wastage = wastageTransactions.filter((t: any) => t.tankId === tankId && !t.isVoided && new Date(t.transactionDate) <= upToDate)
-            .reduce((sum: number, t: any) => sum + (t.transactionType === 'owned' ? Math.abs(safeNumber(t.amount, 0)) : -Math.abs(safeNumber(t.amount, 0))), 0);
-
-          const conversion = productConversions.filter((c: any) => c.tankId === tankId && !c.isVoided && new Date(c.documentDate) <= upToDate)
-            .reduce((sum: number, c: any) => sum + safeNumber(c.producedQuantity, 0) - safeNumber(c.consumedQuantity, 0), 0);
-
-          const inventory = ownedReceipts + consignmentReceipts + additions + wastage + conversion - ownedDeliveries - consignmentDeliveries - deductions;
+          // استفاده از تابع محاسباتی مرکزی برای اطمینان از صحت و یکپارچگی فرمول‌ها
+          const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
+          const inventory = inventoryData.finalInventory || 0;
 
           if (inventory > 0) {
             withInventoryCount++;
@@ -648,8 +599,8 @@ export const InventoryLedgerManager: React.FC = () => {
           }
         });
 
-      return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks };
-    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, upToDate, storage]);
+        return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks };
+      }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, upToDate, calculateConsignmentOwnedTanksInventory]);
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
   const loadBaseData = () => {
@@ -3050,15 +3001,15 @@ export const InventoryLedgerManager: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* باکس هشدار موجودی بحرانی */}
-                              {(() => {
-                                const { lowInventoryAlert, lowInventoryTanks } = calculateTankStatusCounts();
-                                return (
-                                  <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-200 animate-[pulse_2s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-4 rounded-xl border shadow-sm relative overflow-hidden group transition-all`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                      <span className={`${lowInventoryAlert ? 'text-red-800' : 'text-gray-800'} font-bold text-lg`}>وضعیت هشدار:</span>
-                                      <div className={`w-4 h-4 rounded-full ${lowInventoryAlert ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]' : 'bg-gray-400'}`}></div>
-                                    </div>
+                                {/* باکس هشدار موجودی بحرانی */}
+                                {(() => {
+                                  const { lowInventoryAlert, lowInventoryTanks } = calculateTankStatusCounts();
+                                  return (
+                                    <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-200 animate-[pulse_2s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-4 rounded-xl border shadow-sm relative overflow-hidden group transition-all col-span-full`}>
+                                      <div className="flex justify-between items-center mb-2">
+                                        <span className={`${lowInventoryAlert ? 'text-red-800' : 'text-gray-800'} font-bold text-lg`}>وضعیت هشدار:</span>
+                                        <div className={`w-4 h-4 rounded-full ${lowInventoryAlert ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]' : 'bg-gray-400'}`}></div>
+                                      </div>
                                     <div className={`flex flex-col gap-1 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'} text-xs`}>
                                       <div className="flex items-center gap-2">
                                         <AlertTriangle className="w-4 h-4" />
