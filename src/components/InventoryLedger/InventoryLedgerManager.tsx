@@ -118,8 +118,8 @@ export const InventoryLedgerManager: React.FC = () => {
 
   // State for tank inventory calculations
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
-  const [selectedTanksForFilter, setSelectedTanksForFilter] = useState<string[]>([]);
-  const [selectedSitesForFilter, setSelectedSitesForFilter] = useState<string[]>([]);
+  const [selectedTankForFilter, setSelectedTankForFilter] = useState<string>('');
+  const [selectedSiteForFilter, setSelectedSiteForFilter] = useState<string>('');
   const [upToDate, setUpToDate] = useState<Date>(new Date());
   const [showInventoryPackage, setShowInventoryPackage] = useState<boolean>(true);
 
@@ -320,9 +320,9 @@ export const InventoryLedgerManager: React.FC = () => {
     }, [storage, upToDate, baseData.tanks, inventoryRefreshKey]);
 
     // Calculate owned tanks inventory based on user formula
-    const calculateOwnedTanksInventory = useCallback((siteIds?: string[], tankIds?: string[]) => {
-      const currentSiteIds = siteIds || selectedSitesForFilter;
-      const currentTankIds = tankIds || selectedTanksForFilter;
+    const calculateOwnedTanksInventory = useCallback((siteId?: string, tankId?: string) => {
+      const currentSiteId = siteId || selectedSiteForFilter;
+      const currentTankId = tankId || selectedTankForFilter;
       
       let ownedReceiptsAmount = 0;
       let ownedAdditionDocuments = 0;
@@ -332,11 +332,14 @@ export const InventoryLedgerManager: React.FC = () => {
       let ownedConsumedProducts = 0;
       let ownedProducedProducts = 0;
 
-      const tanksToProcess = currentTankIds.length > 0 
-        ? currentTankIds 
-        : memoizedInventoryData.activeTanks
-            .filter(t => currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))
-            .map(t => t.id);
+      const tanksToProcess = memoizedInventoryData.activeTanks
+          .filter(t => {
+            const tankSiteId = String(t.siteId || t.locationId || '');
+            const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
+            const tankMatch = !currentTankId || String(t.id) === currentTankId;
+            return siteMatch && tankMatch;
+          })
+          .map(t => t.id);
 
       tanksToProcess.forEach(tankId => {
         const data = memoizedInventoryData.tankData[tankId];
@@ -344,14 +347,13 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Receipts
         data.receipts.forEach((r: any) => {
-          if (r.userType === 'owned' && (currentSiteIds.length === 0 || currentSiteIds.includes(r.siteId))) {
+          if (r.userType === 'owned') {
             ownedReceiptsAmount += safeNumber(r.amount || r.receiptBasisAmount, 0);
           }
         });
 
         // Adjustments
         data.adjustments.forEach((adj: any) => {
-          if (currentSiteIds.length > 0 && !currentSiteIds.includes(adj.siteId)) return;
           if (adj.productType === 'owned') {
             if (adj.adjustmentType === 'addition') ownedAdditionDocuments += safeNumber(adj.quantity, 0);
             else if (adj.adjustmentType === 'deduction') ownedDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -360,21 +362,18 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Deliveries
         data.deliveries.forEach((d: any) => {
-          if (currentSiteIds.length === 0 || currentSiteIds.includes(d.siteId)) {
-            ownedDeliveries += safeNumber(d.amount, 0);
-          }
+          ownedDeliveries += safeNumber(d.amount, 0);
         });
 
         // Wastage
         data.wastage.forEach((t: any) => {
-          if (t.transactionType === 'owned' && (currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))) {
+          if (t.transactionType === 'owned') {
             ownedGainedAmount += Math.abs(safeNumber(t.amount, 0));
           }
         });
 
         // Conversions
         data.conversions.forEach((c: any) => {
-          if (currentSiteIds.length > 0 && !currentSiteIds.includes(c.siteId)) return;
           if (c.consumedProductType === 'owned') ownedConsumedProducts += safeNumber(c.consumedQuantity, 0);
           if (c.producedProductType === 'owned') ownedProducedProducts += safeNumber(c.producedQuantity, 0);
         });
@@ -386,12 +385,12 @@ export const InventoryLedgerManager: React.FC = () => {
         ownedReceiptsAmount, ownedAdditionDocuments, ownedDeliveries, ownedGainedAmount,
         ownedDeductionDocuments, ownedConsumedProducts, ownedProducedProducts, finalInventory: totalOwnedValue
       };
-    }, [memoizedInventoryData, selectedSitesForFilter, selectedTanksForFilter]);
+    }, [memoizedInventoryData, selectedSiteForFilter, selectedTankForFilter]);
 
     // Calculate consignment tanks inventory
-    const calculateConsignmentTanksInventory = useCallback((siteIds?: string[], tankIds?: string[]) => {
-      const currentSiteIds = siteIds || selectedSitesForFilter;
-      const currentTankIds = tankIds || selectedTanksForFilter;
+    const calculateConsignmentTanksInventory = useCallback((siteId?: string, tankId?: string) => {
+      const currentSiteId = siteId || selectedSiteForFilter;
+      const currentTankId = tankId || selectedTankForFilter;
       
       let consignmentReceiptsAmount = 0;
       let consignmentAdditions = 0;
@@ -401,11 +400,14 @@ export const InventoryLedgerManager: React.FC = () => {
       let consignmentConsumedProducts = 0;
       let consignmentProducedProducts = 0;
 
-      const tanksToProcess = currentTankIds.length > 0 
-        ? currentTankIds 
-        : memoizedInventoryData.activeTanks
-            .filter(t => currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))
-            .map(t => t.id);
+      const tanksToProcess = memoizedInventoryData.activeTanks
+          .filter(t => {
+            const tankSiteId = String(t.siteId || t.locationId || '');
+            const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
+            const tankMatch = !currentTankId || String(t.id) === currentTankId;
+            return siteMatch && tankMatch;
+          })
+          .map(t => t.id);
 
       tanksToProcess.forEach(tankId => {
         const data = memoizedInventoryData.tankData[tankId];
@@ -413,7 +415,7 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Receipts
         data.receipts.forEach((r: any) => {
-          if (r.userType === 'consignment' && (currentSiteIds.length === 0 || currentSiteIds.includes(r.siteId))) {
+          if (r.userType === 'consignment') {
             const baseAmount = r.receiptBasisAmount || r.finalAmount || r.amount || 
                              (safeNumber(r.shipUnloadingAmount, 0) + safeNumber(r.tankShoreAmount, 0) + 
                               safeNumber(r.shipBillOfLadingAmount, 0) + safeNumber(r.weightGross, 0));
@@ -423,7 +425,6 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Adjustments
         data.adjustments.forEach((adj: any) => {
-          if (currentSiteIds.length > 0 && !currentSiteIds.includes(adj.siteId)) return;
           if (adj.productType === 'consignment') {
             if (adj.adjustmentType === 'addition') consignmentAdditions += safeNumber(adj.quantity, 0);
             else if (adj.adjustmentType === 'deduction') consignmentDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -432,7 +433,6 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Consignment Deliveries (Slips + General)
         const processDelivery = (d: any, isConsignmentCheck: boolean) => {
-          if (currentSiteIds.length > 0 && !currentSiteIds.includes(d.siteId)) return;
           if (!isConsignmentCheck || (d.contractNumber || d.permitId || d.userType === 'consignment' || d.type === 'امانی' || d.nature === 'consignment')) {
             consignmentDeliveries += safeNumber(d.amount, 0);
           }
@@ -442,14 +442,13 @@ export const InventoryLedgerManager: React.FC = () => {
 
         // Wastage
         data.wastage.forEach((t: any) => {
-          if (t.transactionType === 'consignment' && (currentSiteIds.length === 0 || currentSiteIds.includes(t.siteId))) {
+          if (t.transactionType === 'consignment') {
             consignmentDeductionAmount += Math.abs(safeNumber(t.amount, 0));
           }
         });
 
         // Conversions
         data.conversions.forEach((c: any) => {
-          if (currentSiteIds.length > 0 && !currentSiteIds.includes(c.siteId)) return;
           if (c.consumedProductType === 'consignment') consignmentConsumedProducts += safeNumber(c.consumedQuantity, 0);
           if (c.producedProductType === 'consignment') consignmentProducedProducts += safeNumber(c.producedQuantity, 0);
         });
@@ -462,12 +461,12 @@ export const InventoryLedgerManager: React.FC = () => {
         consignmentDeductionAmount, consignmentDeductionDocuments, consignmentConsumedProducts,
         consignmentProducedProducts, finalInventory: totalConsignmentValue
       };
-    }, [memoizedInventoryData, selectedSitesForFilter, selectedTanksForFilter]);
+    }, [memoizedInventoryData, selectedSiteForFilter, selectedTankForFilter]);
 
     // Calculate consignment+owned tanks inventory
-    const calculateConsignmentOwnedTanksInventory = useCallback((siteIds?: string[], tankIds?: string[]) => {
-      const owned = calculateOwnedTanksInventory(siteIds, tankIds);
-      const consignment = calculateConsignmentTanksInventory(siteIds, tankIds);
+    const calculateConsignmentOwnedTanksInventory = useCallback((siteId?: string, tankId?: string) => {
+      const owned = calculateOwnedTanksInventory(siteId, tankId);
+      const consignment = calculateConsignmentTanksInventory(siteId, tankId);
       
       return {
         ...owned,
@@ -477,15 +476,17 @@ export const InventoryLedgerManager: React.FC = () => {
     }, [calculateOwnedTanksInventory, calculateConsignmentTanksInventory]);
 
     // Helper function to calculate total tank capacity based on filters
-    const calculateTotalTankCapacity = useCallback((siteIds?: string[], tankIds?: string[]) => {
+    const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
       const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
       let totalCapacity = 0;
-      const currentSiteIds = siteIds || selectedSitesForFilter;
-      const currentTankIds = tankIds || selectedTanksForFilter;
+      const currentSiteId = siteId || selectedSiteForFilter;
+      const currentTankId = tankId || selectedTankForFilter;
       
       tanks.forEach((tank: any) => {
-        if (currentTankIds.length > 0 && !currentTankIds.includes(tank.id)) return;
-        if (currentSiteIds.length > 0 && tank.siteId && !currentSiteIds.includes(tank.siteId)) return;
+        const tankSiteId = String(tank.siteId || tank.locationId || '');
+        const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
+        const tankMatch = !currentTankId || String(tank.id) === currentTankId;
+        if (!siteMatch || !tankMatch) return;
         
         const capacityStr = tank.capacity || "0";
         const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
@@ -496,7 +497,7 @@ export const InventoryLedgerManager: React.FC = () => {
         totalCapacity += capacity;
       });
       return totalCapacity;
-    }, [baseData.tanks, selectedSitesForFilter, selectedTanksForFilter]);
+    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter]);
 
     // Helper function to calculate empty tank capacity
     const calculateEmptyTankCapacity = useCallback(() => {
@@ -508,8 +509,8 @@ export const InventoryLedgerManager: React.FC = () => {
     // Helper function to calculate tank counts and low inventory alert
     const calculateTankStatusCounts = useCallback(() => {
       const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
-      const currentSiteIds = selectedSitesForFilter;
-      const currentTankIds = selectedTanksForFilter;
+      const currentSiteId = selectedSiteForFilter;
+      const currentTankId = selectedTankForFilter;
 
       let totalTanks = 0;
       let withInventoryCount = 0;
@@ -519,12 +520,14 @@ export const InventoryLedgerManager: React.FC = () => {
       let totalShortageSum = 0;
 
       tanks.forEach((tank: any) => {
-        if (currentTankIds.length > 0 && !currentTankIds.includes(tank.id)) return;
-        if (currentSiteIds.length > 0 && tank.siteId && !currentSiteIds.includes(tank.siteId)) return;
+        const tankSiteId = String(tank.siteId || tank.locationId || '');
+        const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
+        const tankMatch = !currentTankId || String(tank.id) === currentTankId;
+        if (!siteMatch || !tankMatch) return;
 
         totalTanks++;
 
-        const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteIds, [tank.id]);
+        const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
         const inventory = inventoryData.finalInventory || 0;
 
         if (inventory > 0) withInventoryCount++;
@@ -550,7 +553,7 @@ export const InventoryLedgerManager: React.FC = () => {
       });
 
       return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum };
-    }, [baseData.tanks, selectedSitesForFilter, selectedTanksForFilter, calculateConsignmentOwnedTanksInventory]);
+    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
 
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
@@ -2803,26 +2806,40 @@ export const InventoryLedgerManager: React.FC = () => {
             />
           </div>
           
-            <div className="z-20">
-              <MultiSelectDropdown
-                label="نام مخزن"
-                placeholder="تمام مخازن"
-                options={uniqueTanks}
-                selectedValues={selectedTanksForFilter}
-                onChange={setSelectedTanksForFilter}
-              />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Building2 className="w-4 h-4 inline ml-1" />
+                نام مخزن
+              </label>
+              <select
+                value={selectedTankForFilter}
+                onChange={(e) => setSelectedTankForFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">تمام مخازن</option>
+                {uniqueTanks.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
             </div>
             
-            <div className="z-20">
-              <MultiSelectDropdown
-                label="سایت مخازن"
-                placeholder="تمام سایت‌ها"
-                options={uniqueSites}
-                selectedValues={selectedSitesForFilter}
-                onChange={setSelectedSitesForFilter}
-              />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Truck className="w-4 h-4 inline ml-1" />
+                سایت مخازن
+              </label>
+              <select
+                value={selectedSiteForFilter}
+                onChange={(e) => setSelectedSiteForFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">تمام سایت‌ها</option>
+                {uniqueSites.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
             </div>
-            
+          
             <div className="flex items-end gap-2">
               <button
                 onClick={() => setUpToDate(new Date())}
@@ -2834,8 +2851,8 @@ export const InventoryLedgerManager: React.FC = () => {
               <button
                 onClick={() => {
                   setUpToDate(new Date());
-                  setSelectedTanksForFilter([]);
-                  setSelectedSitesForFilter([]);
+                  setSelectedTankForFilter('');
+                  setSelectedSiteForFilter('');
                 }}
                 className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
