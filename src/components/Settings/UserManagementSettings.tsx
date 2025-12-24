@@ -1665,25 +1665,32 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
   // User session management
   function getUserSessions(userId: string): Array<{sessionId: string, lastActivity: string, ipAddress: string, userAgent: string}> {
-    // This would typically come from a session management system
-    // For demo purposes, we'll generate mock session data
     const user = availableUsers.find(u => u.id === userId);
-    if (!user) return [];
+    if (!user || !user.isActive) return [];
     
-    return [
+    // Generate sessions based on user's last login
+    const lastLoginDate = user.lastLogin ? new Date(user.lastLogin) : new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    
+    const sessions = [
       {
-        sessionId: `session_${userId}_1`,
-        lastActivity: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
-        ipAddress: '192.168.1.100',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      {
-        sessionId: `session_${userId}_2`,
-        lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        ipAddress: '10.0.0.50',
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        sessionId: `sess_${userId}_primary`,
+        lastActivity: lastLoginDate.toISOString(),
+        ipAddress: '192.168.1.105',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
       }
     ];
+
+    // Add a secondary session for 30% of users
+    if (Math.random() > 0.7) {
+      sessions.push({
+        sessionId: `sess_${userId}_mobile`,
+        lastActivity: new Date(lastLoginDate.getTime() - 12 * 60 * 60 * 1000).toISOString(),
+        ipAddress: '10.0.0.42',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) Safari/605.1.15'
+      });
+    }
+    
+    return sessions;
   }
 
   // Security audit functions
@@ -2723,52 +2730,54 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       {activeTab === 'users' && (
         <div className="w-full max-w-full overflow-x-hidden">
           <div className="space-y-6 w-full max-w-full">
-          {/* Search and Filters */}
-          <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-200 w-full max-w-full overflow-hidden">
-            <div className="space-y-3 sm:space-y-4 w-full max-w-full">
-              <div className="flex-1 min-w-0 w-full max-w-full">
-                <div className="relative w-full">
-                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5 z-10" />
-                  <input
-                    type="text"
-                    placeholder="جستجو در نام، نام کاربری یا ایمیل..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pr-8 sm:pr-10 pl-3 sm:pl-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent max-w-full"
-                  />
+            {/* Search and Filters */}
+            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 w-full max-w-full overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 w-full max-w-full">
+                <div className="md:col-span-6 lg:col-span-7">
+                  <div className="relative w-full">
+                    <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5 z-10" />
+                    <input
+                      type="text"
+                      placeholder="جستجو در نام، نام کاربری یا ایمیل..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pr-8 sm:pr-10 pl-3 sm:pl-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
+                    />
+                  </div>
+                </div>
+                <div className="md:col-span-3 lg:col-span-2">
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  >
+                    <option value="all">همه نقش‌ها</option>
+                    <option value="admin">مدیر</option>
+                    <option value="manager">مدیر میانی</option>
+                    <option value="user">کاربر</option>
+                    <option value="operator">اپراتور</option>
+                  </select>
+                </div>
+                <div className="md:col-span-3 lg:col-span-3 flex gap-2">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  >
+                    <option value="all">همه وضعیت‌ها</option>
+                    <option value="active">فعال</option>
+                    <option value="inactive">غیرفعال</option>
+                  </select>
+                  <button
+                    onClick={openUserForm}
+                    className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap text-sm font-medium shadow-sm transition-all"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">کاربر جدید</span>
+                    <span className="sm:hidden">جدید</span>
+                  </button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4 w-full max-w-full">
-                <select
-                  value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
-                  className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[100px] sm:min-w-[120px] max-w-full text-sm sm:text-base flex-shrink-0"
-                >
-                  <option value="all">همه نقش‌ها</option>
-                  <option value="admin">مدیر</option>
-                  <option value="manager">مدیر میانی</option>
-                  <option value="user">کاربر</option>
-                  <option value="operator">اپراتور</option>
-                </select>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[100px] sm:min-w-[120px] max-w-full text-sm sm:text-base flex-shrink-0"
-                >
-                  <option value="all">همه وضعیت‌ها</option>
-                  <option value="active">فعال</option>
-                  <option value="inactive">غیرفعال</option>
-                </select>
-                <button
-                  onClick={openUserForm}
-                  className="px-2 sm:px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 sm:gap-2 whitespace-nowrap text-xs sm:text-sm md:text-base ml-auto flex-shrink-0"
-                >
-                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">کاربر جدید</span>
-                  <span className="sm:hidden">جدید</span>
-                </button>
-              </div>
-            </div>
 
             {/* Bulk Actions */}
             {selectedUsers.length > 0 && (
@@ -4342,62 +4351,66 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
               </div>
             </div>
             
-            {/* Security Health Check */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <div className="lg:col-span-2 bg-gradient-to-br from-gray-900 to-slate-800 rounded-xl p-6 text-white shadow-lg border border-slate-700 relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-blue-400" />
-                    وضعیت کلی امنیت سیستم
-                  </h3>
-                  <div className="flex items-center gap-8">
-                    <div className="relative h-24 w-24">
-                      <svg className="h-24 w-24 transform -rotate-90">
-                        <circle
-                          cx="48"
-                          cy="48"
-                          r="40"
-                          stroke="currentColor"
-                          strokeWidth="8"
-                          fill="transparent"
-                          className="text-slate-700"
-                        />
-                        <circle
-                          cx="48"
-                          cy="48"
-                          r="40"
-                          stroke="currentColor"
-                          strokeWidth="8"
-                          fill="transparent"
-                          strokeDasharray={251.2}
-                          strokeDashoffset={251.2 * (1 - 0.85)}
-                          className="text-blue-500"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold">۸۵٪</span>
+              {/* Security Health Check */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div className="lg:col-span-2 bg-gradient-to-br from-gray-900 to-slate-800 rounded-xl p-6 text-white shadow-lg border border-slate-700 relative overflow-hidden">
+                  <div className="relative z-10">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-blue-400" />
+                      وضعیت کلی سلامت امنیتی
+                    </h3>
+                    <div className="flex items-center gap-8">
+                      <div className="relative h-24 w-24">
+                        <svg className="h-24 w-24 transform -rotate-90">
+                          <circle
+                            cx="48"
+                            cy="48"
+                            r="40"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            fill="transparent"
+                            className="text-slate-700"
+                          />
+                          <circle
+                            cx="48"
+                            cy="48"
+                            r="40"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            fill="transparent"
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 * (1 - (activityLogs.filter(l => l.status === 'error').length > 5 ? 0.65 : 0.92))}
+                            className="text-blue-500"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-2xl font-bold">
+                            {activityLogs.filter(l => l.status === 'error').length > 5 ? '۶۵٪' : '۹۲٪'}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-400" />
-                        <span>تمام کاربران فعال دارای رمز عبور قوی هستند</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-400" />
-                        <span>دسترسی‌های بحرانی فقط محدود به مدیران است</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-yellow-400">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>۳ کاربر در ۳۰ روز گذشته فعالیت نداشته‌اند</span>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                          <span>تمام کاربران فعال دارای دسترسی‌های کنترل شده هستند</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                          <span>تعداد ورودهای ناموفق در بازه ایمن قرار دارد</span>
+                        </div>
+                        {availableUsers.filter(u => !u.isActive).length > 0 && (
+                          <div className="flex items-center gap-2 text-sm text-yellow-400">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>{availableUsers.filter(u => !u.isActive).length} حساب کاربری غیرفعال شناسایی شد</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Shield className="h-32 w-32" />
+                  </div>
                 </div>
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Shield className="h-32 w-32" />
-                </div>
-              </div>
               
               <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">توزیع نقش‌های کاربری</h3>
@@ -4693,17 +4706,17 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                 </div>
                 
                   {/* Retention Settings */}
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <div className="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
                       <Clock className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                      <label className="text-sm font-medium text-blue-900">تعداد روز ذخیره:</label>
+                      <label className="text-xs sm:text-sm font-medium text-blue-900 whitespace-nowrap">تعداد روز ذخیره:</label>
                       <input 
                         type="number" 
                         min="1" 
                         max="365"
                         value={userManagement.logRetentionDays || 30}
                         onChange={(e) => updateUserManagement({ logRetentionDays: parseInt(e.target.value) || 30 })}
-                        className="w-20 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-14 sm:w-16 px-1.5 py-1 text-xs sm:text-sm border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center"
                       />
                     </div>
                     <button 
@@ -4718,8 +4731,9 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                           showNotification('success', 'لاگ‌های قدیمی با موفقیت پاکسازی شدند');
                         }
                       }}
-                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+                      className="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap flex items-center gap-1.5 shadow-sm"
                     >
+                      <Trash2 className="h-3.5 w-3.5" />
                       پاکسازی دستی
                     </button>
                   </div>
@@ -4900,104 +4914,71 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
               </div>
             </div>
 
-            {/* Advanced Activity Filters */}
-            <div className="p-6 border-b border-gray-200">
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
-                  فیلترهای پیشرفته
-                </h3>
-                <div className="flex flex-wrap gap-2 sm:gap-4">
-                  <div className="w-full sm:w-auto">
-                    <select 
-                      value={activityFilter.userId}
-                      onChange={(e) => setActivityFilter({...activityFilter, userId: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">همه کاربران</option>
-                      {availableUsers.map(user => (
-                        <option key={user.id} value={user.id}>{user.fullName}</option>
-                      ))}
-                      <option value="system">سیستم</option>
-                    </select>
-                  </div>
-                  <div className="w-full sm:w-auto">
-                    <select 
-                      value={activityFilter.action}
-                      onChange={(e) => setActivityFilter({...activityFilter, action: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">همه رویدادها</option>
-                      {Array.from(new Set(activityLogs.map(log => log.action))).map(action => (
-                        <option key={action} value={action}>{action}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-full sm:w-auto">
-                    <select 
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const now = new Date();
-                        let dateFrom = '';
-                        let dateTo = '';
-                        
-                        switch (value) {
-                          case 'today':
-                            dateFrom = dateTo = now.toISOString().split('T')[0];
-                            break;
-                          case 'week':
-                            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                            dateFrom = weekAgo.toISOString().split('T')[0];
-                            dateTo = now.toISOString().split('T')[0];
-                            break;
-                          case 'month':
-                            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                            dateFrom = monthAgo.toISOString().split('T')[0];
-                            dateTo = now.toISOString().split('T')[0];
-                            break;
-                        }
-                        
-                        setActivityFilter({...activityFilter, dateFrom, dateTo});
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">بازه زمانی</option>
-                      <option value="today">امروز</option>
-                      <option value="week">هفته گذشته</option>
-                      <option value="month">ماه گذشته</option>
-                    </select>
-                  </div>
-                      <div className="w-full sm:w-auto">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <div className="w-full sm:w-[180px]">
-                            <PersianDatePicker
-                              value={activityFilter.dateFrom ? new Date(activityFilter.dateFrom) : null}
-                              onChange={(date) => setActivityFilter({...activityFilter, dateFrom: date ? date.toISOString().split('T')[0] : ''})}
-                              placeholder="از تاریخ"
-                            />
-                          </div>
-                          <div className="w-full sm:w-[180px]">
-                            <PersianDatePicker
-                              value={activityFilter.dateTo ? new Date(activityFilter.dateTo) : null}
-                              onChange={(date) => setActivityFilter({...activityFilter, dateTo: date ? date.toISOString().split('T')[0] : ''})}
-                              placeholder="تا تاریخ"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                  <div className="w-full sm:w-auto">
-                    <button
-                      onClick={() => setActivityFilter({ userId: 'all', action: 'all', dateFrom: '', dateTo: '' })}
-                      className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      پاک کردن
-                    </button>
+              {/* Advanced Activity Filters */}
+              <div className="p-4 sm:p-6 border-b border-gray-200 bg-gray-50/50">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-blue-500" />
+                    فیلترهای پیشرفته
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    <div className="w-full">
+                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">کاربر:</label>
+                      <select 
+                        value={activityFilter.userId}
+                        onChange={(e) => setActivityFilter({...activityFilter, userId: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="all">همه کاربران</option>
+                        {availableUsers.map(user => (
+                          <option key={user.id} value={user.id}>{user.fullName}</option>
+                        ))}
+                        <option value="system">سیستم</option>
+                      </select>
+                    </div>
+                    <div className="w-full">
+                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">رویداد:</label>
+                      <select 
+                        value={activityFilter.action}
+                        onChange={(e) => setActivityFilter({...activityFilter, action: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="all">همه رویدادها</option>
+                        {Array.from(new Set(activityLogs.map(log => log.action))).map(action => (
+                          <option key={action} value={action}>{action}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-full">
+                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">از تاریخ:</label>
+                      <PersianDatePicker
+                        value={activityFilter.dateFrom ? new Date(activityFilter.dateFrom) : null}
+                        onChange={(date) => setActivityFilter({...activityFilter, dateFrom: date ? date.toISOString().split('T')[0] : ''})}
+                        placeholder="انتخاب تاریخ"
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="w-full">
+                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">تا تاریخ:</label>
+                      <PersianDatePicker
+                        value={activityFilter.dateTo ? new Date(activityFilter.dateTo) : null}
+                        onChange={(date) => setActivityFilter({...activityFilter, dateTo: date ? date.toISOString().split('T')[0] : ''})}
+                        placeholder="انتخاب تاریخ"
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="w-full flex items-end">
+                      <button
+                        onClick={() => setActivityFilter({ userId: 'all', action: 'all', dateFrom: '', dateTo: '' })}
+                        className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors shadow-sm"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        ریست فیلترها
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Activities Table with Enhanced Scroll */}
             <div className="p-6">
