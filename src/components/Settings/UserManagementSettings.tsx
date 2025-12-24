@@ -2727,57 +2727,58 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'users' && (
-        <div className="w-full max-w-full overflow-x-hidden">
-          <div className="space-y-6 w-full max-w-full">
-            {/* Search and Filters */}
-            <div className="bg-white p-3 sm:p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 w-full max-w-full overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 w-full max-w-full">
-                <div className="md:col-span-6 lg:col-span-7">
-                  <div className="relative w-full">
-                    <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5 z-10" />
-                    <input
-                      type="text"
-                      placeholder="جستجو در نام، نام کاربری یا ایمیل..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pr-8 sm:pr-10 pl-3 sm:pl-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
-                    />
+        {activeTab === 'users' && (
+          <div className="w-full max-w-full overflow-x-auto">
+            <div className="space-y-6 w-full min-w-[320px]">
+              {/* Search and Filters */}
+              <div className="bg-white p-3 sm:p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 w-full">
+                <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 w-full">
+                  <div className="flex-1 min-w-0">
+                    <div className="relative w-full">
+                      <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5 z-10" />
+                      <input
+                        type="text"
+                        placeholder="جستجو در نام، نام کاربری یا ایمیل..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pr-8 sm:pr-10 pl-3 sm:pl-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap sm:flex-nowrap gap-3">
+                    <div className="w-full sm:w-40">
+                      <select
+                        value={filterRole}
+                        onChange={(e) => setFilterRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                      >
+                        <option value="all">همه نقش‌ها</option>
+                        <option value="admin">مدیر</option>
+                        <option value="manager">مدیر میانی</option>
+                        <option value="user">کاربر</option>
+                        <option value="operator">اپراتور</option>
+                      </select>
+                    </div>
+                    <div className="w-full sm:w-40">
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                      >
+                        <option value="all">همه وضعیت‌ها</option>
+                        <option value="active">فعال</option>
+                        <option value="inactive">غیرفعال</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={openUserForm}
+                      className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium shadow-sm transition-all"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      <span>کاربر جدید</span>
+                    </button>
                   </div>
                 </div>
-                <div className="md:col-span-3 lg:col-span-2">
-                  <select
-                    value={filterRole}
-                    onChange={(e) => setFilterRole(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                  >
-                    <option value="all">همه نقش‌ها</option>
-                    <option value="admin">مدیر</option>
-                    <option value="manager">مدیر میانی</option>
-                    <option value="user">کاربر</option>
-                    <option value="operator">اپراتور</option>
-                  </select>
-                </div>
-                <div className="md:col-span-3 lg:col-span-3 flex gap-2">
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                  >
-                    <option value="all">همه وضعیت‌ها</option>
-                    <option value="active">فعال</option>
-                    <option value="inactive">غیرفعال</option>
-                  </select>
-                  <button
-                    onClick={openUserForm}
-                    className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap text-sm font-medium shadow-sm transition-all"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    <span className="hidden sm:inline">کاربر جدید</span>
-                    <span className="sm:hidden">جدید</span>
-                  </button>
-                </div>
-              </div>
 
             {/* Bulk Actions */}
             {selectedUsers.length > 0 && (
@@ -4689,306 +4690,302 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       )}
 
       {/* Activities Tab */}
-      {activeTab === 'activities' && (
-        <div className="space-y-6 w-full max-w-full overflow-x-hidden">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-full">
-            {/* Activities Header */}
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-green-500" />
-                    فعالیت‌های کاربران
-                  </h2>
-                  <p className="text-gray-600 text-sm">
-                    تاریخچه فعالیت‌ها و رویدادهای سیستم
-                  </p>
-                </div>
-                
-                  {/* Retention Settings */}
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                    <div className="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                      <label className="text-xs sm:text-sm font-medium text-blue-900 whitespace-nowrap">تعداد روز ذخیره:</label>
-                      <input 
-                        type="number" 
-                        min="1" 
-                        max="365"
-                        value={userManagement.logRetentionDays || 30}
-                        onChange={(e) => updateUserManagement({ logRetentionDays: parseInt(e.target.value) || 30 })}
-                        className="w-14 sm:w-16 px-1.5 py-1 text-xs sm:text-sm border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => {
-                        if (confirm('آیا از پاکسازی لاگ‌های قدیمی‌تر از بازه تعیین شده مطمئن هستید؟')) {
-                          const retentionDays = userManagement.logRetentionDays || 30;
-                          const cutoffDate = new Date();
-                          cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-                          const filtered = activityLogs.filter(log => new Date(log.timestamp) >= cutoffDate);
-                          setActivityLogs(filtered);
-                          storage.saveData('activityLogs', filtered);
-                          showNotification('success', 'لاگ‌های قدیمی با موفقیت پاکسازی شدند');
-                        }
-                      }}
-                      className="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      پاکسازی دستی
-                    </button>
-                  </div>
-              </div>
-            </div>
-            
-
-
-            {/* Enhanced Activity Statistics Dashboard */}
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                آمار جامع فعالیت‌ها
-              </h3>
-              
-              {/* Main Statistics Grid - Enhanced */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between">
+        {activeTab === 'activities' && (
+          <div className="w-full max-w-full overflow-x-auto">
+            <div className="space-y-6 w-full min-w-[320px]">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
+                {/* Activities Header */}
+                <div className="p-4 sm:p-6 border-b border-gray-200">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm text-blue-600 font-medium">کل فعالیت‌ها</p>
-                      <p className="text-2xl font-bold text-blue-900">{activityStats.total}</p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        {activityStats.today} امروز • {activityStats.thisWeek} این هفته
+                      <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-green-500" />
+                        فعالیت‌های کاربران
+                      </h2>
+                      <p className="text-gray-600 text-sm">
+                        تاریخچه فعالیت‌ها و رویدادهای سیستم
                       </p>
                     </div>
-                    <div className="p-2 bg-blue-200 rounded-lg">
-                      <Activity className="h-6 w-6 text-blue-700" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-green-600 font-medium">فعالیت‌های موفق</p>
-                      <p className="text-2xl font-bold text-green-900">{activityStats.successful}</p>
-                      <p className="text-xs text-green-600 mt-1">
-                        {activityStats.successRate}% موفقیت
-                      </p>
-                    </div>
-                    <div className="p-2 bg-green-200 rounded-lg">
-                      <CheckCircle className="h-6 w-6 text-green-700" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-yellow-600 font-medium">هشدارها</p>
-                      <p className="text-2xl font-bold text-yellow-900">{activityStats.warnings}</p>
-                      <p className="text-xs text-yellow-600 mt-1">
-                        نیاز به بررسی
-                      </p>
-                    </div>
-                    <div className="p-2 bg-yellow-200 rounded-lg">
-                      <AlertTriangle className="h-6 w-6 text-yellow-700" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-red-600 font-medium">خطاها</p>
-                      <p className="text-2xl font-bold text-red-900">{activityStats.failed}</p>
-                      <p className="text-xs text-red-600 mt-1">
-                        نیاز به اقدام فوری
-                      </p>
-                    </div>
-                    <div className="p-2 bg-red-200 rounded-lg">
-                      <XCircle className="h-6 w-6 text-red-700" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-purple-600 font-medium">این ماه</p>
-                      <p className="text-2xl font-bold text-purple-900">{activityStats.thisMonth}</p>
-                      <p className="text-xs text-purple-600 mt-1">
-                        فعالیت ثبت شده
-                      </p>
-                    </div>
-                    <div className="p-2 bg-purple-200 rounded-lg">
-                      <Calendar className="h-6 w-6 text-purple-700" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Statistics */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Most Active Users */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    پرفعالیت‌ترین کاربران
-                  </h4>
-                  <div className="space-y-2">
-                    {activityStats.mostActiveUsers.length > 0 ? (
-                      activityStats.mostActiveUsers.slice(0, 3).map(([userName, count], index) => (
-                        <div key={userName} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                              index === 0 ? 'bg-yellow-500' : 
-                              index === 1 ? 'bg-gray-400' : 'bg-orange-500'
-                            }`}>
-                              {index + 1}
-                            </span>
-                            <span className="text-sm text-gray-700">{userName}</span>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900">{count} فعالیت</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500 text-center py-2">هیچ فعالیتی ثبت نشده</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    اقدامات سریع
-                  </h4>
-                  <div className="space-y-2">
-                    <button 
-                      onClick={() => {
-                        // Export filtered activities to Excel
-                        try {
-                          exportToExcel({
-                            filename: `فعالیت‌ها_${formatPersianDate(new Date())}`,
-                            sheetName: 'فعالیت‌ها',
-                            title: 'گزارش فعالیت‌های سیستم',
-                            subtitle: `تاریخ: ${formatPersianDate(new Date())}`,
-                            columns: [
-                              { key: 'timestamp', header: 'زمان', width: 20 },
-                              { key: 'userName', header: 'کاربر', width: 15 },
-                              { key: 'action', header: 'رویداد', width: 25 },
-                              { key: 'module', header: 'ماژول', width: 15 },
-                              { key: 'status', header: 'وضعیت', width: 12 },
-                              { key: 'ipAddress', header: 'آدرس IP', width: 15 }
-                            ],
-                            data: (filteredActivities || []).map(log => ({
-                              timestamp: formatPersianDateTime(log.timestamp),
-                              userName: log.userName,
-                              action: log.action,
-                              module: log.module,
-                              status: log.status,
-                              ipAddress: log.ipAddress || ''
-                            }))
-                          });
-                          showNotification('success', 'گزارش با موفقیت دانلود شد');
-                        } catch (error) {
-                          console.error('Export error:', error);
-                          showNotification('error', 'خطا در ایجاد فایل اکسل');
-                        }
-                      }}
-                      className="w-full text-right px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                      <Download className="h-4 w-4" />
-                      خروجی Excel
-                    </button>
                     
-                    <button 
-                      onClick={() => setActivityFilter({ userId: 'all', action: 'all', dateFrom: '', dateTo: '' })}
-                      className="w-full text-right px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      ریست فیلترها
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-              {/* Advanced Activity Filters */}
-              <div className="p-4 sm:p-6 border-b border-gray-200 bg-gray-50/50">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-blue-500" />
-                    فیلترهای پیشرفته
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                    <div className="w-full">
-                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">کاربر:</label>
-                      <select 
-                        value={activityFilter.userId}
-                        onChange={(e) => setActivityFilter({...activityFilter, userId: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                    {/* Retention Settings */}
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                      <div className="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <label className="text-xs sm:text-sm font-medium text-blue-900 whitespace-nowrap">تعداد روز ذخیره:</label>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="365"
+                          value={userManagement.logRetentionDays || 30}
+                          onChange={(e) => updateUserManagement({ logRetentionDays: parseInt(e.target.value) || 30 })}
+                          className="w-14 sm:w-16 px-1.5 py-1 text-xs sm:text-sm border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center"
+                        />
+                      </div>
+                      <button 
+                        onClick={() => {
+                          if (confirm('آیا از پاکسازی لاگ‌های قدیمی‌تر از بازه تعیین شده مطمئن هستید؟')) {
+                            const retentionDays = userManagement.logRetentionDays || 30;
+                            const cutoffDate = new Date();
+                            cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+                            const filtered = activityLogs.filter(log => new Date(log.timestamp) >= cutoffDate);
+                            setActivityLogs(filtered);
+                            storage.saveData('activityLogs', filtered);
+                            showNotification('success', 'لاگ‌های قدیمی با موفقیت پاکسازی شدند');
+                          }
+                        }}
+                        className="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap flex items-center gap-1.5 shadow-sm"
                       >
-                        <option value="all">همه کاربران</option>
-                        {availableUsers.map(user => (
-                          <option key={user.id} value={user.id}>{user.fullName}</option>
-                        ))}
-                        <option value="system">سیستم</option>
-                      </select>
-                    </div>
-                    <div className="w-full">
-                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">رویداد:</label>
-                      <select 
-                        value={activityFilter.action}
-                        onChange={(e) => setActivityFilter({...activityFilter, action: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
-                      >
-                        <option value="all">همه رویدادها</option>
-                        {Array.from(new Set(activityLogs.map(log => log.action))).map(action => (
-                          <option key={action} value={action}>{action}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-full">
-                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">از تاریخ:</label>
-                      <PersianDatePicker
-                        value={activityFilter.dateFrom ? new Date(activityFilter.dateFrom) : null}
-                        onChange={(date) => setActivityFilter({...activityFilter, dateFrom: date ? date.toISOString().split('T')[0] : ''})}
-                        placeholder="انتخاب تاریخ"
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="w-full">
-                      <label className="block text-[10px] text-gray-500 mb-1 mr-1">تا تاریخ:</label>
-                      <PersianDatePicker
-                        value={activityFilter.dateTo ? new Date(activityFilter.dateTo) : null}
-                        onChange={(date) => setActivityFilter({...activityFilter, dateTo: date ? date.toISOString().split('T')[0] : ''})}
-                        placeholder="انتخاب تاریخ"
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="w-full flex items-end">
-                      <button
-                        onClick={() => setActivityFilter({ userId: 'all', action: 'all', dateFrom: '', dateTo: '' })}
-                        className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors shadow-sm"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        ریست فیلترها
+                        <Trash2 className="h-3.5 w-3.5" />
+                        پاکسازی دستی
                       </button>
                     </div>
                   </div>
                 </div>
-              </div>
 
-            {/* Activities Table with Enhanced Scroll */}
-            <div className="p-6">
-              <div className="overflow-hidden border border-gray-200 rounded-lg w-full max-w-full">
-                {/* Desktop Table */}
-                <div className="hidden lg:block w-full">
-                  <div className="overflow-x-auto max-h-96 overflow-y-auto w-full max-w-full">
-                    <table className="w-full min-w-full max-w-full">
-                      <thead className="bg-gray-50 sticky top-0 z-10">
-                        <tr>
+                {/* Enhanced Activity Statistics Dashboard */}
+                <div className="p-4 sm:p-6 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    آمار جامع فعالیت‌ها
+                  </h3>
+                  
+                  {/* Main Statistics Grid - Enhanced */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-blue-600 font-medium truncate">کل فعالیت‌ها</p>
+                          <p className="text-2xl font-bold text-blue-900">{activityStats.total}</p>
+                          <p className="text-xs text-blue-600 mt-1 truncate">
+                            {activityStats.today} امروز • {activityStats.thisWeek} هفته
+                          </p>
+                        </div>
+                        <div className="p-2 bg-blue-200 rounded-lg flex-shrink-0">
+                          <Activity className="h-6 w-6 text-blue-700" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-green-600 font-medium truncate">فعالیت‌های موفق</p>
+                          <p className="text-2xl font-bold text-green-900">{activityStats.successful}</p>
+                          <p className="text-xs text-green-600 mt-1 truncate">
+                            {activityStats.successRate}% موفقیت
+                          </p>
+                        </div>
+                        <div className="p-2 bg-green-200 rounded-lg flex-shrink-0">
+                          <CheckCircle className="h-6 w-6 text-green-700" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-yellow-600 font-medium truncate">هشدارها</p>
+                          <p className="text-2xl font-bold text-yellow-900">{activityStats.warnings}</p>
+                          <p className="text-xs text-yellow-600 mt-1 truncate">
+                            نیاز به بررسی
+                          </p>
+                        </div>
+                        <div className="p-2 bg-yellow-200 rounded-lg flex-shrink-0">
+                          <AlertTriangle className="h-6 w-6 text-yellow-700" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-red-600 font-medium truncate">خطاها</p>
+                          <p className="text-2xl font-bold text-red-900">{activityStats.failed}</p>
+                          <p className="text-xs text-red-600 mt-1 truncate">
+                            نیاز به اقدام
+                          </p>
+                        </div>
+                        <div className="p-2 bg-red-200 rounded-lg flex-shrink-0">
+                          <XCircle className="h-6 w-6 text-red-700" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm text-purple-600 font-medium truncate">این ماه</p>
+                          <p className="text-2xl font-bold text-purple-900">{activityStats.thisMonth}</p>
+                          <p className="text-xs text-purple-600 mt-1 truncate">
+                            فعالیت ثبت شده
+                          </p>
+                        </div>
+                        <div className="p-2 bg-purple-200 rounded-lg flex-shrink-0">
+                          <Calendar className="h-6 w-6 text-purple-700" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Statistics */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Most Active Users */}
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        پرفعالیت‌ترین کاربران
+                      </h4>
+                      <div className="space-y-2">
+                        {activityStats.mostActiveUsers.length > 0 ? (
+                          activityStats.mostActiveUsers.slice(0, 3).map(([userName, count], index) => (
+                            <div key={userName} className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${
+                                  index === 0 ? 'bg-yellow-500' : 
+                                  index === 1 ? 'bg-gray-400' : 'bg-orange-500'
+                                }`}>
+                                  {index + 1}
+                                </span>
+                                <span className="text-sm text-gray-700 truncate">{userName}</span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900 whitespace-nowrap">{count} فعالیت</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-2">هیچ فعالیتی ثبت نشده</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        اقدامات سریع
+                      </h4>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button 
+                          onClick={() => {
+                            try {
+                              exportToExcel({
+                                filename: `فعالیت‌ها_${formatPersianDate(new Date())}`,
+                                sheetName: 'فعالیت‌ها',
+                                title: 'گزارش فعالیت‌های سیستم',
+                                subtitle: `تاریخ: ${formatPersianDate(new Date())}`,
+                                columns: [
+                                  { key: 'timestamp', header: 'زمان', width: 20 },
+                                  { key: 'userName', header: 'کاربر', width: 15 },
+                                  { key: 'action', header: 'رویداد', width: 25 },
+                                  { key: 'module', header: 'ماژول', width: 15 },
+                                  { key: 'status', header: 'وضعیت', width: 12 },
+                                  { key: 'ipAddress', header: 'آدرس IP', width: 15 }
+                                ],
+                                data: (filteredActivities || []).map(log => ({
+                                  timestamp: formatPersianDateTime(log.timestamp),
+                                  userName: log.userName,
+                                  action: log.action,
+                                  module: log.module,
+                                  status: log.status,
+                                  ipAddress: log.ipAddress || ''
+                                }))
+                              });
+                              showNotification('success', 'گزارش با موفقیت دانلود شد');
+                            } catch (error) {
+                              console.error('Export error:', error);
+                              showNotification('error', 'خطا در ایجاد فایل اکسل');
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                          <Download className="h-4 w-4" />
+                          خروجی Excel
+                        </button>
+                        
+                        <button 
+                          onClick={() => setActivityFilter({ userId: 'all', action: 'all', dateFrom: '', dateTo: '' })}
+                          className="flex-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          ریست فیلترها
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                  {/* Advanced Activity Filters */}
+                  <div className="p-4 sm:p-6 border-b border-gray-200 bg-gray-50/50">
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-blue-500" />
+                        فیلترهای پیشرفته
+                      </h3>
+                      <div className="flex flex-col md:flex-row flex-wrap gap-3 sm:gap-4">
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="block text-[10px] text-gray-500 mb-1 mr-1">کاربر:</label>
+                          <select 
+                            value={activityFilter.userId}
+                            onChange={(e) => setActivityFilter({...activityFilter, userId: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                          >
+                            <option value="all">همه کاربران</option>
+                            {availableUsers.map(user => (
+                              <option key={user.id} value={user.id}>{user.fullName}</option>
+                            ))}
+                            <option value="system">سیستم</option>
+                          </select>
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="block text-[10px] text-gray-500 mb-1 mr-1">رویداد:</label>
+                          <select 
+                            value={activityFilter.action}
+                            onChange={(e) => setActivityFilter({...activityFilter, action: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                          >
+                            <option value="all">همه رویدادها</option>
+                            {Array.from(new Set(activityLogs.map(log => log.action))).map(action => (
+                              <option key={action} value={action}>{action}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[150px]">
+                          <label className="block text-[10px] text-gray-500 mb-1 mr-1">از تاریخ:</label>
+                          <PersianDatePicker
+                            value={activityFilter.dateFrom ? new Date(activityFilter.dateFrom) : null}
+                            onChange={(date) => setActivityFilter({...activityFilter, dateFrom: date ? date.toISOString().split('T')[0] : ''})}
+                            placeholder="انتخاب تاریخ"
+                            className="bg-white"
+                          />
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[150px]">
+                          <label className="block text-[10px] text-gray-500 mb-1 mr-1">تا تاریخ:</label>
+                          <PersianDatePicker
+                            value={activityFilter.dateTo ? new Date(activityFilter.dateTo) : null}
+                            onChange={(date) => setActivityFilter({...activityFilter, dateTo: date ? date.toISOString().split('T')[0] : ''})}
+                            placeholder="انتخاب تاریخ"
+                            className="bg-white"
+                          />
+                        </div>
+                        <div className="w-full sm:w-auto flex items-end">
+                          <button
+                            onClick={() => setActivityFilter({ userId: 'all', action: 'all', dateFrom: '', dateTo: '' })}
+                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors shadow-sm whitespace-nowrap"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            ریست
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                {/* Activities Table with Enhanced Scroll */}
+                <div className="p-4 sm:p-6">
+                  <div className="border border-gray-200 rounded-lg w-full max-w-full overflow-hidden">
+                    <div className="overflow-x-auto w-full max-w-full scrollbar-thin">
+                      <table className="w-full min-w-[1100px] border-collapse">
+                        <thead className="bg-gray-50">
+                          <tr className="border-b border-gray-200">
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
