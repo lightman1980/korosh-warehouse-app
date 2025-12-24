@@ -504,73 +504,87 @@ export const ReportsManager = () => {
   }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, selectedSiteForFilter, selectedTankForFilter]);
 
   // Helper function to calculate tank counts and low inventory alert
-    const calculateTankStatusCounts = useCallback(() => {
-      const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
-      const currentSiteId = selectedSiteForFilter;
-      const currentTankId = selectedTankForFilter;
+      const calculateTankStatusCounts = useCallback(() => {
+        const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
+        const currentSiteId = selectedSiteForFilter;
+        const currentTankId = selectedTankForFilter;
 
-      let totalTanks = 0;
-      let withInventoryCount = 0;
-      let withoutInventoryCount = 0;
-      let lowInventoryAlert = false;
-      let lowInventoryTanks: any[] = [];
-      let totalShortageSum = 0;
+        let totalTanks = 0;
+        let withInventoryCount = 0;
+        let withoutInventoryCount = 0;
+        let lowInventoryAlert = false;
+        let lowInventoryTanks: any[] = [];
+        let totalShortageSum = 0;
 
-        tanks.forEach((tank: any) => {
-          // اگر فیلتر مخزن داریم، فقط همان مخزن
-          if (currentTankId && String(tank.id) !== currentTankId) return;
-          
-          // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
-          // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم
-          const tankSiteId = String(tank.siteId || tank.locationId || '');
-          if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
+        // Map for fast site lookup from uniqueSites
+        const siteIdToNameMap = new Map<string, string>(uniqueSites);
 
-          totalTanks++;
-
-        const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
-        const inventory = inventoryData.finalInventory || 0;
-
-        if (inventory > 0) withInventoryCount++;
-        else withoutInventoryCount++;
-
-        const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
-        const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
-        const minInventory = minInventoryMatch 
-          ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
-          : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
-
-          if (minInventory > 0 && inventory <= minInventory) {
-            lowInventoryAlert = true;
-            const deficit = minInventory - inventory;
-            totalShortageSum += deficit;
+          tanks.forEach((tank: any) => {
+            // اگر فیلتر مخزن داریم، فقط همان مخزن
+            if (currentTankId && String(tank.id) !== currentTankId) return;
             
-            // Get site name with multiple fallbacks
-            const site = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
-            const siteName = site?.name || tank.siteName || tank.locationName || tank.siteLocationName || '';
+            // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+            const tankSiteId = String(tank.siteId || tank.locationId || '');
+            if (currentSiteId) {
+              const filterSiteIds = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+              if (filterSiteIds.length > 0 && tankSiteId && !filterSiteIds.includes(tankSiteId)) return;
+            }
 
-            lowInventoryTanks.push({
-              name: tank.name || tank.id,
-              inventory: inventory,
-              minInventory: minInventory,
-              deficit: deficit,
-              siteId: tank.siteId || tank.locationId,
-              siteName: siteName
-            });
+            totalTanks++;
+
+          const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId as string, tank.id);
+          const inventory = inventoryData.finalInventory || 0;
+
+          if (inventory > 0) withInventoryCount++;
+          else withoutInventoryCount++;
+
+          const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
+          const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
+          const minInventory = minInventoryMatch 
+            ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
+            : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
+
+            if (minInventory > 0 && inventory <= minInventory) {
+              lowInventoryAlert = true;
+              const deficit = minInventory - inventory;
+              totalShortageSum += deficit;
+              
+              // Get site name with multiple fallbacks
+              const siteFromBase = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
+              const siteFromUnique = siteIdToNameMap.get(tankSiteId);
+              let siteName = siteFromBase?.name || siteFromUnique || tank.siteName || tank.locationName || tank.siteLocationName || '';
+
+              // If siteName is still empty and a site filter is active, try to get the name from the filter
+              if (!siteName && currentSiteId) {
+                const activeId = Array.isArray(currentSiteId) ? currentSiteId[0] : currentSiteId;
+                if (activeId) {
+                  siteName = siteIdToNameMap.get(activeId) || '';
+                }
+              }
+
+              lowInventoryTanks.push({
+                name: tank.name || tank.id,
+                inventory: inventory,
+                minInventory: minInventory,
+                deficit: deficit,
+                siteId: tankSiteId,
+                siteName: siteName || 'نامشخص'
+              });
+            }
+        });
+
+        // Check if all lowInventoryTanks are from the same site
+        let commonSiteName = '';
+        if (lowInventoryTanks.length > 0) {
+          const firstSiteId = lowInventoryTanks[0].siteId;
+          const allSameSite = lowInventoryTanks.every(t => t.siteId === firstSiteId);
+          if (allSameSite) {
+            commonSiteName = lowInventoryTanks[0].siteName !== 'نامشخص' ? lowInventoryTanks[0].siteName : '';
           }
-      });
-
-      // Check if all lowInventoryTanks are from the same site
-      let commonSiteName = '';
-      if (lowInventoryTanks.length > 0) {
-        const firstSiteId = lowInventoryTanks[0].siteId;
-        const allSameSite = lowInventoryTanks.every(t => t.siteId === firstSiteId);
-        if (allSameSite) {
-          commonSiteName = lowInventoryTanks[0].siteName;
         }
-      }
 
-      return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName };
-    }, [baseData.tanks, baseData.sites, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
+        return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName };
+      }, [baseData.tanks, baseData.sites, uniqueSites, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
   const loadBaseData = () => {

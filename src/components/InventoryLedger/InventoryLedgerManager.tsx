@@ -522,18 +522,23 @@ export const InventoryLedgerManager: React.FC = () => {
       let lowInventoryTanks: any[] = [];
       let totalShortageSum = 0;
 
+      // Map for fast site lookup from uniqueSites
+      const siteIdToNameMap = new Map<string, string>(uniqueSites);
+
       tanks.forEach((tank: any) => {
         // اگر فیلتر مخزن داریم، فقط همان مخزن
         if (currentTankId && String(tank.id) !== currentTankId) return;
         
         // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
-        // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم
         const tankSiteId = String(tank.siteId || tank.locationId || '');
-        if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
+        if (currentSiteId) {
+          const filterSiteIds = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (filterSiteIds.length > 0 && tankSiteId && !filterSiteIds.includes(tankSiteId)) return;
+        }
 
         totalTanks++;
 
-        const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
+        const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId as string, tank.id);
         const inventory = inventoryData.finalInventory || 0;
 
         if (inventory > 0) withInventoryCount++;
@@ -551,16 +556,25 @@ export const InventoryLedgerManager: React.FC = () => {
             totalShortageSum += deficit;
             
             // Get site name with multiple fallbacks
-            const site = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
-            const siteName = site?.name || tank.siteName || tank.locationName || tank.siteLocationName || '';
+            const siteFromBase = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
+            const siteFromUnique = siteIdToNameMap.get(tankSiteId);
+            let siteName = siteFromBase?.name || siteFromUnique || tank.siteName || tank.locationName || tank.siteLocationName || '';
+
+            // If siteName is still empty and a site filter is active, try to get the name from the filter
+            if (!siteName && currentSiteId) {
+              const activeId = Array.isArray(currentSiteId) ? currentSiteId[0] : currentSiteId;
+              if (activeId) {
+                siteName = siteIdToNameMap.get(activeId) || '';
+              }
+            }
 
             lowInventoryTanks.push({
               name: tank.name || tank.id,
               inventory: inventory,
               minInventory: minInventory,
               deficit: deficit,
-              siteId: tank.siteId || tank.locationId,
-              siteName: siteName
+              siteId: tankSiteId,
+              siteName: siteName || 'نامشخص'
             });
           }
       });
@@ -571,12 +585,12 @@ export const InventoryLedgerManager: React.FC = () => {
         const firstSiteId = lowInventoryTanks[0].siteId;
         const allSameSite = lowInventoryTanks.every(t => t.siteId === firstSiteId);
         if (allSameSite) {
-          commonSiteName = lowInventoryTanks[0].siteName;
+          commonSiteName = lowInventoryTanks[0].siteName !== 'نامشخص' ? lowInventoryTanks[0].siteName : '';
         }
       }
 
       return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName };
-    }, [baseData.tanks, baseData.sites, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
+    }, [baseData.tanks, baseData.sites, uniqueSites, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
 
 
   // تابع برای بارگذاری داده‌های پایه به صورت داینامیک
