@@ -483,16 +483,19 @@ export const InventoryLedgerManager: React.FC = () => {
       const currentTankId = tankId || selectedTankForFilter;
       
       tanks.forEach((tank: any) => {
-        const tankSiteId = String(tank.siteId || tank.locationId || '');
-        const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
-        const tankMatch = !currentTankId || String(tank.id) === currentTankId;
-        if (!siteMatch || !tankMatch) return;
+        // اگر فیلتر مخزن داریم، فقط همان مخزن
+        if (currentTankId && String(tank.id) !== currentTankId) return;
         
-        const capacityStr = tank.capacity || "0";
+        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+        // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم تا ظرفیت صفر نشود
+        const tankSiteId = String(tank.siteId || tank.locationId || '');
+        if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
+        
+        const capacityStr = tank.capacity || "5,000,000 کیلوگرم";
         const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
         const capacity = capacityMatch 
-          ? parseInt(capacityMatch[0].replace(/,/g, '')) 
-          : (typeof capacityStr === 'number' ? capacityStr : 0);
+          ? parseInt(capacityMatch[0].replace(/,/g, ''), 10) 
+          : (typeof capacityStr === 'number' ? capacityStr : 5000000);
         
         totalCapacity += capacity;
       });
@@ -520,10 +523,13 @@ export const InventoryLedgerManager: React.FC = () => {
       let totalShortageSum = 0;
 
       tanks.forEach((tank: any) => {
+        // اگر فیلتر مخزن داریم، فقط همان مخزن
+        if (currentTankId && String(tank.id) !== currentTankId) return;
+        
+        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+        // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم
         const tankSiteId = String(tank.siteId || tank.locationId || '');
-        const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
-        const tankMatch = !currentTankId || String(tank.id) === currentTankId;
-        if (!siteMatch || !tankMatch) return;
+        if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
 
         totalTanks++;
 
@@ -993,7 +999,7 @@ export const InventoryLedgerManager: React.FC = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig, selectedSiteForFilter, selectedTankForFilter]);
+  }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig]);
 
   const applyFilters = () => {
     // Get real data from storage
@@ -1844,21 +1850,13 @@ export const InventoryLedgerManager: React.FC = () => {
         if (!referenceNumber.includes(filters.referenceNumber.toLowerCase())) return false;
       }
       
-        // فیلترهای انتخاب از dropdown
-        if (filters.productName) {
-          if (!item.productName || item.productName !== filters.productName) return false;
+          // فیلترهای انتخاب از dropdown
+          if (filters.productName) {
+            if (!item.productName || item.productName !== filters.productName) return false;
+          }
+        if (filters.locationName) {
+          if (!item.locationName || item.locationName !== filters.locationName) return false;
         }
-          if (selectedSiteForFilter) {
-            const itemSiteId = String(item.siteId || item.locationId || '');
-            if (itemSiteId !== selectedSiteForFilter) return false;
-          }
-          if (selectedTankForFilter) {
-            const itemTankId = String(item.tankId || '');
-            if (itemTankId !== selectedTankForFilter) return false;
-          }
-      if (filters.locationName) {
-        if (!item.locationName || item.locationName !== filters.locationName) return false;
-      }
       if (filters.companyLocationName) {
         const value = normalizeFieldName('companyLocationName', item);
         if (!value || value !== filters.companyLocationName) return false;

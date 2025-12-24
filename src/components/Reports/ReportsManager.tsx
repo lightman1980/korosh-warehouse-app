@@ -470,28 +470,31 @@ export const ReportsManager = () => {
   }, [calculateOwnedTanksInventory, calculateConsignmentTanksInventory]);
 
   // Helper function to calculate total tank capacity based on filters
-  const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
-    const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
-    let totalCapacity = 0;
-    const currentSiteId = siteId || selectedSiteForFilter;
-    const currentTankId = tankId || selectedTankForFilter;
-    
-    tanks.forEach((tank: any) => {
-      const tankSiteId = String(tank.siteId || tank.locationId || '');
-      const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
-      const tankMatch = !currentTankId || String(tank.id) === currentTankId;
-      if (!siteMatch || !tankMatch) return;
+    const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
+      const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
+      let totalCapacity = 0;
+      const currentSiteId = siteId || selectedSiteForFilter;
+      const currentTankId = tankId || selectedTankForFilter;
       
-      const capacityStr = tank.capacity || "0";
-      const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
-      const capacity = capacityMatch 
-        ? parseInt(capacityMatch[0].replace(/,/g, '')) 
-        : (typeof capacityStr === 'number' ? capacityStr : 0);
-      
-      totalCapacity += capacity;
-    });
-    return totalCapacity;
-  }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter]);
+      tanks.forEach((tank: any) => {
+        // اگر فیلتر مخزن داریم، فقط همان مخزن
+        if (currentTankId && String(tank.id) !== currentTankId) return;
+        
+        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+        // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم تا ظرفیت صفر نشود
+        const tankSiteId = String(tank.siteId || tank.locationId || '');
+        if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
+        
+        const capacityStr = tank.capacity || "5,000,000 کیلوگرم";
+        const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
+        const capacity = capacityMatch 
+          ? parseInt(capacityMatch[0].replace(/,/g, ''), 10) 
+          : (typeof capacityStr === 'number' ? capacityStr : 5000000);
+        
+        totalCapacity += capacity;
+      });
+      return totalCapacity;
+    }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter]);
 
   // Helper function to calculate empty tank capacity
   const calculateEmptyTankCapacity = useCallback(() => {
@@ -513,13 +516,16 @@ export const ReportsManager = () => {
     let lowInventoryTanks: any[] = [];
     let totalShortageSum = 0;
 
-    tanks.forEach((tank: any) => {
-      const tankSiteId = String(tank.siteId || tank.locationId || '');
-      const siteMatch = !currentSiteId || tankSiteId === currentSiteId;
-      const tankMatch = !currentTankId || String(tank.id) === currentTankId;
-      if (!siteMatch || !tankMatch) return;
+      tanks.forEach((tank: any) => {
+        // اگر فیلتر مخزن داریم، فقط همان مخزن
+        if (currentTankId && String(tank.id) !== currentTankId) return;
+        
+        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+        // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم
+        const tankSiteId = String(tank.siteId || tank.locationId || '');
+        if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
 
-      totalTanks++;
+        totalTanks++;
 
       const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
       const inventory = inventoryData.finalInventory || 0;
@@ -986,7 +992,7 @@ export const ReportsManager = () => {
 
     useEffect(() => {
       applyFilters();
-    }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig, selectedSiteForFilter, selectedTankForFilter, upToDate]);
+    }, [filters, searchTerm, unitToggle, includeNonFinalized, baseData, sortConfig]);
 
   const applyFilters = () => {
     // Get real data from storage
@@ -1799,24 +1805,14 @@ export const ReportsManager = () => {
         if (!referenceNumber.includes(filters.referenceNumber.toLowerCase())) return false;
       }
       
-        // فیلترهای انتخاب از dropdown
-        if (filters.productName) {
-          if (!item.productName || item.productName !== filters.productName) return false;
+          // فیلترهای انتخاب از dropdown
+          if (filters.productName) {
+            if (!item.productName || item.productName !== filters.productName) return false;
+          }
+          
+        if (filters.locationName) {
+          if (!item.locationName || item.locationName !== filters.locationName) return false;
         }
-        
-          // فیلتر سایت و مخزن (استفاده از مقادیر انتخاب شده در بخش پکیج موجودی)
-          if (selectedSiteForFilter) {
-            const itemSiteId = String(item.siteId || item.locationId || '');
-            if (itemSiteId !== selectedSiteForFilter) return false;
-          }
-          if (selectedTankForFilter) {
-            const itemTankId = String(item.tankId || '');
-            if (itemTankId !== selectedTankForFilter) return false;
-          }
-
-      if (filters.locationName) {
-        if (!item.locationName || item.locationName !== filters.locationName) return false;
-      }
       if (filters.companyLocationName) {
         const value = normalizeFieldName('companyLocationName', item);
         if (!value || value !== filters.companyLocationName) return false;
