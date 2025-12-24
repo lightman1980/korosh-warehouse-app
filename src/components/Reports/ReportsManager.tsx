@@ -543,15 +543,19 @@ export const ReportsManager = () => {
           lowInventoryAlert = true;
           const deficit = minInventory - inventory;
           totalShortageSum += deficit;
+          
+          const tankSiteId = String(tank.siteId || tank.locationId || '');
+          const siteName = uniqueSites.find(([id]) => id === tankSiteId)?.[1] || '';
+          
           lowInventoryTanks.push({
             name: tank.name || tank.id,
+            siteName: siteName,
             inventory: inventory,
             minInventory: minInventory,
-            deficit: deficit,
-            siteName: baseData.sites?.find((s: any) => s.id === (tank.siteId || tank.locationId))?.name || tank.siteName || ''
+            deficit: deficit
           });
         }
-      });
+    });
 
     return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum };
   }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
@@ -2182,6 +2186,8 @@ export const ReportsManager = () => {
       return [
         ...baseFilters,
         dynamicFilters.find(f => f.id === 'productName'),
+        dynamicFilters.find(f => f.id === 'siteName'),
+        dynamicFilters.find(f => f.id === 'tankName'),
         dynamicFilters.find(f => f.id === 'receiptBasis'),
         dynamicFilters.find(f => f.id === 'rentalType'),
         dynamicFilters.find(f => f.id === 'rentalRate'),
@@ -2192,6 +2198,8 @@ export const ReportsManager = () => {
       return [
         ...baseFilters,
         dynamicFilters.find(f => f.id === 'productName'),
+        dynamicFilters.find(f => f.id === 'siteName'),
+        dynamicFilters.find(f => f.id === 'tankName'),
         dynamicFilters.find(f => f.id === 'companyName'),
         dynamicFilters.find(f => f.id === 'customerCompanyName'),
         dynamicFilters.find(f => f.id === 'companyLocationName'),
@@ -2211,6 +2219,8 @@ export const ReportsManager = () => {
       return [
         ...baseFilters,
         dynamicFilters.find(f => f.id === 'productName'),
+        dynamicFilters.find(f => f.id === 'siteName'),
+        dynamicFilters.find(f => f.id === 'tankName'),
         dynamicFilters.find(f => f.id === 'contractNumber'),
         dynamicFilters.find(f => f.id === 'permitNumber'),
         dynamicFilters.find(f => f.id === 'companyName'),
@@ -3004,32 +3014,28 @@ export const ReportsManager = () => {
               </div>
             </div>
 
-            {/* گزارش حداقل موجودی مخزن - ردیف آخر کامل */}
-            <div className="lg:col-span-2 mt-2">
-              {(() => {
-                const { lowInventoryAlert, lowInventoryTanks, totalShortageSum } = calculateTankStatusCounts();
-                return (
-                  <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden group transition-all`}>
-                    <div className="flex justify-between items-center mb-4 border-b pb-4 border-red-100">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${lowInventoryAlert ? 'bg-red-100' : 'bg-gray-100'}`}>
-                          <AlertTriangle className={`w-6 h-6 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'}`} />
+              {/* گزارش حداقل موجودی مخزن - ردیف آخر کامل */}
+              <div className="lg:col-span-2 mt-2">
+                {(() => {
+                  const { lowInventoryAlert, lowInventoryTanks, totalShortageSum } = calculateTankStatusCounts();
+                  const allSameSite = lowInventoryTanks.length > 0 && lowInventoryTanks.every((t: any) => t.siteName && t.siteName === lowInventoryTanks[0].siteName);
+                  const commonSiteName = allSameSite ? lowInventoryTanks[0].siteName : null;
+                  
+                  return (
+                    <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden group transition-all`}>
+                      <div className="flex justify-between items-start mb-4 border-b pb-4 border-red-100">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${lowInventoryAlert ? 'bg-red-100' : 'bg-gray-100'}`}>
+                            <AlertTriangle className={`w-6 h-6 ${lowInventoryAlert ? 'text-red-600' : 'text-gray-600'}`} />
+                          </div>
+                          <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخازن</span>
                         </div>
-                        <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخازن</span>
-                      </div>
                         <div className="flex flex-col gap-2">
-                          {(() => {
-                            const { lowInventoryTanks } = calculateTankStatusCounts();
-                            const uniqueSitesInLow = Array.from(new Set(lowInventoryTanks?.map((t: any) => t.siteName).filter(Boolean)));
-                            if (uniqueSitesInLow.length === 1) {
-                              return (
-                                <div className="text-right text-green-700 font-bold text-sm bg-green-100/50 px-3 py-1 rounded-lg border border-green-200">
-                                  سایت: {uniqueSitesInLow[0]}
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
+                          {commonSiteName && (
+                            <div className="bg-white/80 border border-green-400 text-green-800 px-4 py-1 rounded-lg text-center font-bold text-sm shadow-sm">
+                              سایت: {commonSiteName}
+                            </div>
+                          )}
                           <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-400 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
                             <span className="font-bold">تعداد مخزن:</span>
                             <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
@@ -3041,42 +3047,42 @@ export const ReportsManager = () => {
                             </div>
                           )}
                         </div>
-                    </div>
-                  
-                    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
-                      {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
-                        lowInventoryTanks.map((t: any, i: number) => (
-                          <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow">
+                      </div>
+                    
+                      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
+                        {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
+                          lowInventoryTanks.map((t: any, i: number) => (
+                            <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow">
                               <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
                                 <span>{t.name}</span>
-                                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">{t.siteName}</span>
+                                <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{t.siteName || 'بدون سایت'}</span>
                               </div>
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
-                                <span className="font-bold text-black opacity-80">حداقل تعریف شده:</span>
-                                <span className="font-black text-xl text-black">{formatPersianNumber(t.minInventory)}</span>
-                              </div>
-                              <div className="flex justify-between items-center p-2 bg-green-50/50 rounded-lg">
-                                <span className="font-bold text-green-700 opacity-80">موجودي فعلي:</span>
-                                <span className="font-black text-xl text-green-600">{formatPersianNumber(t.inventory)}</span>
-                              </div>
-                              <div className="flex justify-between items-center p-3 bg-red-400 text-white rounded-lg font-black shadow-inner">
-                                <span className="text-lg">کسری موجودی:</span>
-                                <span className="text-2xl">{formatPersianNumber(t.deficit)}</span>
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
+                                  <span className="font-bold text-black opacity-80">حداقل تعریف شده:</span>
+                                  <span className="font-black text-xl text-black">{formatPersianNumber(t.minInventory)}</span>
+                                </div>
+                                <div className="flex justify-between items-center p-2 bg-green-50/50 rounded-lg">
+                                  <span className="font-bold text-green-700 opacity-80">موجودي فعلي:</span>
+                                  <span className="font-black text-xl text-green-600">{formatPersianNumber(t.inventory)}</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-red-400 text-white rounded-lg font-black shadow-inner">
+                                  <span className="text-lg">کسری موجودی:</span>
+                                  <span className="text-2xl">{formatPersianNumber(t.deficit)}</span>
+                                </div>
                               </div>
                             </div>
+                          ))
+                        ) : (
+                          <div className="col-span-full py-8 text-center bg-green-50 rounded-xl border border-green-100">
+                            <div className="text-green-600 font-bold text-xl">وضعیت تمام مخازن در شرایط نرمال قرار دارد ✅</div>
                           </div>
-                        ))
-                      ) : (
-                        <div className="col-span-full py-8 text-center bg-green-50 rounded-xl border border-green-100">
-                          <div className="text-green-600 font-bold text-xl">وضعیت تمام مخازن در شرایط نرمال قرار دارد ✅</div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
+                  );
+                })()}
+              </div>
           </div>
           </>
         )}
