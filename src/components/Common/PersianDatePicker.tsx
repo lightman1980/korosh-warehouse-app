@@ -606,48 +606,33 @@ const PersianDatePicker: React.FC<PersianDatePickerProps> = forwardRef<PersianDa
     return renderPopup();
   }
   
-  return (
-    <div ref={containerRef} className="relative">
-      <div className="mb-2 text-sm">
-        <div className="flex justify-between mb-1">
-          <span className="font-medium text-gray-700">تاریخ امروز:</span>
-          <span className="font-semibold text-blue-600">
-            {formatPersianDate(new Date())}
-          </span>
+    return (
+      <div ref={containerRef} className="relative w-full">
+        <div className="relative">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            onClick={openCalendar}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={`w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${className}`}
+          />
+          <button
+            ref={calendarButtonRef}
+            type="button"
+            onClick={openCalendar}
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600 focus:outline-none"
+            disabled={disabled}
+          >
+            <Calendar className="h-4 w-4" />
+          </button>
         </div>
-        <div className="flex justify-between">
-          <span className="font-medium text-gray-700">تاریخ انتخاب شده:</span>
-          <span className="font-semibold text-yellow-600">
-            {safeSelectedValue ? formatPersianDate(safeSelectedValue) : '---'}
-          </span>
-        </div>
+        
+        {renderPopup()}
       </div>
-      
-      <div className="relative">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={handleInputChange}
-          onKeyDown={handleInputKeyDown}
-          onClick={openCalendar}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={`w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
-        />
-        <button
-          ref={calendarButtonRef}
-          type="button"
-          onClick={openCalendar}
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600 focus:outline-none"
-          disabled={disabled}
-        >
-          <Calendar className="h-4 w-4" />
-        </button>
-      </div>
-      
-      {renderPopup()}
-    </div>
-  );
+    );
 });
 
 // *** تغییر اصلی: برای دیباگینگ بهتر، یک displayName تنظیم می‌کنیم ***
