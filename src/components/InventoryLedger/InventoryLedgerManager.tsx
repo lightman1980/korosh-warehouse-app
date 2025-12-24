@@ -3149,12 +3149,11 @@ export const InventoryLedgerManager: React.FC = () => {
                         {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
                             lowInventoryTanks.map((t: any, i: number) => (
                               <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow relative pt-8">
-                                <div className="absolute top-2 right-2 flex items-center gap-1">
-                                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                                  <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
-                                    {t.siteName}
-                                  </span>
-                                </div>
+                                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                                    <span className="text-[11px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 shadow-sm">
+                                      {t.siteName}
+                                    </span>
+                                  </div>
                                 <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2">
                                   {t.name}
                                 </div>
