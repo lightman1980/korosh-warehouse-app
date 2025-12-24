@@ -539,24 +539,24 @@ export const ReportsManager = () => {
           ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
           : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
 
-        if (minInventory > 0 && inventory <= minInventory) {
-          lowInventoryAlert = true;
-          const deficit = minInventory - inventory;
-          totalShortageSum += deficit;
-          
-          // Get site name
-          const site = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
-          const siteName = site?.name || tank.siteName || '';
+          if (minInventory > 0 && inventory <= minInventory) {
+            lowInventoryAlert = true;
+            const deficit = minInventory - inventory;
+            totalShortageSum += deficit;
+            
+            // Get site name with multiple fallbacks
+            const site = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
+            const siteName = site?.name || tank.siteName || tank.locationName || tank.siteLocationName || '';
 
-          lowInventoryTanks.push({
-            name: tank.name || tank.id,
-            inventory: inventory,
-            minInventory: minInventory,
-            deficit: deficit,
-            siteId: tank.siteId || tank.locationId,
-            siteName: siteName
-          });
-        }
+            lowInventoryTanks.push({
+              name: tank.name || tank.id,
+              inventory: inventory,
+              minInventory: minInventory,
+              deficit: deficit,
+              siteId: tank.siteId || tank.locationId,
+              siteName: siteName
+            });
+          }
       });
 
       // Check if all lowInventoryTanks are from the same site
@@ -3059,17 +3059,17 @@ export const ReportsManager = () => {
                       </div>
                     
                       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
-                        {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
-                            lowInventoryTanks.map((t: any, i: number) => (
-                                <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow relative">
-                                  <div className="flex justify-between items-center mb-3 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                                    <span className="text-[12px] font-black text-blue-800">
-                                      سایت: {t.siteName || '---'}
-                                    </span>
-                                  </div>
-                                  <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2">
-                                    {t.name}
-                                  </div>
+                          {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
+                              lowInventoryTanks.map((t: any, i: number) => (
+                                  <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow relative pt-10 overflow-hidden">
+                                    <div className="absolute top-0 right-0 left-0 bg-blue-600 text-white py-1.5 px-4 text-[11px] font-black flex items-center gap-2 shadow-sm border-b border-blue-700">
+                                      <Building2 className="w-3.5 h-3.5 text-blue-200" />
+                                      <span>سایت: {t.siteName || 'نامشخص'}</span>
+                                    </div>
+                                    <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
+                                      <span>{t.name}</span>
+                                      <div className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"></div>
+                                    </div>
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
                                   <span className="font-bold text-black opacity-80">حداقل تعریف شده:</span>
