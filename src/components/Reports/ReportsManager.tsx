@@ -562,14 +562,14 @@ export const ReportsManager = () => {
                 }
               }
 
-              lowInventoryTanks.push({
-                name: tank.name || tank.id,
-                inventory: inventory,
-                minInventory: minInventory,
-                deficit: deficit,
-                siteId: tankSiteId,
-                siteName: siteName || 'نامشخص'
-              });
+                lowInventoryTanks.push({
+                  name: tank.name || tank.id,
+                  inventory: inventory,
+                  minInventory: minInventory,
+                  deficit: deficit,
+                  siteId: tankSiteId,
+                  siteName: siteName || (currentSiteId ? 'نامشخص' : 'تمام سایت ها')
+                });
             }
         });
 
@@ -3078,7 +3078,7 @@ export const ReportsManager = () => {
                                   <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow relative pt-10 overflow-hidden">
                                     <div className="absolute top-0 right-0 left-0 bg-blue-600 text-white py-1.5 px-4 text-[11px] font-black flex items-center gap-2 shadow-sm border-b border-blue-700">
                                       <Building2 className="w-3.5 h-3.5 text-blue-200" />
-                                      <span>سایت: {t.siteName || 'نامشخص'}</span>
+                                        <span>سایت: {t.siteName || (selectedSiteForFilter ? 'نامشخص' : 'تمام سایت ها')}</span>
                                     </div>
                                     <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
                                       <span>{t.name}</span>

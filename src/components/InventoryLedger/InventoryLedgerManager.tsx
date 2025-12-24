@@ -568,14 +568,14 @@ export const InventoryLedgerManager: React.FC = () => {
               }
             }
 
-            lowInventoryTanks.push({
-              name: tank.name || tank.id,
-              inventory: inventory,
-              minInventory: minInventory,
-              deficit: deficit,
-              siteId: tankSiteId,
-              siteName: siteName || 'نامشخص'
-            });
+              lowInventoryTanks.push({
+                name: tank.name || tank.id,
+                inventory: inventory,
+                minInventory: minInventory,
+                deficit: deficit,
+                siteId: tankSiteId,
+                siteName: siteName || (!currentSiteId ? 'تمام سایت ها' : 'نامشخص')
+              });
           }
       });
 
