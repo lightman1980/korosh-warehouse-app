@@ -539,18 +539,19 @@ export const ReportsManager = () => {
         ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
         : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
 
-      if (minInventory > 0 && inventory <= minInventory) {
-        lowInventoryAlert = true;
-        const deficit = minInventory - inventory;
-        totalShortageSum += deficit;
-        lowInventoryTanks.push({
-          name: tank.name || tank.id,
-          inventory: inventory,
-          minInventory: minInventory,
-          deficit: deficit
-        });
-      }
-    });
+        if (minInventory > 0 && inventory <= minInventory) {
+          lowInventoryAlert = true;
+          const deficit = minInventory - inventory;
+          totalShortageSum += deficit;
+          lowInventoryTanks.push({
+            name: tank.name || tank.id,
+            inventory: inventory,
+            minInventory: minInventory,
+            deficit: deficit,
+            siteName: baseData.sites?.find((s: any) => s.id === (tank.siteId || tank.locationId))?.name || tank.siteName || ''
+          });
+        }
+      });
 
     return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum };
   }, [baseData.tanks, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
@@ -2181,8 +2182,6 @@ export const ReportsManager = () => {
       return [
         ...baseFilters,
         dynamicFilters.find(f => f.id === 'productName'),
-        dynamicFilters.find(f => f.id === 'siteName'),
-        dynamicFilters.find(f => f.id === 'tankName'),
         dynamicFilters.find(f => f.id === 'receiptBasis'),
         dynamicFilters.find(f => f.id === 'rentalType'),
         dynamicFilters.find(f => f.id === 'rentalRate'),
@@ -2193,8 +2192,6 @@ export const ReportsManager = () => {
       return [
         ...baseFilters,
         dynamicFilters.find(f => f.id === 'productName'),
-        dynamicFilters.find(f => f.id === 'siteName'),
-        dynamicFilters.find(f => f.id === 'tankName'),
         dynamicFilters.find(f => f.id === 'companyName'),
         dynamicFilters.find(f => f.id === 'customerCompanyName'),
         dynamicFilters.find(f => f.id === 'companyLocationName'),
@@ -2214,8 +2211,6 @@ export const ReportsManager = () => {
       return [
         ...baseFilters,
         dynamicFilters.find(f => f.id === 'productName'),
-        dynamicFilters.find(f => f.id === 'siteName'),
-        dynamicFilters.find(f => f.id === 'tankName'),
         dynamicFilters.find(f => f.id === 'contractNumber'),
         dynamicFilters.find(f => f.id === 'permitNumber'),
         dynamicFilters.find(f => f.id === 'companyName'),
@@ -3022,28 +3017,40 @@ export const ReportsManager = () => {
                         </div>
                         <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخازن</span>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-400 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
-                          <span className="font-bold">تعداد مخزن:</span>
-                          <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
-                        </div>
-                        {lowInventoryAlert && (
-                          <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-400 text-white shadow-lg">
-                            <span className="font-bold text-xs">جمع کل کسر موجودی ها:</span>
-                            <span className="text-lg font-black">{formatPersianNumber(totalShortageSum)}</span>
+                        <div className="flex flex-col gap-2">
+                          {(() => {
+                            const { lowInventoryTanks } = calculateTankStatusCounts();
+                            const uniqueSitesInLow = Array.from(new Set(lowInventoryTanks?.map((t: any) => t.siteName).filter(Boolean)));
+                            if (uniqueSitesInLow.length === 1) {
+                              return (
+                                <div className="text-right text-green-700 font-bold text-sm bg-green-100/50 px-3 py-1 rounded-lg border border-green-200">
+                                  سایت: {uniqueSitesInLow[0]}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                          <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-400 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
+                            <span className="font-bold">تعداد مخزن:</span>
+                            <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
                           </div>
-                        )}
-                      </div>
+                          {lowInventoryAlert && (
+                            <div className="flex items-center justify-between gap-4 px-4 py-2 rounded-full bg-red-400 text-white shadow-lg">
+                              <span className="font-bold text-xs">جمع کل کسر موجودی ها:</span>
+                              <span className="text-lg font-black">{formatPersianNumber(totalShortageSum)}</span>
+                            </div>
+                          )}
+                        </div>
                     </div>
                   
                     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${lowInventoryAlert ? 'text-red-700' : 'text-gray-600'}`}>
                       {lowInventoryAlert && lowInventoryTanks && lowInventoryTanks.length > 0 ? (
                         lowInventoryTanks.map((t: any, i: number) => (
                           <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
-                              <span>{t.name}</span>
-                              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                            </div>
+                              <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
+                                <span>{t.name}</span>
+                                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">{t.siteName}</span>
+                              </div>
                             <div className="space-y-3">
                               <div className="flex justify-between items-center p-2 bg-gray-50/50 rounded-lg">
                                 <span className="font-bold text-black opacity-80">حداقل تعریف شده:</span>
