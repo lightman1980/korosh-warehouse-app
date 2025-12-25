@@ -1,12 +1,29 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Save, X, FileCheck, Download, ArrowUpDown, Filter, FilterX, Minimize2, Maximize2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { Save, X, FileCheck, Download, ArrowUpDown, Filter, FilterX, Minimize2, Maximize2, Database, Droplets, Scale, Warehouse, Truck, FlaskConical, AlertTriangle, AlertOctagon, Info, Building2, Clock, Calendar, RefreshCw, Package } from 'lucide-react';
 import { useSortingAndFiltering } from '../../hooks/useSortingAndFiltering';
 import { FieldWithTooltip } from './FieldWithTooltip';
 import { ChartsSection } from './ChartsSection';
 import { Receipt, Contract, DeliveryPermit, TableColumn } from '../../types/accounting';
-import { formatPersianNumber, formatPersianDate } from '../../utils/persian';
+import { formatPersianNumber, formatPersianDate, safeParseDate } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
 import PersianDatePicker from '../Common/PersianDatePicker';
+
+interface BaseDataItem {
+  id: string;
+  code?: string;
+  name: string;
+  isActive: boolean;
+  canDelete: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  address?: string;
+  phone?: string;
+  postalCode?: string;
+  additionalInfo?: string;
+  nationalId?: string;
+  plateNumber?: string;
+  homeAddress?: string;
+}
 
 interface DeliveryPermitsTabProps {
   receipts: Receipt[];
