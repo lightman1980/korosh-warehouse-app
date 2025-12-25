@@ -125,9 +125,12 @@ export const ReportsManager = () => {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const toggleOption = (value: string, event?: React.MouseEvent) => {
+    const toggleOption = (value: string, event?: React.MouseEvent | React.KeyboardEvent) => {
       let newValues;
-      if (event?.ctrlKey) {
+      // بررسی کلید کنترل یا فرمان برای مولتی سلکشن
+      const isMultiSelect = event?.ctrlKey || event?.metaKey || (event as any)?.detail === 0;
+      
+      if (isMultiSelect) {
         newValues = selectedValues.includes(value)
           ? selectedValues.filter(v => v !== value)
           : [...selectedValues, value];
@@ -183,10 +186,20 @@ export const ReportsManager = () => {
             </div>
               <div className="p-1">
                 {options.map(([id, name]) => (
-                  <label key={id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer" onClick={(e) => {
-                    e.preventDefault();
-                    toggleOption(id, e);
-                  }}>
+                  <label 
+                    key={id} 
+                    className={`flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer ${selectedValues.includes(id) ? 'bg-blue-50' : ''}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleOption(id, e);
+                    }}
+                    onDoubleClick={(e) => {
+                      // دبل کلیک برای بستن دراپ‌داون و اعمال فیلتر
+                      if (selectedValues.length > 0) {
+                        setIsOpen(false);
+                      }
+                    }}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedValues.includes(id)}
@@ -194,6 +207,9 @@ export const ReportsManager = () => {
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ml-2"
                     />
                     <span className="text-sm text-gray-700">{name}</span>
+                    {selectedValues.includes(id) && (
+                      <span className="mr-auto text-blue-600">✓</span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -217,8 +233,8 @@ export const ReportsManager = () => {
 
   // State for tank inventory calculations
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
-  const [selectedTankForFilter, setSelectedTankForFilter] = useState<string>('');
-  const [selectedSiteForFilter, setSelectedSiteForFilter] = useState<string>('');
+  const [selectedTankForFilter, setSelectedTankForFilter] = useState<string[]>([]);
+  const [selectedSiteForFilter, setSelectedSiteForFilter] = useState<string[]>([]);
   const [upToDate, setUpToDate] = useState<Date>(new Date());
   const [showInventoryPackage, setShowInventoryPackage] = useState<boolean>(true);
 
@@ -308,9 +324,9 @@ export const ReportsManager = () => {
 
 
   // Calculate owned tanks inventory based on user formula
-    const calculateOwnedTanksInventory = useCallback((siteId?: string, tankId?: string) => {
-      const currentSiteId = siteId || selectedSiteForFilter;
-      const currentTankId = tankId || selectedTankForFilter;
+    const calculateOwnedTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
+      const currentSiteId = siteId || (selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined);
+      const currentTankId = tankId || (selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined);
       
       let ownedReceiptsAmount = 0;
       let ownedAdditionDocuments = 0;
@@ -328,8 +344,16 @@ export const ReportsManager = () => {
 
         // Receipts
         data.receipts.forEach((r: any) => {
-          if (currentSiteId && r.siteId !== currentSiteId) return;
-          if (currentTankId && r.tankId !== currentTankId) return;
+          // بررسی فیلتر سایت (آرایه یا رشته)
+          if (currentSiteId) {
+            const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+            if (!siteArray.includes(r.siteId)) return;
+          }
+          // بررسی فیلتر مخزن (آرایه یا رشته)
+          if (currentTankId) {
+            const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+            if (!tankArray.includes(r.tankId)) return;
+          }
           if (r.userType === 'owned') {
             ownedReceiptsAmount += safeNumber(r.amount || r.receiptBasisAmount, 0);
           }
@@ -337,8 +361,16 @@ export const ReportsManager = () => {
 
         // Adjustments
         data.adjustments.forEach((adj: any) => {
-          if (currentSiteId && adj.siteId !== currentSiteId) return;
-          if (currentTankId && adj.tankId !== currentTankId) return;
+          // بررسی فیلتر سایت (آرایه یا رشته)
+          if (currentSiteId) {
+            const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+            if (!siteArray.includes(adj.siteId)) return;
+          }
+          // بررسی فیلتر مخزن (آرایه یا رشته)
+          if (currentTankId) {
+            const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+            if (!tankArray.includes(adj.tankId)) return;
+          }
           if (adj.productType === 'owned') {
             if (adj.adjustmentType === 'addition') ownedAdditionDocuments += safeNumber(adj.quantity, 0);
             else if (adj.adjustmentType === 'deduction') ownedDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -347,15 +379,31 @@ export const ReportsManager = () => {
 
         // Deliveries
         data.deliveries.forEach((d: any) => {
-          if (currentSiteId && d.siteId !== currentSiteId) return;
-          if (currentTankId && d.tankId !== currentTankId) return;
+          // بررسی فیلتر سایت (آرایه یا رشته)
+          if (currentSiteId) {
+            const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+            if (!siteArray.includes(d.siteId)) return;
+          }
+          // بررسی فیلتر مخزن (آرایه یا رشته)
+          if (currentTankId) {
+            const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+            if (!tankArray.includes(d.tankId)) return;
+          }
           ownedDeliveries += safeNumber(d.amount, 0);
         });
 
         // Wastage
         data.wastage.forEach((t: any) => {
-          if (currentSiteId && t.siteId !== currentSiteId) return;
-          if (currentTankId && t.tankId !== currentTankId) return;
+          // بررسی فیلتر سایت (آرایه یا رشته)
+          if (currentSiteId) {
+            const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+            if (!siteArray.includes(t.siteId)) return;
+          }
+          // بررسی فیلتر مخزن (آرایه یا رشته)
+          if (currentTankId) {
+            const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+            if (!tankArray.includes(t.tankId)) return;
+          }
           if (t.transactionType === 'owned') {
             ownedGainedAmount += Math.abs(safeNumber(t.amount, 0));
           }
@@ -363,8 +411,16 @@ export const ReportsManager = () => {
 
         // Conversions
         data.conversions.forEach((c: any) => {
-          if (currentSiteId && c.siteId !== currentSiteId) return;
-          if (currentTankId && c.tankId !== currentTankId) return;
+          // بررسی فیلتر سایت (آرایه یا رشته)
+          if (currentSiteId) {
+            const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+            if (!siteArray.includes(c.siteId)) return;
+          }
+          // بررسی فیلتر مخزن (آرایه یا رشته)
+          if (currentTankId) {
+            const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+            if (!tankArray.includes(c.tankId)) return;
+          }
           if (c.consumedProductType === 'owned') ownedConsumedProducts += safeNumber(c.consumedQuantity, 0);
           if (c.producedProductType === 'owned') ownedProducedProducts += safeNumber(c.producedQuantity, 0);
         });
@@ -379,9 +435,9 @@ export const ReportsManager = () => {
     }, [memoizedInventoryData, selectedSiteForFilter, selectedTankForFilter]);
 
   // Calculate consignment tanks inventory
-  const calculateConsignmentTanksInventory = useCallback((siteId?: string, tankId?: string) => {
-    const currentSiteId = siteId || selectedSiteForFilter;
-    const currentTankId = tankId || selectedTankForFilter;
+  const calculateConsignmentTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
+    const currentSiteId = siteId || (selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined);
+    const currentTankId = tankId || (selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined);
     
     let consignmentReceiptsAmount = 0;
     let consignmentAdditions = 0;
@@ -399,8 +455,16 @@ export const ReportsManager = () => {
 
       // Receipts
       data.receipts.forEach((r: any) => {
-        if (currentSiteId && r.siteId !== currentSiteId) return;
-        if (currentTankId && r.tankId !== currentTankId) return;
+        // بررسی فیلتر سایت (آرایه یا رشته)
+        if (currentSiteId) {
+          const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (!siteArray.includes(r.siteId)) return;
+        }
+        // بررسی فیلتر مخزن (آرایه یا رشته)
+        if (currentTankId) {
+          const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+          if (!tankArray.includes(r.tankId)) return;
+        }
         if (r.userType === 'consignment') {
           const baseAmount = r.receiptBasisAmount || r.finalAmount || r.amount || 
                            (safeNumber(r.shipUnloadingAmount, 0) + safeNumber(r.tankShoreAmount, 0) + 
@@ -411,8 +475,16 @@ export const ReportsManager = () => {
 
       // Adjustments
       data.adjustments.forEach((adj: any) => {
-        if (currentSiteId && adj.siteId !== currentSiteId) return;
-        if (currentTankId && adj.tankId !== currentTankId) return;
+        // بررسی فیلتر سایت (آرایه یا رشته)
+        if (currentSiteId) {
+          const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (!siteArray.includes(adj.siteId)) return;
+        }
+        // بررسی فیلتر مخزن (آرایه یا رشته)
+        if (currentTankId) {
+          const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+          if (!tankArray.includes(adj.tankId)) return;
+        }
         if (adj.productType === 'consignment') {
           if (adj.adjustmentType === 'addition') consignmentAdditions += safeNumber(adj.quantity, 0);
           else if (adj.adjustmentType === 'deduction') consignmentDeductionDocuments += safeNumber(adj.quantity, 0);
@@ -421,8 +493,16 @@ export const ReportsManager = () => {
 
       // Consignment Deliveries (Slips + General)
       const processDelivery = (d: any, isConsignmentCheck: boolean) => {
-        if (currentSiteId && d.siteId !== currentSiteId) return;
-        if (currentTankId && d.tankId !== currentTankId) return;
+        // بررسی فیلتر سایت (آرایه یا رشته)
+        if (currentSiteId) {
+          const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (!siteArray.includes(d.siteId)) return;
+        }
+        // بررسی فیلتر مخزن (آرایه یا رشته)
+        if (currentTankId) {
+          const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+          if (!tankArray.includes(d.tankId)) return;
+        }
         if (!isConsignmentCheck || (d.contractNumber || d.permitId || d.userType === 'consignment' || d.type === 'امانی' || d.nature === 'consignment')) {
           consignmentDeliveries += safeNumber(d.amount, 0);
         }
@@ -432,8 +512,16 @@ export const ReportsManager = () => {
 
       // Wastage
       data.wastage.forEach((t: any) => {
-        if (currentSiteId && t.siteId !== currentSiteId) return;
-        if (currentTankId && t.tankId !== currentTankId) return;
+        // بررسی فیلتر سایت (آرایه یا رشته)
+        if (currentSiteId) {
+          const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (!siteArray.includes(t.siteId)) return;
+        }
+        // بررسی فیلتر مخزن (آرایه یا رشته)
+        if (currentTankId) {
+          const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+          if (!tankArray.includes(t.tankId)) return;
+        }
         if (t.transactionType === 'consignment') {
           consignmentDeductionAmount += Math.abs(safeNumber(t.amount, 0));
         }
@@ -441,8 +529,16 @@ export const ReportsManager = () => {
 
       // Conversions
       data.conversions.forEach((c: any) => {
-        if (currentSiteId && c.siteId !== currentSiteId) return;
-        if (currentTankId && c.tankId !== currentTankId) return;
+        // بررسی فیلتر سایت (آرایه یا رشته)
+        if (currentSiteId) {
+          const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (!siteArray.includes(c.siteId)) return;
+        }
+        // بررسی فیلتر مخزن (آرایه یا رشته)
+        if (currentTankId) {
+          const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+          if (!tankArray.includes(c.tankId)) return;
+        }
         if (c.consumedProductType === 'consignment') consignmentConsumedProducts += safeNumber(c.consumedQuantity, 0);
         if (c.producedProductType === 'consignment') consignmentProducedProducts += safeNumber(c.producedQuantity, 0);
       });
@@ -458,7 +554,7 @@ export const ReportsManager = () => {
   }, [memoizedInventoryData, selectedSiteForFilter, selectedTankForFilter]);
 
   // Calculate consignment+owned tanks inventory
-  const calculateConsignmentOwnedTanksInventory = useCallback((siteId?: string, tankId?: string) => {
+  const calculateConsignmentOwnedTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
     const owned = calculateOwnedTanksInventory(siteId, tankId);
     const consignment = calculateConsignmentTanksInventory(siteId, tankId);
     
@@ -470,20 +566,25 @@ export const ReportsManager = () => {
   }, [calculateOwnedTanksInventory, calculateConsignmentTanksInventory]);
 
   // Helper function to calculate total tank capacity based on filters
-    const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
+    const calculateTotalTankCapacity = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
       const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
       let totalCapacity = 0;
-      const currentSiteId = siteId || selectedSiteForFilter;
-      const currentTankId = tankId || selectedTankForFilter;
+      const currentSiteId = siteId || (selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined);
+      const currentTankId = tankId || (selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined);
       
       tanks.forEach((tank: any) => {
-        // اگر فیلتر مخزن داریم، فقط همان مخزن
-        if (currentTankId && String(tank.id) !== currentTankId) return;
+        // بررسی فیلتر مخزن (آرایه یا رشته)
+        if (currentTankId) {
+          const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+          if (!tankArray.includes(String(tank.id))) return;
+        }
         
-        // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
-        // اگر سایت روی مخزن تعریف نشده باشد (null/empty)، آن را رد نمی‌کنیم تا ظرفیت صفر نشود
+        // بررسی فیلتر سایت (آرایه یا رشته)
         const tankSiteId = String(tank.siteId || tank.locationId || '');
-        if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
+        if (currentSiteId && tankSiteId) {
+          const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+          if (!siteArray.includes(tankSiteId)) return;
+        }
         
         const capacityStr = tank.capacity || "5,000,000 کیلوگرم";
         const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
@@ -520,19 +621,22 @@ export const ReportsManager = () => {
         const siteIdToNameMap = new Map<string, string>(uniqueSites);
 
           tanks.forEach((tank: any) => {
-            // اگر فیلتر مخزن داریم، فقط همان مخزن
-            if (currentTankId && String(tank.id) !== currentTankId) return;
+            // بررسی فیلتر مخزن (آرایه یا رشته)
+            if (currentTankId && currentTankId.length > 0) {
+              const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
+              if (!tankArray.includes(String(tank.id))) return;
+            }
             
-            // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید هم‌خوان باشد
+            // بررسی فیلتر سایت (آرایه یا رشته)
             const tankSiteId = String(tank.siteId || tank.locationId || '');
-            if (currentSiteId) {
-              const filterSiteIds = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
-              if (filterSiteIds.length > 0 && tankSiteId && !filterSiteIds.includes(tankSiteId)) return;
+            if (currentSiteId && currentSiteId.length > 0 && tankSiteId) {
+              const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
+              if (!siteArray.includes(tankSiteId)) return;
             }
 
             totalTanks++;
 
-          const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId as string, tank.id);
+          const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
           const inventory = inventoryData.finalInventory || 0;
 
           if (inventory > 0) withInventoryCount++;
@@ -1841,6 +1945,26 @@ export const ReportsManager = () => {
             if (!item.productName || item.productName !== filters.productName) return false;
           }
           
+          // فیلتر سایت مخزن (پشتیبانی از آرایه و تطبیق نام/آی‌دی)
+          if (selectedSiteForFilter && selectedSiteForFilter.length > 0) {
+            const itemSiteId = item.siteId || '';
+            const itemSiteName = item.siteName || '';
+            const siteMatch = selectedSiteForFilter.some(siteId => 
+              itemSiteId === siteId || itemSiteName === siteId
+            );
+            if (!siteMatch) return false;
+          }
+          
+          // فیلتر مخزن (پشتیبانی از آرایه و تطبیق نام/آی‌دی)
+          if (selectedTankForFilter && selectedTankForFilter.length > 0) {
+            const itemTankId = item.tankId || '';
+            const itemTankName = item.tankName || '';
+            const tankMatch = selectedTankForFilter.some(tankId => 
+              itemTankId === tankId || itemTankName === tankId
+            );
+            if (!tankMatch) return false;
+          }
+          
         if (filters.locationName) {
           if (!item.locationName || item.locationName !== filters.locationName) return false;
         }
@@ -2761,16 +2885,13 @@ export const ReportsManager = () => {
                 <Building2 className="w-4 h-4 inline ml-1" />
                 نام مخزن
               </label>
-              <select
-                value={selectedTankForFilter}
-                onChange={(e) => setSelectedTankForFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">تمام مخازن</option>
-                {uniqueTanks.map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                label=""
+                placeholder="تمام مخازن"
+                options={uniqueTanks}
+                selectedValues={selectedTankForFilter}
+                onChange={setSelectedTankForFilter}
+              />
             </div>
             
             <div>
@@ -2778,16 +2899,13 @@ export const ReportsManager = () => {
                 <Truck className="w-4 h-4 inline ml-1" />
                 سایت مخازن
               </label>
-              <select
-                value={selectedSiteForFilter}
-                onChange={(e) => setSelectedSiteForFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">تمام سایت‌ها</option>
-                {uniqueSites.map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                label=""
+                placeholder="تمام سایت‌ها"
+                options={uniqueSites}
+                selectedValues={selectedSiteForFilter}
+                onChange={setSelectedSiteForFilter}
+              />
             </div>
           
             <div className="flex items-end gap-2">
@@ -2801,8 +2919,8 @@ export const ReportsManager = () => {
               <button
                 onClick={() => {
                   setUpToDate(new Date());
-                  setSelectedTankForFilter('');
-                  setSelectedSiteForFilter('');
+                  setSelectedTankForFilter([]);
+                  setSelectedSiteForFilter([]);
                 }}
                 className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
@@ -3054,11 +3172,25 @@ export const ReportsManager = () => {
                           <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخازن</span>
                         </div>
                         <div className="flex flex-col gap-2">
-                            {commonSiteName && (
-                              <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
-                                {commonSiteName}
-                              </div>
-                            )}
+                            {(() => {
+                              // بررسی اینکه آیا تمام سایت‌ها انتخاب شده‌اند
+                              const allSitesSelected = uniqueSites.length > 0 && 
+                                selectedSiteForFilter.length === uniqueSites.length;
+                              
+                              return (
+                                <>
+                                  {allSitesSelected ? (
+                                    <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
+                                      (تمام سایت‌ها)
+                                    </div>
+                                  ) : commonSiteName ? (
+                                    <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
+                                      {commonSiteName}
+                                    </div>
+                                  ) : null}
+                                </>
+                              );
+                            })()}
                             <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-400 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
                               <span className="font-bold">تعداد مخزن:</span>
                               <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
@@ -3078,7 +3210,11 @@ export const ReportsManager = () => {
                                   <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow relative pt-10 overflow-hidden">
                                     <div className="absolute top-0 right-0 left-0 bg-blue-600 text-white py-1.5 px-4 text-[11px] font-black flex items-center gap-2 shadow-sm border-b border-blue-700">
                                       <Building2 className="w-3.5 h-3.5 text-blue-200" />
-                                        <span>سایت: {t.siteName || (selectedSiteForFilter ? 'نامشخص' : 'تمام سایت ها')}</span>
+                                      <span>سایت: {
+                                        allSitesSelected 
+                                          ? '(تمام سایت‌ها)' 
+                                          : t.siteName || (selectedSiteForFilter ? 'نامشخص' : 'تمام سایت ها')
+                                      }</span>
                                     </div>
                                     <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
                                       <span>{t.name}</span>

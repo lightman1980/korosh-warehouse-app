@@ -151,7 +151,7 @@ const MultiSelectDropdown = ({ options, selectedValues, onChange, label, placeho
   const toggleOption = (value: string, event?: React.MouseEvent) => {
     const currentValues = Array.isArray(selectedValues) ? selectedValues : (selectedValues ? [selectedValues] : []);
     let newValues;
-    if (event?.ctrlKey) {
+    if (event?.ctrlKey || event?.metaKey) {
       newValues = currentValues.includes(value)
         ? currentValues.filter(v => v !== value)
         : [...currentValues, value];
@@ -249,11 +249,11 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
   const [isReceiptTableMinimized, setIsReceiptTableMinimized] = useState<boolean>(false);
   const storage = DataStorage.getInstance();
 
-  // State for inventory package
+  // State for inventory package - آرایه‌ای برای پشتیبانی از انتخاب چند مخزن
   const [baseData, setBaseData] = useState<Record<string, any[]>>({});
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
-  const [selectedTankForFilter, setSelectedTankForFilter] = useState<string>('');
-  const [selectedSiteForFilter, setSelectedSiteForFilter] = useState<string>('');
+  const [selectedTankForFilter, setSelectedTankForFilter] = useState<string | string[]>('');
+  const [selectedSiteForFilter, setSelectedSiteForFilter] = useState<string | string[]>('');
   const [upToDate, setUpToDate] = useState<Date>(new Date());
   const [showInventoryPackage, setShowInventoryPackage] = useState<boolean>(true);
 
@@ -373,9 +373,11 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
     return Array.from(siteMap.entries());
   }, [storage]);
 
-  const calculateOwnedTanksInventory = useCallback((siteId?: string, tankId?: string) => {
-    const currentSiteId = siteId || selectedSiteForFilter;
-    const currentTankId = tankId || selectedTankForFilter;
+  const calculateOwnedTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
+    const currentSiteId = siteId !== undefined ? siteId : selectedSiteForFilter;
+    const currentTankId = tankId !== undefined ? tankId : selectedTankForFilter;
+    const currentSiteIds = Array.isArray(currentSiteId) ? currentSiteId : (currentSiteId ? [currentSiteId] : []);
+    const currentTankIds = Array.isArray(currentTankId) ? currentTankId : (currentTankId ? [currentTankId] : []);
     
     let ownedReceiptsAmount = 0;
     let ownedAdditionDocuments = 0;
@@ -391,40 +393,45 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
       const data = memoizedInventoryData.tankData[tankId];
       if (!data) return;
 
+      // Receipts
       data.receipts.forEach((r: any) => {
-        if (currentSiteId && r.siteId !== currentSiteId) return;
-        if (currentTankId && r.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(r.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(r.tankId)) return;
         if (r.userType === 'owned') {
           ownedReceiptsAmount += safeNumber(r.amount || r.receiptBasisAmount, 0);
         }
       });
 
+      // Adjustments
       data.adjustments.forEach((adj: any) => {
-        if (currentSiteId && adj.siteId !== currentSiteId) return;
-        if (currentTankId && adj.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(adj.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(adj.tankId)) return;
         if (adj.productType === 'owned') {
           if (adj.adjustmentType === 'addition') ownedAdditionDocuments += safeNumber(adj.quantity, 0);
           else if (adj.adjustmentType === 'deduction') ownedDeductionDocuments += safeNumber(adj.quantity, 0);
         }
       });
 
+      // Deliveries
       data.deliveries.forEach((d: any) => {
-        if (currentSiteId && d.siteId !== currentSiteId) return;
-        if (currentTankId && d.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(d.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(d.tankId)) return;
         ownedDeliveries += safeNumber(d.amount, 0);
       });
 
+      // Wastage
       data.wastage.forEach((t: any) => {
-        if (currentSiteId && t.siteId !== currentSiteId) return;
-        if (currentTankId && t.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(t.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(t.tankId)) return;
         if (t.transactionType === 'owned') {
           ownedGainedAmount += Math.abs(safeNumber(t.amount, 0));
         }
       });
 
+      // Conversions
       data.conversions.forEach((c: any) => {
-        if (currentSiteId && c.siteId !== currentSiteId) return;
-        if (currentTankId && c.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(c.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(c.tankId)) return;
         if (c.consumedProductType === 'owned') ownedConsumedProducts += safeNumber(c.consumedQuantity, 0);
         if (c.producedProductType === 'owned') ownedProducedProducts += safeNumber(c.producedQuantity, 0);
       });
@@ -438,9 +445,11 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
     };
   }, [memoizedInventoryData, selectedSiteForFilter, selectedTankForFilter]);
 
-  const calculateConsignmentTanksInventory = useCallback((siteId?: string, tankId?: string) => {
-    const currentSiteId = siteId || selectedSiteForFilter;
-    const currentTankId = tankId || selectedTankForFilter;
+  const calculateConsignmentTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
+    const currentSiteId = siteId !== undefined ? siteId : selectedSiteForFilter;
+    const currentTankId = tankId !== undefined ? tankId : selectedTankForFilter;
+    const currentSiteIds = Array.isArray(currentSiteId) ? currentSiteId : (currentSiteId ? [currentSiteId] : []);
+    const currentTankIds = Array.isArray(currentTankId) ? currentTankId : (currentTankId ? [currentTankId] : []);
     
     let consignmentReceiptsAmount = 0;
     let consignmentAdditions = 0;
@@ -456,9 +465,10 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
       const data = memoizedInventoryData.tankData[tankId];
       if (!data) return;
 
+      // Receipts
       data.receipts.forEach((r: any) => {
-        if (currentSiteId && r.siteId !== currentSiteId) return;
-        if (currentTankId && r.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(r.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(r.tankId)) return;
         if (r.userType === 'consignment') {
           const baseAmount = r.receiptBasisAmount || r.finalAmount || r.amount || 
                            (safeNumber(r.shipUnloadingAmount, 0) + safeNumber(r.tankShoreAmount, 0) + 
@@ -467,18 +477,20 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
         }
       });
 
+      // Adjustments
       data.adjustments.forEach((adj: any) => {
-        if (currentSiteId && adj.siteId !== currentSiteId) return;
-        if (currentTankId && adj.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(adj.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(adj.tankId)) return;
         if (adj.productType === 'consignment') {
           if (adj.adjustmentType === 'addition') consignmentAdditions += safeNumber(adj.quantity, 0);
           else if (adj.adjustmentType === 'deduction') consignmentDeductionDocuments += safeNumber(adj.quantity, 0);
         }
       });
 
+      // Consignment Deliveries (Slips + General)
       const processDelivery = (d: any, isConsignmentCheck: boolean) => {
-        if (currentSiteId && d.siteId !== currentSiteId) return;
-        if (currentTankId && d.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(d.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(d.tankId)) return;
         if (!isConsignmentCheck || (d.contractNumber || d.permitId || d.userType === 'consignment' || d.type === 'امانی' || d.nature === 'consignment')) {
           consignmentDeliveries += safeNumber(d.amount, 0);
         }
@@ -486,17 +498,19 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
       data.consignmentSlips.forEach((s: any) => processDelivery(s, false));
       data.generalDeliveries.forEach((d: any) => processDelivery(d, true));
 
+      // Wastage
       data.wastage.forEach((t: any) => {
-        if (currentSiteId && t.siteId !== currentSiteId) return;
-        if (currentTankId && t.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(t.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(t.tankId)) return;
         if (t.transactionType === 'consignment') {
           consignmentDeductionAmount += Math.abs(safeNumber(t.amount, 0));
         }
       });
 
+      // Conversions
       data.conversions.forEach((c: any) => {
-        if (currentSiteId && c.siteId !== currentSiteId) return;
-        if (currentTankId && c.tankId !== currentTankId) return;
+        if (currentSiteIds.length > 0 && !currentSiteIds.includes(c.siteId)) return;
+        if (currentTankIds.length > 0 && !currentTankIds.includes(c.tankId)) return;
         if (c.consumedProductType === 'consignment') consignmentConsumedProducts += safeNumber(c.consumedQuantity, 0);
         if (c.producedProductType === 'consignment') consignmentProducedProducts += safeNumber(c.producedQuantity, 0);
       });
@@ -511,7 +525,7 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
     };
   }, [memoizedInventoryData, selectedSiteForFilter, selectedTankForFilter]);
 
-  const calculateConsignmentOwnedTanksInventory = useCallback((siteId?: string, tankId?: string) => {
+  const calculateConsignmentOwnedTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
     const owned = calculateOwnedTanksInventory(siteId, tankId);
     const consignment = calculateConsignmentTanksInventory(siteId, tankId);
     return {
@@ -521,18 +535,28 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
     };
   }, [calculateOwnedTanksInventory, calculateConsignmentTanksInventory]);
 
-  const calculateTotalTankCapacity = useCallback((siteId?: string, tankId?: string) => {
+  const calculateTotalTankCapacity = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
     const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
     let totalCapacity = 0;
-    const currentSiteId = siteId || selectedSiteForFilter;
-    const currentTankId = tankId || selectedTankForFilter;
+    const currentSiteId = siteId !== undefined ? siteId : selectedSiteForFilter;
+    const currentTankId = tankId !== undefined ? tankId : selectedTankForFilter;
+    const currentSiteIds = Array.isArray(currentSiteId) ? currentSiteId : (currentSiteId ? [currentSiteId] : []);
+    const currentTankIds = Array.isArray(currentTankId) ? currentTankId : (currentTankId ? [currentTankId] : []);
+    
     tanks.forEach((tank: any) => {
-      if (currentTankId && String(tank.id) !== currentTankId) return;
+      // اگر فیلتر مخزن داریم، مخزن باید در لیست انتخابی باشد
+      if (currentTankIds.length > 0 && !currentTankIds.includes(String(tank.id))) return;
+      
+      // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید در لیست سایت‌های انتخابی باشد
       const tankSiteId = String(tank.siteId || tank.locationId || '');
-      if (currentSiteId && tankSiteId && tankSiteId !== currentSiteId) return;
+      if (currentSiteIds.length > 0 && tankSiteId && !currentSiteIds.includes(tankSiteId)) return;
+      
       const capacityStr = tank.capacity || "5,000,000 کیلوگرم";
       const capacityMatch = typeof capacityStr === 'string' ? capacityStr.match(/[\d,]+/) : null;
-      const capacity = capacityMatch ? parseInt(capacityMatch[0].replace(/,/g, ''), 10) : (typeof capacityStr === 'number' ? capacityStr : 5000000);
+      const capacity = capacityMatch 
+        ? parseInt(capacityMatch[0].replace(/,/g, ''), 10) 
+        : (typeof capacityStr === 'number' ? capacityStr : 5000000);
+      
       totalCapacity += capacity;
     });
     return totalCapacity;
@@ -542,6 +566,9 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
     const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
     const currentSiteId = selectedSiteForFilter;
     const currentTankId = selectedTankForFilter;
+    const currentSiteIds = Array.isArray(currentSiteId) ? currentSiteId : (currentSiteId ? [currentSiteId] : []);
+    const currentTankIds = Array.isArray(currentTankId) ? currentTankId : (currentTankId ? [currentTankId] : []);
+    
     let totalTanks = 0;
     let withInventoryCount = 0;
     let withoutInventoryCount = 0;
@@ -549,49 +576,71 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
     let lowInventoryTanks: any[] = [];
     let totalShortageSum = 0;
     const siteIdToNameMap = new Map<string, string>(uniqueSites);
+    const showingAllSites = currentSiteIds.length === 0 || currentSiteIds.length === uniqueSites.length;
+    
     tanks.forEach((tank: any) => {
-      if (currentTankId && String(tank.id) !== currentTankId) return;
+      // اگر فیلتر مخزن داریم، مخزن باید در لیست انتخابی باشد
+      if (currentTankIds.length > 0 && !currentTankIds.includes(String(tank.id))) return;
+      
+      // اگر فیلتر سایت داریم و سایت روی مخزن تعریف شده، باید در لیست سایت‌های انتخابی باشد
       const tankSiteId = String(tank.siteId || tank.locationId || '');
-      if (currentSiteId) {
-        const filterSiteIds = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
-        if (filterSiteIds.length > 0 && tankSiteId && !filterSiteIds.includes(tankSiteId)) return;
-      }
+      if (currentSiteIds.length > 0 && tankSiteId && !currentSiteIds.includes(tankSiteId)) return;
+      
       totalTanks++;
-      const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId as string, tank.id);
+
+      const inventoryData = calculateConsignmentOwnedTanksInventory(currentSiteId, tank.id);
       const inventory = inventoryData.finalInventory || 0;
+
       if (inventory > 0) withInventoryCount++;
       else withoutInventoryCount++;
+
       const minInventoryStr = tank.minimumStock || tank.minInventory || tank.minimumInventory || "0";
       const minInventoryMatch = typeof minInventoryStr === 'string' ? minInventoryStr.match(/[\d,]+/) : null;
-      const minInventory = minInventoryMatch ? parseInt(minInventoryMatch[0].replace(/,/g, '')) : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
+      const minInventory = minInventoryMatch 
+        ? parseInt(minInventoryMatch[0].replace(/,/g, '')) 
+        : (typeof minInventoryStr === 'number' ? minInventoryStr : 0);
+
       if (minInventory > 0 && inventory <= minInventory) {
         lowInventoryAlert = true;
         const deficit = minInventory - inventory;
         totalShortageSum += deficit;
+        
+        // Get site name with multiple fallbacks
         const siteFromBase = baseData.sites?.find((s: any) => s.id === tank.siteId || s.id === tank.locationId);
         const siteFromUnique = siteIdToNameMap.get(tankSiteId);
         let siteName = siteFromBase?.name || siteFromUnique || tank.siteName || tank.locationName || tank.siteLocationName || '';
-        if (!siteName && currentSiteId) {
-          const activeId = Array.isArray(currentSiteId) ? currentSiteId[0] : currentSiteId;
-          if (activeId) siteName = siteIdToNameMap.get(activeId) || '';
+
+        // If siteName is still empty and a site filter is active, try to get the name from the filter
+        if (!siteName && currentSiteIds.length > 0) {
+          siteName = siteIdToNameMap.get(currentSiteIds[0]) || '';
         }
+
         lowInventoryTanks.push({
           name: tank.name || tank.id,
           inventory: inventory,
           minInventory: minInventory,
           deficit: deficit,
           siteId: tankSiteId,
-          siteName: siteName || (currentSiteId ? 'نامشخص' : 'تمام سایت ها')
+          siteName: siteName || 'نامشخص'
         });
       }
     });
+
+    // Check if all lowInventoryTanks are from the same site and a specific site is selected
     let commonSiteName = '';
-    if (lowInventoryTanks.length > 0) {
+    if (showingAllSites) {
+      // When all sites are selected, show "تمام سایت‌ها"
+      commonSiteName = 'تمام سایت‌ها';
+    } else if (lowInventoryTanks.length > 0) {
+      // When specific sites are selected, show common site name if all tanks are from same site
       const firstSiteId = lowInventoryTanks[0].siteId;
       const allSameSite = lowInventoryTanks.every(t => t.siteId === firstSiteId);
-      if (allSameSite) commonSiteName = lowInventoryTanks[0].siteName !== 'نامشخص' ? lowInventoryTanks[0].siteName : '';
+      if (allSameSite) {
+        commonSiteName = lowInventoryTanks[0].siteName !== 'نامشخص' ? lowInventoryTanks[0].siteName : '';
+      }
     }
-    return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName };
+
+    return { totalTanks, withInventoryCount, withoutInventoryCount, lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName, showingAllSites };
   }, [baseData.tanks, baseData.sites, uniqueSites, selectedSiteForFilter, selectedTankForFilter, calculateConsignmentOwnedTanksInventory]);
 
   // محاسبه وزن مانده قرارداد
@@ -962,7 +1011,7 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
                   placeholder="تمام مخازن"
                   options={uniqueTanks}
                   selectedValues={selectedTankForFilter}
-                  onChange={(val) => setSelectedTankForFilter(Array.isArray(val) ? val.join(',') : val)}
+                  onChange={(val) => setSelectedTankForFilter(val)}
                 />
               </div>
               
@@ -972,7 +1021,7 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
                   placeholder="تمام سایت‌ها"
                   options={uniqueSites}
                   selectedValues={selectedSiteForFilter}
-                  onChange={(val) => setSelectedSiteForFilter(Array.isArray(val) ? val.join(',') : val)}
+                  onChange={(val) => setSelectedSiteForFilter(val)}
                 />
               </div>
             
@@ -989,6 +1038,7 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
                     setUpToDate(new Date());
                     setSelectedTankForFilter('');
                     setSelectedSiteForFilter('');
+                    setInventoryRefreshKey(prev => prev + 1);
                   }}
                   className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors h-[38px]"
                 >
@@ -1228,7 +1278,7 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
               {/* گزارش حداقل موجودی مخازن */}
               <div className="lg:col-span-2">
                 {(() => {
-                  const { lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName } = calculateTankStatusCounts();
+                  const { lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName, showingAllSites } = calculateTankStatusCounts();
                   return (
                     <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden transition-all`}>
                       <div className="flex justify-between items-center mb-4 border-b pb-4 border-red-100">
@@ -1263,7 +1313,22 @@ export const UninvoicedReceiptsTab: React.FC<UninvoicedReceiptsTabProps> = ({
                                   <div key={i} className="p-4 bg-white rounded-xl border-2 border-red-100 shadow-sm hover:shadow-md transition-shadow relative pt-10 overflow-hidden">
                                     <div className="absolute top-0 right-0 left-0 bg-blue-600 text-white py-1.5 px-4 text-[11px] font-black flex items-center gap-2 shadow-sm border-b border-blue-700">
                                       <BuildingIcon className="w-3.5 h-3.5 text-blue-200" />
-                                        <span>سایت: {t.siteName || (selectedSiteForFilter ? 'نامشخص' : 'تمام سایت ها')}</span>
+                                        <span>
+                                          سایت: 
+                                          {showingAllSites ? (
+                                            <span className="text-red-200 mr-1">تمام سایت ها</span>
+                                          ) : (
+                                            <span className="text-green-300 mr-1">
+                                              {Array.isArray(selectedSiteForFilter) 
+                                                ? selectedSiteForFilter.map(siteId => {
+                                                    const site = uniqueSites.find(([id]) => id === siteId);
+                                                    return site ? site[1] : '';
+                                                  }).filter(Boolean).join('، ')
+                                                : (uniqueSites.find(([id]) => id === selectedSiteForFilter)?.[1] || 'نامشخص')
+                                              }
+                                            </span>
+                                          )}
+                                        </span>
                                     </div>
                                     <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
                                       <span>{t.name}</span>
