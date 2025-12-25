@@ -2727,11 +2727,12 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         </div>
       </div>
 
-        {/* Tab Content */}
-          {activeTab === 'users' && (
-            <div className="custom-scrollbar-container">
-              <div className="space-y-6 w-full min-w-[320px]">
-              {/* Search and Filters */}
+          {/* Tab Content */}
+            {activeTab === 'users' && (
+              <div className="custom-scrollbar-container p-1">
+                <div className="scroll-content-wrapper space-y-6 w-full">
+                {/* Search and Filters */}
+
               <div className="bg-white p-3 sm:p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 w-full">
                 <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 w-full">
                   <div className="flex-1 min-w-0">
@@ -2819,9 +2820,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
             )}
           </div>
 
-          {/* Users Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full max-w-full">
-            <div className="w-full max-w-full overflow-x-hidden">
+            {/* Users Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
+              <div className="w-full overflow-x-auto custom-scrollbar-container">
+
             {/* Mobile Cards View */}
             <div className="lg:hidden space-y-3 sm:space-y-4 p-2 sm:p-3 overflow-hidden w-full max-w-full">
               {filteredUsers.map((user) => {
@@ -4690,11 +4692,12 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         </div>
       )}
 
-        {/* Activities Tab */}
-          {activeTab === 'activities' && (
-            <div className="custom-scrollbar-container">
-              <div className="space-y-6 w-full min-w-[320px]">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
+          {/* Activities Tab */}
+            {activeTab === 'activities' && (
+              <div className="custom-scrollbar-container p-1">
+                <div className="scroll-content-wrapper space-y-6 w-full">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
+
                 {/* Activities Header */}
                 <div className="p-4 sm:p-6 border-b border-gray-200">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -4983,7 +4986,8 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                 {/* Activities Table with Enhanced Scroll */}
                 <div className="p-4 sm:p-6">
                   <div className="border border-gray-200 rounded-lg w-full max-w-full overflow-hidden">
-                    <div className="overflow-x-auto w-full max-w-full scrollbar-thin">
+                      <div className="overflow-x-auto w-full custom-scrollbar-container">
+
                       <table className="w-full min-w-[1100px] border-collapse">
                         <thead className="bg-gray-50">
                           <tr className="border-b border-gray-200">

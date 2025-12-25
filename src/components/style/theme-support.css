@@ -527,24 +527,32 @@ body[data-theme] {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 250px);
   -webkit-overflow-scrolling: touch;
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: var(--primary-color) transparent;
+  padding-bottom: 10px;
 }
 
 .custom-scrollbar-container::-webkit-scrollbar {
+  width: 6px;
   height: 6px;
 }
 
 .custom-scrollbar-container::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
 }
 
 .custom-scrollbar-container::-webkit-scrollbar-thumb {
   background-color: var(--primary-color);
   border-radius: 20px;
+}
+
+.custom-scrollbar-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--primary-hover);
 }
 
 .scroll-content-wrapper {
