@@ -15,6 +15,7 @@ import jalaali from 'jalaali-js';
 import { exportToExcel } from '../../utils/excelExport';
 import { formatPersianDate as utilsFormatPersianDate } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
+import '../style/theme-support.css';
 
 type PermissionAction = 'create' | 'edit' | 'view' | 'delete';
 
@@ -2726,10 +2727,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         </div>
       </div>
 
-      {/* Tab Content */}
-        {activeTab === 'users' && (
-          <div className="w-full max-w-full overflow-x-auto">
-            <div className="space-y-6 w-full min-w-[320px]">
+        {/* Tab Content */}
+          {activeTab === 'users' && (
+            <div className="custom-scrollbar-container">
+              <div className="space-y-6 w-full min-w-[320px]">
               {/* Search and Filters */}
               <div className="bg-white p-3 sm:p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 w-full">
                 <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 w-full">
@@ -4689,10 +4690,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         </div>
       )}
 
-      {/* Activities Tab */}
-        {activeTab === 'activities' && (
-          <div className="w-full max-w-full overflow-x-auto">
-            <div className="space-y-6 w-full min-w-[320px]">
+        {/* Activities Tab */}
+          {activeTab === 'activities' && (
+            <div className="custom-scrollbar-container">
+              <div className="space-y-6 w-full min-w-[320px]">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
                 {/* Activities Header */}
                 <div className="p-4 sm:p-6 border-b border-gray-200">

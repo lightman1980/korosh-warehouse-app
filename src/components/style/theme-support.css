@@ -522,6 +522,37 @@ body[data-theme] {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Custom Scrollbar and Container Styles */
+.custom-scrollbar-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-color) transparent;
+}
+
+.custom-scrollbar-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.custom-scrollbar-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar-container::-webkit-scrollbar-thumb {
+  background-color: var(--primary-color);
+  border-radius: 20px;
+}
+
+.scroll-content-wrapper {
+  min-width: 100%;
+  display: inline-block;
+  vertical-align: top;
+}
+
 /* === ENHANCED PRODUCT DEVELOPMENT STYLES === */
 
 /* Live Prices Animation */
