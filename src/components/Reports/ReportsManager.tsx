@@ -104,7 +104,7 @@ export const ReportsManager = () => {
   } | null>(null);
   const storage = DataStorage.getInstance();
 
-  // Multi-select dropdown component
+  // Multi-select dropdown component with improved multi-selection
   const MultiSelectDropdown = ({ options, selectedValues, onChange, label, placeholder }: { 
     options: [string, string][], 
     selectedValues: string[], 
@@ -114,6 +114,7 @@ export const ReportsManager = () => {
   }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const lastSelectedRef = React.useRef<string | null>(null);
 
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -128,17 +129,46 @@ export const ReportsManager = () => {
     const toggleOption = (value: string, event?: React.MouseEvent | React.KeyboardEvent) => {
       let newValues;
       // بررسی کلید کنترل یا فرمان برای مولتی سلکشن
-      const isMultiSelect = event?.ctrlKey || event?.metaKey || (event as any)?.detail === 0;
+      const isMultiSelect = event?.ctrlKey || event?.metaKey;
       
       if (isMultiSelect) {
+        // حالت چند انتخابی با کلید کنترل
         newValues = selectedValues.includes(value)
           ? selectedValues.filter(v => v !== value)
           : [...selectedValues, value];
+        lastSelectedRef.current = null;
       } else {
-        if (selectedValues.length === 1 && selectedValues[0] === value) {
-          newValues = [];
+        // حالت تک انتخابی یا انتخاب محدوده با Shift
+        if (event?.shiftKey && lastSelectedRef.current !== null) {
+          // انتخاب محدوده با Shift
+          const lastIndex = options.findIndex(o => o[0] === lastSelectedRef.current);
+          const currentIndex = options.findIndex(o => o[0] === value);
+          
+          if (lastIndex !== -1 && currentIndex !== -1) {
+            const start = Math.min(lastIndex, currentIndex);
+            const end = Math.max(lastIndex, currentIndex);
+            const rangeValues = options.slice(start, end + 1).map(o => o[0]);
+            
+            if (selectedValues.includes(value)) {
+              // حذف از انتخاب
+              newValues = selectedValues.filter(v => !rangeValues.includes(v));
+            } else {
+              // اضافه به انتخاب
+              const uniqueNewValues = new Set([...selectedValues, ...rangeValues]);
+              newValues = Array.from(uniqueNewValues);
+            }
+          } else {
+            newValues = [value];
+          }
+          lastSelectedRef.current = null;
         } else {
-          newValues = [value];
+          // تک انتخاب
+          if (selectedValues.length === 1 && selectedValues[0] === value) {
+            newValues = [];
+          } else {
+            newValues = [value];
+          }
+          lastSelectedRef.current = value;
         }
       }
       onChange(newValues);
@@ -152,6 +182,7 @@ export const ReportsManager = () => {
       } else {
         onChange(options.map(o => o[0]));
       }
+      lastSelectedRef.current = null;
     };
 
     return (
@@ -159,59 +190,81 @@ export const ReportsManager = () => {
         <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg bg-white text-right focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-50 transition-colors"
         >
-          <span className="truncate">
+          <span className="truncate flex items-center gap-2">
             {selectedValues.length === 0 
               ? placeholder 
               : selectedValues.length === options.length 
-                ? 'همه انتخاب شده‌اند' 
-                : `${selectedValues.length} مورد انتخاب شده`}
+                ? <span className="flex items-center gap-1"><span className="text-blue-600">✓</span> همه ({options.length})</span>
+                : <span className="flex items-center gap-1"><span className="text-blue-600">{selectedValues.length}</span> مورد انتخاب شده</span>
+            }
           </span>
-          <Filter className="w-4 h-4 text-gray-400" />
+          <div className="flex items-center gap-2">
+            {selectedValues.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange([]);
+                  lastSelectedRef.current = null;
+                }}
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-gray-100"
+                title="پاک کردن انتخاب‌ها"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+            <Filter className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-80 overflow-y-auto animate-fade-in">
             <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
               <label className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
-                  onChange={toggleAll}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    toggleAll();
+                  }}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ml-2"
                 />
                 <span className="text-sm font-medium text-gray-700">انتخاب همه</span>
               </label>
+              <div className="text-xs text-gray-500 mt-1 px-2">
+                برای انتخاب چندگانه: <kbd className="px-1 py-0.5 bg-gray-100 rounded border">Ctrl</kbd> + کلیک
+              </div>
             </div>
               <div className="p-1">
-                {options.map(([id, name]) => (
-                  <label 
-                    key={id} 
-                    className={`flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer ${selectedValues.includes(id) ? 'bg-blue-50' : ''}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      toggleOption(id, e);
-                    }}
-                    onDoubleClick={(e) => {
-                      // دبل کلیک برای بستن دراپ‌داون و اعمال فیلتر
-                      if (selectedValues.length > 0) {
-                        setIsOpen(false);
-                      }
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedValues.includes(id)}
-                      readOnly
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ml-2"
-                    />
-                    <span className="text-sm text-gray-700">{name}</span>
-                    {selectedValues.includes(id) && (
-                      <span className="mr-auto text-blue-600">✓</span>
-                    )}
-                  </label>
-                ))}
+                {options.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500 text-sm">
+                    موردی یافت نشد
+                  </div>
+                ) : (
+                  options.map(([id, name]) => (
+                    <label 
+                      key={id} 
+                      className={`flex items-center p-2.5 hover:bg-gray-50 rounded cursor-pointer transition-colors ${selectedValues.includes(id) ? 'bg-blue-50 border-l-2 border-blue-500' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        toggleOption(id, e);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedValues.includes(id)}
+                        readOnly
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 ml-2.5"
+                      />
+                      <span className="text-sm text-gray-700 flex-1 truncate">{name}</span>
+                      {selectedValues.includes(id) && (
+                        <span className="text-blue-600 font-bold">✓</span>
+                      )}
+                    </label>
+                  ))
+                )}
               </div>
           </div>
         )}
@@ -295,38 +348,227 @@ export const ReportsManager = () => {
     return { tankData, activeTanks };
   }, [storage, upToDate, baseData.tanks, inventoryRefreshKey]);
 
-  // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها - فیلتر شده بر اساس موجودی و تراکنش‌ها
+  // منحصربه‌فرد مخازن و سایت‌ها برای فیلترها - فقط مخازن و سایت‌های دارای تراکنش
   const uniqueTanks = useMemo(() => {
-    const tankMap = new Map<string, string>();
-    // مشابه ProductConversionManager: فقط از رسیدها استخراج می‌کنیم
-    const allReceipts = storage.loadData('receipts');
-    const receiptsArray = Array.isArray(allReceipts) ? allReceipts : [];
-    receiptsArray.forEach((receipt: any) => {
-      if (receipt && receipt.tankId && receipt.tankName && !receipt.isVoided) {
-        tankMap.set(receipt.tankId, receipt.tankName);
+    const tankMap = new Map<string, { name: string; transactionCount: number }>();
+    
+    // بررسی تمام انواع تراکنش‌ها برای یافتن مخازن دارای تراکنش
+    const allReceipts = storage.loadData('receipts') || [];
+    const allDeliveries = storage.loadData('deliveries') || [];
+    const allOwnershipSlips = storage.loadData('ownership-delivery-slips') || [];
+    const allConsignmentSlips = storage.loadData('consignment-delivery-slips') || [];
+    const allAdjustments = storage.loadData('inventoryAdjustments') || [];
+    const allWastage = storage.loadData('wastageTransactions') || [];
+    const allConversions = storage.loadData('productConversions') || [];
+    
+    // پردازش رسیدها
+    (Array.isArray(allReceipts) ? allReceipts : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
       }
     });
-    return Array.from(tankMap.entries());
+    
+    // پردازش حواله‌های عمومی
+    (Array.isArray(allDeliveries) ? allDeliveries : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش حواله‌های تملیکی
+    (Array.isArray(allOwnershipSlips) ? allOwnershipSlips : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش حواله‌های امانی
+    (Array.isArray(allConsignmentSlips) ? allConsignmentSlips : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش اسناد اضافه/کسر
+    (Array.isArray(allAdjustments) ? allAdjustments : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش تراکنش‌های افت
+    (Array.isArray(allWastage) ? allWastage : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش تبدیل محصولات
+    (Array.isArray(allConversions) ? allConversions : []).forEach((item: any) => {
+      if (item && item.tankId && item.tankName && !item.isVoided) {
+        const existing = tankMap.get(item.tankId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          tankMap.set(item.tankId, { name: item.tankName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // تبدیل به آرایه و مرتب‌سازی بر اساس تعداد تراکنش (بیشترین اول)
+    const result = Array.from(tankMap.entries())
+      .map(([id, data]) => [id, data.name] as [string, string])
+      .sort((a, b) => a[1].localeCompare(b[1]));
+    
+    console.log(`🏷️ Found ${result.length} tanks with transactions`);
+    return result;
   }, [storage]);
 
   const uniqueSites = useMemo(() => {
-    const siteMap = new Map<string, string>();
-    // مشابه ProductConversionManager: فقط از رسیدها استخراج می‌کنیم
-    const allReceipts = storage.loadData('receipts');
-    const receiptsArray = Array.isArray(allReceipts) ? allReceipts : [];
-    receiptsArray.forEach((receipt: any) => {
-      if (receipt && receipt.siteId && receipt.siteName && !receipt.isVoided) {
-        siteMap.set(receipt.siteId, receipt.siteName);
+    const siteMap = new Map<string, { name: string; transactionCount: number }>();
+    
+    // بررسی تمام انواع تراکنش‌ها برای یافتن سایت‌های دارای تراکنش
+    const allReceipts = storage.loadData('receipts') || [];
+    const allDeliveries = storage.loadData('deliveries') || [];
+    const allOwnershipSlips = storage.loadData('ownership-delivery-slips') || [];
+    const allConsignmentSlips = storage.loadData('consignment-delivery-slips') || [];
+    const allAdjustments = storage.loadData('inventoryAdjustments') || [];
+    const allWastage = storage.loadData('wastageTransactions') || [];
+    const allConversions = storage.loadData('productConversions') || [];
+    
+    // پردازش رسیدها
+    (Array.isArray(allReceipts) ? allReceipts : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
       }
     });
-    return Array.from(siteMap.entries());
+    
+    // پردازش حواله‌های عمومی
+    (Array.isArray(allDeliveries) ? allDeliveries : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش حواله‌های تملیکی
+    (Array.isArray(allOwnershipSlips) ? allOwnershipSlips : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش حواله‌های امانی
+    (Array.isArray(allConsignmentSlips) ? allConsignmentSlips : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش اسناد اضافه/کسر
+    (Array.isArray(allAdjustments) ? allAdjustments : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش تراکنش‌های افت
+    (Array.isArray(allWastage) ? allWastage : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // پردازش تبدیل محصولات
+    (Array.isArray(allConversions) ? allConversions : []).forEach((item: any) => {
+      if (item && item.siteId && item.siteName && !item.isVoided) {
+        const existing = siteMap.get(item.siteId);
+        if (existing) {
+          existing.transactionCount++;
+        } else {
+          siteMap.set(item.siteId, { name: item.siteName, transactionCount: 1 });
+        }
+      }
+    });
+    
+    // تبدیل به آرایه و مرتب‌سازی بر اساس نام
+    const result = Array.from(siteMap.entries())
+      .map(([id, data]) => [id, data.name] as [string, string])
+      .sort((a, b) => a[1].localeCompare(b[1]));
+    
+    console.log(`🏷️ Found ${result.length} sites with transactions`);
+    return result;
   }, [storage]);
 
+  // Filter logic - always respect user selection, never auto-treat as "all"
+  // Unlike UserManagementSettings, we only show tanks/sites that have transactions in the dropdown
+  // So any selection the user makes should be respected exactly
+  const effectiveSiteFilter = selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined;
+  const effectiveTankFilter = selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined;
 
   // Calculate owned tanks inventory based on user formula
     const calculateOwnedTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
-      const currentSiteId = siteId || (selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined);
-      const currentTankId = tankId || (selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined);
+      const currentSiteId = siteId || effectiveSiteFilter;
+      const currentTankId = tankId || effectiveTankFilter;
       
       let ownedReceiptsAmount = 0;
       let ownedAdditionDocuments = 0;
@@ -436,8 +678,8 @@ export const ReportsManager = () => {
 
   // Calculate consignment tanks inventory
   const calculateConsignmentTanksInventory = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
-    const currentSiteId = siteId || (selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined);
-    const currentTankId = tankId || (selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined);
+    const currentSiteId = siteId || effectiveSiteFilter;
+    const currentTankId = tankId || effectiveTankFilter;
     
     let consignmentReceiptsAmount = 0;
     let consignmentAdditions = 0;
@@ -569,8 +811,8 @@ export const ReportsManager = () => {
     const calculateTotalTankCapacity = useCallback((siteId?: string | string[], tankId?: string | string[]) => {
       const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
       let totalCapacity = 0;
-      const currentSiteId = siteId || (selectedSiteForFilter.length > 0 ? selectedSiteForFilter : undefined);
-      const currentTankId = tankId || (selectedTankForFilter.length > 0 ? selectedTankForFilter : undefined);
+      const currentSiteId = siteId || effectiveSiteFilter;
+      const currentTankId = tankId || effectiveTankFilter;
       
       tanks.forEach((tank: any) => {
         // بررسی فیلتر مخزن (آرایه یا رشته)
@@ -599,16 +841,16 @@ export const ReportsManager = () => {
 
   // Helper function to calculate empty tank capacity
   const calculateEmptyTankCapacity = useCallback(() => {
-    const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter || undefined, selectedTankForFilter || undefined);
-    const finalInventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter || undefined, selectedTankForFilter || undefined).finalInventory || 0;
+    const totalCapacity = calculateTotalTankCapacity(effectiveSiteFilter, effectiveTankFilter);
+    const finalInventory = calculateConsignmentOwnedTanksInventory(effectiveSiteFilter, effectiveTankFilter).finalInventory || 0;
     return Math.max(0, totalCapacity - finalInventory);
-  }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, selectedSiteForFilter, selectedTankForFilter]);
+  }, [calculateTotalTankCapacity, calculateConsignmentOwnedTanksInventory, effectiveSiteFilter, effectiveTankFilter]);
 
   // Helper function to calculate tank counts and low inventory alert
       const calculateTankStatusCounts = useCallback(() => {
         const tanks = (baseData.tanks || []).filter((t: any) => t.isActive !== false);
-        const currentSiteId = selectedSiteForFilter;
-        const currentTankId = selectedTankForFilter;
+        const currentSiteId = effectiveSiteFilter;
+        const currentTankId = effectiveTankFilter;
 
         let totalTanks = 0;
         let withInventoryCount = 0;
@@ -622,14 +864,14 @@ export const ReportsManager = () => {
 
           tanks.forEach((tank: any) => {
             // بررسی فیلتر مخزن (آرایه یا رشته)
-            if (currentTankId && currentTankId.length > 0) {
+            if (currentTankId) {
               const tankArray = Array.isArray(currentTankId) ? currentTankId : [currentTankId];
               if (!tankArray.includes(String(tank.id))) return;
             }
             
             // بررسی فیلتر سایت (آرایه یا رشته)
             const tankSiteId = String(tank.siteId || tank.locationId || '');
-            if (currentSiteId && currentSiteId.length > 0 && tankSiteId) {
+            if (currentSiteId && tankSiteId) {
               const siteArray = Array.isArray(currentSiteId) ? currentSiteId : [currentSiteId];
               if (!siteArray.includes(tankSiteId)) return;
             }
@@ -1946,20 +2188,20 @@ export const ReportsManager = () => {
           }
           
           // فیلتر سایت مخزن (پشتیبانی از آرایه و تطبیق نام/آی‌دی)
-          if (selectedSiteForFilter && selectedSiteForFilter.length > 0) {
+          if (effectiveSiteFilter && effectiveSiteFilter.length > 0) {
             const itemSiteId = item.siteId || '';
             const itemSiteName = item.siteName || '';
-            const siteMatch = selectedSiteForFilter.some(siteId => 
+            const siteMatch = effectiveSiteFilter.some(siteId => 
               itemSiteId === siteId || itemSiteName === siteId
             );
             if (!siteMatch) return false;
           }
           
           // فیلتر مخزن (پشتیبانی از آرایه و تطبیق نام/آی‌دی)
-          if (selectedTankForFilter && selectedTankForFilter.length > 0) {
+          if (effectiveTankFilter && effectiveTankFilter.length > 0) {
             const itemTankId = item.tankId || '';
             const itemTankName = item.tankName || '';
-            const tankMatch = selectedTankForFilter.some(tankId => 
+            const tankMatch = effectiveTankFilter.some(tankId => 
               itemTankId === tankId || itemTankName === tankId
             );
             if (!tankMatch) return false;
@@ -2939,7 +3181,7 @@ export const ReportsManager = () => {
               </div>
               <div className="p-4">
                 {(() => {
-                  const inventory = calculateOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
+                  const inventory = calculateOwnedTanksInventory(effectiveSiteFilter, effectiveTankFilter);
                   return (
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between items-center">
@@ -2988,7 +3230,7 @@ export const ReportsManager = () => {
               </div>
               <div className="p-4">
                 {(() => {
-                  const inventory = calculateConsignmentTanksInventory(selectedSiteForFilter, selectedTankForFilter);
+                  const inventory = calculateConsignmentTanksInventory(effectiveSiteFilter, effectiveTankFilter);
                   return (
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between items-center">
@@ -3048,8 +3290,8 @@ export const ReportsManager = () => {
                 {/* نتایج محاسبات */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   {(() => {
-                    const inventory = calculateConsignmentOwnedTanksInventory(selectedSiteForFilter, selectedTankForFilter);
-                    const totalCapacity = calculateTotalTankCapacity(selectedSiteForFilter, selectedTankForFilter);
+                    const inventory = calculateConsignmentOwnedTanksInventory(effectiveSiteFilter, effectiveTankFilter);
+                    const totalCapacity = calculateTotalTankCapacity(effectiveSiteFilter, effectiveTankFilter);
                     const emptyCapacity = Math.max(0, totalCapacity - (inventory.finalInventory || 0));
                     const { totalTanks, withInventoryCount, withoutInventoryCount } = calculateTankStatusCounts();
                     
@@ -3162,6 +3404,11 @@ export const ReportsManager = () => {
               <div className="lg:col-span-2 mt-2">
                 {(() => {
                   const { lowInventoryAlert, lowInventoryTanks, totalShortageSum, commonSiteName } = calculateTankStatusCounts();
+                  // بررسی اینکه آیا تمام سایت‌ها انتخاب شده‌اند یا فیلتر خالی است (برای نمایش در UI)
+                  // نمایش "(تمام سایت‌ها)" هم در حالت فیلتر خالی و هم در حالت انتخاب همه سایت‌ها
+                  const allSitesSelected = selectedSiteForFilter.length === 0 || 
+                    (uniqueSites.length > 0 && selectedSiteForFilter.length === uniqueSites.length);
+                  
                   return (
                     <div className={`${lowInventoryAlert ? 'bg-red-50 border-red-300 animate-[pulse_3s_infinite]' : 'bg-gray-50 border-gray-200 opacity-60'} p-6 rounded-2xl border-2 shadow-md relative overflow-hidden group transition-all`}>
                       <div className="flex justify-between items-center mb-4 border-b pb-4 border-red-100">
@@ -3172,25 +3419,15 @@ export const ReportsManager = () => {
                           <span className={`${lowInventoryAlert ? 'text-red-900' : 'text-gray-900'} font-black text-2xl`}>گزارش حداقل موجودی مخازن</span>
                         </div>
                         <div className="flex flex-col gap-2">
-                            {(() => {
-                              // بررسی اینکه آیا تمام سایت‌ها انتخاب شده‌اند
-                              const allSitesSelected = uniqueSites.length > 0 && 
-                                selectedSiteForFilter.length === uniqueSites.length;
-                              
-                              return (
-                                <>
-                                  {allSitesSelected ? (
-                                    <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
-                                      (تمام سایت‌ها)
-                                    </div>
-                                  ) : commonSiteName ? (
-                                    <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
-                                      {commonSiteName}
-                                    </div>
-                                  ) : null}
-                                </>
-                              );
-                            })()}
+                            {allSitesSelected ? (
+                              <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
+                                (تمام سایت‌ها)
+                              </div>
+                            ) : commonSiteName ? (
+                              <div className="bg-green-500 text-white px-6 py-1.5 rounded-xl text-center font-black text-sm shadow-md border-2 border-green-400 animate-bounce">
+                                {commonSiteName}
+                              </div>
+                            ) : null}
                             <div className={`flex items-center justify-between gap-4 px-4 py-2 rounded-full ${lowInventoryAlert ? 'bg-red-400 text-white shadow-lg' : 'bg-gray-400 text-white'}`}>
                               <span className="font-bold">تعداد مخزن:</span>
                               <span className="text-xl font-black">{formatPersianNumber(lowInventoryTanks?.length || 0)}</span>
@@ -3213,7 +3450,7 @@ export const ReportsManager = () => {
                                       <span>سایت: {
                                         allSitesSelected 
                                           ? '(تمام سایت‌ها)' 
-                                          : t.siteName || (selectedSiteForFilter ? 'نامشخص' : 'تمام سایت ها')
+                                          : t.siteName || (selectedSiteForFilter && selectedSiteForFilter.length > 0 ? 'نامشخص' : 'تمام سایت‌ها')
                                       }</span>
                                     </div>
                                     <div className="font-black text-blue-600 text-2xl mb-3 border-b border-red-50 pb-2 flex items-center justify-between">
