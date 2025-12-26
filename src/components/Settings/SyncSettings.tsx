@@ -70,9 +70,9 @@ import {
   Maximize2,
   Minimize2,
   XCircle,
-  AlertTriangle,
-  QuestionCircle,
-  ExternalLink,
+    AlertTriangle,
+    HelpCircle,
+    ExternalLink,
   Database,
   Table,
   KeyRound,
@@ -3305,3 +3305,7 @@ export const SyncSettings: React.FC<IntegrationHubProps> = ({
 };
 
 export default SyncSettings;
+
+
+
+SyncSettings
