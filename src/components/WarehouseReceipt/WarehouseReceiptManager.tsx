@@ -2012,9 +2012,11 @@ export const WarehouseReceiptManager: React.FC = () => {
     
     // Load settings for automatic loss
     const savedSettings = (storage.loadData('settings') || {}) as any;
-    const automaticLoss = (savedSettings.userManagement as any)?.automaticLoss !== undefined 
-      ? (savedSettings.userManagement as any).automaticLoss 
-      : true; // Default to true if not set
+    const automaticLoss = savedSettings.performance?.automaticLoss !== undefined 
+      ? savedSettings.performance.automaticLoss 
+      : (savedSettings.userManagement?.automaticLoss !== undefined 
+          ? savedSettings.userManagement.automaticLoss 
+          : true); // Default to true if not set
     setAutomaticLossEnabled(automaticLoss);
 
     const perfSettings = savedSettings.performance || {};

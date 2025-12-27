@@ -86,6 +86,7 @@ dataCompression: boolean;
 lazyLoading: boolean;
 maxUploadSize: number;
 connectionTimeout: number;
+  automaticLoss: boolean;
   requireReceiptExtraInfo?: {
     consignment: boolean;
     owned: boolean;
@@ -175,7 +176,6 @@ interface UserManagementSettings {
   selfRegistration: boolean;
   emailVerification: boolean;
   defaultRole: string;
-  automaticLoss?: boolean;
   permissionCatalog: SystemModule[];
   userGroups: UserGroup[];
   userAccess: UserAccessEntry[];
@@ -330,15 +330,16 @@ encryptionEnabled: true,
 auditLogEnabled: true
 },
 // Performance Settings
-performance: {
-cacheEnabled: true,
-cacheSize: 512,
-autoOptimize: true,
-dataCompression: true,
-lazyLoading: true,
-maxUploadSize: 10,
-  connectionTimeout: 30,
-  requireReceiptExtraInfo: {
+  performance: {
+  cacheEnabled: true,
+  cacheSize: 512,
+  autoOptimize: true,
+  dataCompression: true,
+  lazyLoading: true,
+  maxUploadSize: 10,
+    connectionTimeout: 30,
+    automaticLoss: true,
+    requireReceiptExtraInfo: {
     consignment: false,
     owned: false
   },

@@ -18,18 +18,19 @@ export const PerformanceAndReportingSettings: React.FC<PerformanceAndReportingSe
   }
 
   // Ensure performance settings exist
-  const performance = settings?.performance || {
-    cacheEnabled: true,
-    cacheSize: 512,
-    autoOptimize: true,
-    dataCompression: true,
-    lazyLoading: true,
-    maxUploadSize: 10,
-    connectionTimeout: 30,
-    requireReceiptExtraInfo: {
-      consignment: false,
-      owned: false
-    },
+    const performance = settings?.performance || {
+      cacheEnabled: true,
+      cacheSize: 512,
+      autoOptimize: true,
+      dataCompression: true,
+      lazyLoading: true,
+      maxUploadSize: 10,
+      connectionTimeout: 30,
+      automaticLoss: true,
+      requireReceiptExtraInfo: {
+        consignment: false,
+        owned: false
+      },
     requireDeliveryExtraInfo: {
       consignment: false,
       owned: false
@@ -162,10 +163,26 @@ export const PerformanceAndReportingSettings: React.FC<PerformanceAndReportingSe
               اجباری شدن اطلاعات تکمیلی حواله تملیکی
             </label>
           </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="cacheEnabled"
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="automaticLoss"
+                checked={performance.automaticLoss !== false}
+                onChange={(e) => updatePerformanceSettings({ automaticLoss: e.target.checked })}
+                className="ml-2"
+              />
+              <label htmlFor="automaticLoss" className="text-sm font-medium text-gray-700 flex items-center">
+                فعال سازي افت اتوماتیک رسیدهای امانی
+                <Tooltip 
+                  title="افت اتوماتیک"
+                  text="با فعال کردن این گزینه، هنگام ثبت رسید انبار امانی، تراکنش‌های افت به صورت خودکار و با تایید کاربر ثبت می‌شوند."
+                />
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="cacheEnabled"
               checked={performance.cacheEnabled || false}
               onChange={(e) => updatePerformanceSettings({ cacheEnabled: e.target.checked })}
               className="ml-2"
