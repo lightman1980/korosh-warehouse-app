@@ -52,6 +52,7 @@ const initialCategories: BaseDataCategory[] = [
       { id: "9", code: "9", name: "روغن ذرت-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
       { id: "10", code: "10", name: "روغن کنجد-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
       { id: "11", code: "11", name: "دانه-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "12", code: "12", name: "لرد", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
     ],
   },
   {
@@ -71,6 +72,7 @@ const initialCategories: BaseDataCategory[] = [
       { id: "9-9", code: "9-9", name: "روغن ذرت-اماني", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
       { id: "10-10", code: "10-10", name: "روغن کنجد-اماني", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
       { id: "11-11", code: "11-11", name: "دانه-اماني", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "12-12", code: "12-12", name: "لرد-اماني", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
     ],
   },
   {
@@ -110,16 +112,16 @@ const initialCategories: BaseDataCategory[] = [
     hasCode: false,
     description: "ليست مخازن",
     items: [
-      { id: "tankA", name: "مخزن A-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankB", name: "مخزن B-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankC", name: "مخزن C-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankD", name: "مخزن D-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankE", name: "مخزن E-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankF", name: "مخزن F-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankG", name: "مخزن G-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankH", name: "مخزن H-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankI", name: "مخزن I-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "tankJ", name: "مخزن J-انزلی", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankA", name: "مخزن A", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankB", name: "مخزن B", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankC", name: "مخزن C", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankD", name: "مخزن D", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankE", name: "مخزن E", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankF", name: "مخزن F", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankG", name: "مخزن G", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankH", name: "مخزن H", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankI", name: "مخزن A-جنوب", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "tankJ", name: "مخزن B-جنوب", capacity: "5,000,000", minimumStock: "5,000,000", unit: "کیلوگرم", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
     ],
   },
   {
@@ -320,8 +322,9 @@ const cleanNumber = (num: string | undefined): string => {
 // --- تابع اصلی کامپوننت ---
 const BaseDataManager = () => {
   const storage = DataStorage.getInstance();
-  const [categories, setCategories] = useState<BaseDataCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  // مقدار اولیه categories را از initialCategories می‌گیریم تا همیشه داده داشته باشیم
+  const [categories, setCategories] = useState<BaseDataCategory[]>(initialCategories);
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategories[0]?.id || "");
   const [searchTerm, setSearchTerm] = useState("");
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<Partial<BaseDataItem>>({});
@@ -352,51 +355,88 @@ const BaseDataManager = () => {
     }
   };
 
-  // بارگذاری اولیه داده‌ها
+  // بارگذاری اولیه داده‌ها - بلافاصله پس از mount اجرا می‌شود
   useEffect(() => {
-    try {
-      console.log('🔄 Starting to load base data...');
-      const saved = storage.loadData<BaseDataCategory[]>("baseDataCategories");
-      const savedSelected = storage.loadData<string>("baseDataSelectedCategory");
-      
-      console.log('📦 Loaded from storage:', {
-        hasData: !!saved,
-        isArray: Array.isArray(saved),
-        length: Array.isArray(saved) ? saved.length : 0,
-        selectedCategory: savedSelected
-      });
-      
-      // بررسی اینکه آیا داده‌ها معتبر هستند: باید آرایه باشد و حداقل یک دسته‌بندی داشته باشد
-      if (saved && Array.isArray(saved) && saved.length > 0) {
-        // بررسی ساده‌تر: فقط بررسی کنیم که ساختار کلی درست است
-        let hasValidData = true;
-        let invalidCategories: string[] = [];
+    const loadData = async () => {
+      try {
+        console.log('🔄 Starting to load base data...');
         
-        saved.forEach((cat: any, index: number) => {
-          if (!cat || typeof cat !== 'object' || !cat.id || !Array.isArray(cat.items)) {
-            hasValidData = false;
-            invalidCategories.push(`Category ${index}: missing id or items array`);
-          } else {
-            // بررسی items
-            const invalidItems = cat.items.filter((item: any) => 
-              !item || typeof item !== 'object' || !item.id || typeof item.name !== 'string'
-            );
-            if (invalidItems.length > 0) {
-              console.warn(`⚠️ Category ${cat.id} has ${invalidItems.length} invalid items`);
-            }
-          }
+        // ابتدا داده‌های ذخیره شده را بخوان
+        const saved = storage.loadData<BaseDataCategory[]>("baseDataCategories");
+        const savedSelected = storage.loadData<string>("baseDataSelectedCategory");
+        
+        console.log('📦 Loaded from storage:', {
+          hasData: !!saved,
+          isArray: Array.isArray(saved),
+          length: Array.isArray(saved) ? saved.length : 0,
+          selectedCategory: savedSelected
         });
         
-        if (hasValidData && invalidCategories.length === 0) {
-          console.log('✅ Valid data found, processing...');
-          // پردازش و تبدیل تاریخ‌ها
-          const processed = saved.map((cat) => ({
+        // بررسی اینکه آیا داده‌ها معتبر هستند
+        let shouldUseInitialData = false;
+        
+        if (!saved || !Array.isArray(saved) || saved.length === 0) {
+          console.log('📭 No saved data found, will use initial data');
+          shouldUseInitialData = true;
+        } else if (saved.length !== initialCategories.length) {
+          // تعداد دسته‌بندی‌ها مطابقت ندارد - باید از داده‌های اولیه استفاده کنیم
+          console.warn(`⚠️ Saved data has ${saved.length} categories, expected ${initialCategories.length}. Using initial data.`);
+          shouldUseInitialData = true;
+        } else {
+          // بررسی اعتبار داده‌ها
+          let hasValidData = true;
+          let invalidCategories: string[] = [];
+          
+          saved.forEach((cat: any, index: number) => {
+            if (!cat || typeof cat !== 'object' || !cat.id || !Array.isArray(cat.items)) {
+              hasValidData = false;
+              invalidCategories.push(`Category ${index}: missing id or items array`);
+            } else {
+              const invalidItems = cat.items.filter((item: any) => 
+                !item || typeof item !== 'object' || !item.id || typeof item.name !== 'string'
+              );
+              if (invalidItems.length > 0) {
+                console.warn(`⚠️ Category ${cat.id} has ${invalidItems.length} invalid items`);
+              }
+            }
+          });
+          
+          if (!hasValidData || invalidCategories.length > 0) {
+            console.warn('⚠️ Invalid data detected:', invalidCategories);
+            shouldUseInitialData = true;
+          }
+        }
+        
+        if (shouldUseInitialData || !saved) {
+          // استفاده از داده‌های اولیه و ذخیره در localStorage
+          console.log('🔄 Using initial data and saving to localStorage...');
+          
+          // ابتدا در localStorage ذخیره کن
+          storage.saveData("baseDataCategories", initialCategories);
+          initialCategories.forEach((cat) => {
+            storage.saveData(`category_${cat.id}`, cat);
+          });
+          
+          if (savedSelected) {
+            storage.saveData("baseDataSelectedCategory", savedSelected);
+          }
+          
+          // سپس state را به‌روز کن
+          setCategories(initialCategories);
+          const firstCategoryId = savedSelected || initialCategories[0]?.id || "";
+          setSelectedCategory(firstCategoryId);
+          
+          console.log('💾 Saved and set initial data with', initialCategories.length, 'categories');
+        } else {
+          // داده‌های معتبر پیدا شد، پردازش و استفاده از آن‌ها
+          console.log('✅ Valid saved data found, processing...');
+          
+          const processed = saved.map((cat: any) => ({
             ...cat,
             items: cat.items.map((item: any) => {
               let createdAt: Date;
               let updatedAt: Date;
               
-              // تبدیل createdAt
               if (item.createdAt instanceof Date) {
                 createdAt = item.createdAt;
               } else if (typeof item.createdAt === 'string') {
@@ -406,7 +446,6 @@ const BaseDataManager = () => {
                 createdAt = new Date();
               }
               
-              // تبدیل updatedAt
               if (item.updatedAt instanceof Date) {
                 updatedAt = item.updatedAt;
               } else if (typeof item.updatedAt === 'string') {
@@ -416,75 +455,58 @@ const BaseDataManager = () => {
                 updatedAt = new Date();
               }
               
-              return {
-                ...item,
-                createdAt,
-                updatedAt,
-              };
+              return { ...item, createdAt, updatedAt };
             }),
           }));
           
-          console.log('✅ Processed categories:', processed.map(c => ({ id: c.id, name: c.name, itemsCount: c.items.length })));
-          
           setCategories(processed);
-          setSelectedCategory(savedSelected || processed[0]?.id || initialCategories[0]?.id || "");
+          const categoryToSelect = savedSelected || processed[0]?.id || initialCategories[0]?.id || "";
+          setSelectedCategory(categoryToSelect);
           
-          // ارسال رویداد به‌روزرسانی داده‌های پایه بعد از بارگذاری از localStorage
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("baseDataUpdated", {
-              detail: { action: "loaded-from-storage", timestamp: Date.now() }
-            }));
-          }, 100);
-        } else {
-          // داده‌ها معتبر نیستند، از داده‌های اولیه استفاده کن
-          console.warn('⚠️ INVALID DATA DETECTED:', invalidCategories);
-          console.log('🔄 Loading initial data...');
-          setCategories(initialCategories);
-          setSelectedCategory(initialCategories[0]?.id || "");
-          storage.saveData("baseDataCategories", initialCategories);
-          console.log('💾 Saved baseDataCategories with', initialCategories.length, 'categories');
-          // بارگذاری هر دسته به صورت جداگانه
-          initialCategories.forEach((cat) => {
-            storage.saveData(`category_${cat.id}`, cat);
-            console.log(`💾 Saved category_${cat.id} with ${cat.items.length} items`);
-          });
+          console.log('✅ Processed and set saved data');
         }
-      } else {
-        // داده‌ها وجود ندارند یا خالی هستند، از داده‌های اولیه استفاده کن
-        console.log('📭 NO DATA FOUND, LOADING INITIAL DATA');
+        
+        // اطمینان از ذخیره در localStorage
+        setTimeout(() => {
+          const verifySaved = storage.loadData<BaseDataCategory[]>("baseDataCategories");
+          if (!verifySaved || !Array.isArray(verifySaved) || verifySaved.length === 0 || verifySaved.length !== initialCategories.length) {
+            console.log('⚠️ Data not found or incomplete in storage, re-saving...');
+            storage.saveData("baseDataCategories", initialCategories);
+            initialCategories.forEach((cat) => {
+              storage.saveData(`category_${cat.id}`, cat);
+            });
+            console.log('💾 Re-saved initial data with', initialCategories.length, 'categories');
+          }
+        }, 500);
+        
+      } catch (err) {
+        console.error("❌ Error loading base data:", err);
+        // در صورت خطا، از داده‌های اولیه استفاده کن
         setCategories(initialCategories);
         setSelectedCategory(initialCategories[0]?.id || "");
-        storage.saveData("baseDataCategories", initialCategories);
-        console.log('💾 Saved baseDataCategories with', initialCategories.length, 'categories');
-        // بارگذاری هر دسته به صورت جداگانه
-        initialCategories.forEach((cat) => {
-          storage.saveData(`category_${cat.id}`, cat);
-          console.log(`💾 Saved category_${cat.id} with ${cat.items.length} items`);
-        });
+        
+        try {
+          storage.saveData("baseDataCategories", initialCategories);
+          initialCategories.forEach((cat) => {
+            storage.saveData(`category_${cat.id}`, cat);
+          });
+        } catch (saveErr) {
+          console.error("❌ Error saving initial data:", saveErr);
+        }
+      } finally {
+        setIsDataLoaded(true);
+        console.log('✅ Data loading completed');
+        
+        // ارسال رویداد به‌روزرسانی
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("baseDataUpdated", {
+            detail: { action: "loaded", timestamp: Date.now() }
+          }));
+        }, 100);
       }
-    } catch (err) {
-      console.error("❌ Error loading base data:", err);
-      setCategories(initialCategories);
-      setSelectedCategory(initialCategories[0]?.id || "");
-      // در صورت خطا هم داده‌های اولیه را ذخیره کن
-      try {
-        storage.saveData("baseDataCategories", initialCategories);
-        initialCategories.forEach((cat) => {
-          storage.saveData(`category_${cat.id}`, cat);
-        });
-      } catch (saveErr) {
-        console.error("❌ Error saving initial data:", saveErr);
-      }
-    } finally {
-      setIsDataLoaded(true);
-      console.log('✅ Data loading completed');
-      // ارسال رویداد به‌روزرسانی داده‌های پایه بعد از بارگذاری کامل
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("baseDataUpdated", {
-          detail: { action: "initial-load", timestamp: Date.now() }
-        }));
-      }, 100);
-    }
+    };
+    
+    loadData();
   }, []);
 
   // ذخیره خودکار دسته‌بندی‌ها
@@ -515,6 +537,95 @@ const BaseDataManager = () => {
       setSelectedCategory(categories[0].id);
     }
   }, [isDataLoaded, categories, selectedCategory]);
+
+  // نظارت بر تغییرات localStorage و بازیابی خودکار در صورت مشکل
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "baseDataCategories" && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          // بررسی خالی بودن یا تعداد نادرست دسته‌بندی‌ها
+          if (!data || !Array.isArray(data) || data.length === 0 || data.length !== initialCategories.length) {
+            console.warn(`⚠️ Detected incomplete data in storage (${data?.length || 0}/${initialCategories.length}), reloading initial data...`);
+            // بازیابی خودکار داده‌های اولیه
+            setCategories(initialCategories);
+            setSelectedCategory(initialCategories[0]?.id || "");
+            storage.saveData("baseDataCategories", initialCategories);
+            initialCategories.forEach((cat) => {
+              storage.saveData(`category_${cat.id}`, cat);
+            });
+            console.log('💾 Saved initial data with', initialCategories.length, 'categories');
+          }
+        } catch (err) {
+          console.error("❌ Error parsing storage data:", err);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  // نظارت بر وضعیت داده‌ها و بازیابی در صورت خالی بودن
+  useEffect(() => {
+    if (!isDataLoaded) return;
+    
+    // اگر categories خالی است، داده‌های اولیه را بارگذاری کن
+    if (categories.length === 0) {
+      console.warn("⚠️ Categories is empty, reloading initial data...");
+      setCategories(initialCategories);
+      setSelectedCategory(initialCategories[0]?.id || "");
+      storage.saveData("baseDataCategories", initialCategories);
+      initialCategories.forEach((cat) => {
+        storage.saveData(`category_${cat.id}`, cat);
+      });
+    }
+    
+    // اگر selectedCategory معتبر نیست، اولین دسته‌بندی را انتخاب کن
+    if (categories.length > 0 && !categories.find(c => c.id === selectedCategory)) {
+      console.warn("⚠️ Selected category is invalid, selecting first category...");
+      setSelectedCategory(categories[0].id);
+    }
+  }, [isDataLoaded, categories, selectedCategory]);
+
+  // پاکسازی و اطمینان از ذخیره داده‌ها در localStorage
+  const cleanupCorruptedData = () => {
+    try {
+      console.log('🧹 Running cleanup and data verification...');
+      
+      // بررسی و ذخیره داده‌های categories
+      const savedCategories = storage.loadData<BaseDataCategory[]>("baseDataCategories");
+      if (!savedCategories || !Array.isArray(savedCategories) || savedCategories.length === 0 || savedCategories.length !== initialCategories.length) {
+        console.log(`🧹 Categories data missing, corrupted, or incomplete (${savedCategories?.length || 0}/${initialCategories.length}), saving initial data...`);
+        storage.saveData("baseDataCategories", initialCategories);
+        initialCategories.forEach((cat) => {
+          storage.saveData(`category_${cat.id}`, cat);
+        });
+        console.log('💾 Saved', initialCategories.length, 'categories to storage');
+        
+        // به‌روزرسانی state با داده‌های کامل
+        setCategories(initialCategories);
+      }
+      
+      // بررسی و ذخیره selectedCategory
+      const savedSelected = storage.loadData<string>("baseDataSelectedCategory");
+      if (!savedSelected) {
+        console.log('🧹 Selected category missing, saving default...');
+        storage.saveData("baseDataSelectedCategory", initialCategories[0]?.id || "");
+      }
+      
+      console.log('✅ Cleanup completed successfully');
+    } catch (err) {
+      console.error("❌ Error during cleanup:", err);
+    }
+  };
+
+  // اجرای پاکسازی در صورت مشکل
+  useEffect(() => {
+    if (isDataLoaded) {
+      cleanupCorruptedData();
+    }
+  }, [isDataLoaded]);
 
   const currentCategory = categories.find((c) => c.id === selectedCategory);
   const filteredItems = useMemo(() => {
@@ -728,7 +839,8 @@ const BaseDataManager = () => {
             <p className="text-gray-600">مديريت و ويرايش اطلاعات پايه سيستم</p>
             <p className="text-sm text-gray-500 mt-1">
               تعداد دسته‌بندی‌ها: {categories.length} | 
-              {currentCategory && ` آیتم‌های ${currentCategory.name}: ${currentCategory.items.length}`}
+              {currentCategory && ` آیتم‌های ${currentCategory.name}: ${currentCategory.items.length}`} | 
+              {isDataLoaded ? <span className="text-green-600">✓ بارگذاری کامل</span> : <span className="text-orange-600">در حال بارگذاری...</span>}
             </p>
           </div>
           <div className="flex items-center gap-4">

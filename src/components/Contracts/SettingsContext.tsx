@@ -102,10 +102,11 @@ export interface ServerSettings {
   serviceRegistryUrl?: string;
   healthCheckEndpoint?: string;
   remoteAccessEnabled?: boolean;
-  allowedNetworks?: string[];
-  // اجازه‌ی توسعه فیلدهای بیشتر بدون خطای TypeScript
-  [key: string]: any;
-}
+    allowedNetworks?: string[];
+    rawAppPath?: string;
+    // اجازه‌ی توسعه فیلدهای بیشتر بدون خطای TypeScript
+    [key: string]: any;
+  }
 
 export interface DatabaseSettings {
   type: 'sqlite' | 'postgresql' | 'mysql' | 'mongodb';
