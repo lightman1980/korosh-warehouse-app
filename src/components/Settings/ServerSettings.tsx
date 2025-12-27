@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Server, TestTube, FolderOpen, Save, RefreshCw, Settings as SettingsIcon, 
   CheckCircle, AlertCircle, Shield, Globe, Monitor, Cpu, HardDrive,
-  Wifi, Network, Terminal, Info
+  Wifi, Network, Terminal, Info, Activity
 } from 'lucide-react';
 import { useSettings } from '../Contracts/SettingsContext';
 import { FilePathSelector } from './FilePathSelector';
