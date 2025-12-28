@@ -231,81 +231,100 @@ export const logUserActivity = async (
   let finalStatus = status;
   let finalDetails = details;
   let finalField = '';
-    let finalSelection = '';
-    let finalAmount = '';
-    let finalProduct = '';
-    let finalLogType = 'user';
-    let finalLogNature = '';
-    let finalOldValue = oldValue;
-    let finalNewValue = newValue;
+  let finalSelection = '';
+  let finalAmount = '';
+  let finalProduct = '';
+  let finalLogType = 'user';
+  let finalLogNature = '';
+  let finalReceiptDate = '';
+  let finalDocumentType = '';
+  let finalCounterparty = '';
+  let finalOldValue = oldValue;
+  let finalNewValue = newValue;
 
-    if (typeof action === 'object' && action !== null) {
-      finalAction = action.action || '';
-      finalCategory = action.category || category;
-      finalPage = action.page || page;
-      finalStatus = action.status || status;
-      finalDetails = action.details || details;
-      finalField = action.field || '';
-      finalSelection = action.selection || '';
-      finalAmount = action.amount || '';
-      finalProduct = action.product || '';
-      const finalReceiptDate = action.receiptDate || '';
-      const finalDocumentType = action.documentType || '';
-      const finalCounterparty = action.counterparty || '';
-      finalLogType = action.logType || 'user';
-      finalLogNature = action.logNature || '';
-      finalOldValue = action.oldValue || oldValue;
-      finalNewValue = action.newValue || newValue;
+  if (typeof action === 'object' && action !== null) {
+    finalAction = action.action || '';
+    finalCategory = action.category || category;
+    finalPage = action.page || page;
+    finalStatus = action.status || status;
+    finalDetails = action.details || details;
+    finalField = action.field || '';
+    finalSelection = action.selection || '';
+    finalAmount = action.amount || '';
+    finalProduct = action.product || '';
+    finalReceiptDate = action.receiptDate || '';
+    finalDocumentType = action.documentType || '';
+    finalCounterparty = action.counterparty || '';
+    finalLogType = action.logType || 'user';
+    finalLogNature = action.logNature || '';
+    finalOldValue = action.oldValue || oldValue;
+    finalNewValue = action.newValue || newValue;
+  }
 
-      const activity: UserActivityEntry = {
-        id: Math.random().toString(36).substring(2, 11),
-        timestamp: new Date().toISOString(),
-        userId: userId,
-        userName: userName,
-        action: finalAction,
-        category: finalCategory,
-        page: finalPage,
-        status: finalStatus,
-        details: finalDetails,
-        field: finalField,
-        selection: finalSelection,
-        amount: finalAmount,
-        product: finalProduct,
-        receiptDate: finalReceiptDate,
-        documentType: finalDocumentType,
-        counterparty: finalCounterparty,
-        logType: finalLogType,
-        logNature: detectedLogNature,
-        oldValue: finalOldValue,
-        newValue: finalNewValue,
-        ipAddress: '127.0.0.1' // In a browser app, IP is usually handled by server
-      };
+  const currentUser = storage.loadData<any>('currentUser');
+  const userId = currentUser?.id || 'guest';
+  const userName = currentUser?.fullName || currentUser?.username || 'کاربر مهمان';
 
-      // Log via LoggerService
-      await logger.log({
-        level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
-        category: finalCategory,
-        message: finalAction,
-        userName: userName,
-        userId: userId,
-        page: finalPage,
-        field: finalField,
-        selection: finalSelection,
-        amount: finalAmount,
-        product: finalProduct,
-        receiptDate: finalReceiptDate,
-        documentType: finalDocumentType,
-        counterparty: finalCounterparty,
-        logType: finalLogType,
-        logNature: detectedLogNature,
-        details: finalDetails,
-        ipAddress: activity.ipAddress
-      });
+  // Automatically detect log nature if not provided
+  let detectedLogNature = finalLogNature;
+  if (!detectedLogNature) {
+    if (finalAction.includes('ایجاد') || finalAction.includes('ثبت')) detectedLogNature = 'ایجاد';
+    else if (finalAction.includes('ویرایش') || finalAction.includes('آپدیت')) detectedLogNature = 'ویرایش';
+    else if (finalAction.includes('حذف')) detectedLogNature = 'حذف';
+    else if (finalAction.includes('ورود')) detectedLogNature = 'ورود';
+    else if (finalAction.includes('خروج')) detectedLogNature = 'خروج';
+    else detectedLogNature = 'عملیات';
+  }
 
-  // Save to userActivities for immediate UI update in LoggingSettings
+  const activity: UserActivityEntry = {
+    id: Math.random().toString(36).substring(2, 11),
+    timestamp: new Date().toISOString(),
+    userId,
+    userName,
+    action: finalAction,
+    category: finalCategory,
+    page: finalPage,
+    status: finalStatus,
+    details: finalDetails,
+    field: finalField,
+    selection: finalSelection,
+    amount: finalAmount,
+    product: finalProduct,
+    receiptDate: finalReceiptDate,
+    documentType: finalDocumentType,
+    counterparty: finalCounterparty,
+    logType: finalLogType,
+    logNature: detectedLogNature,
+    oldValue: finalOldValue,
+    newValue: finalNewValue,
+    ipAddress: '127.0.0.1'
+  };
+
+  // Log via LoggerService
+  await logger.log({
+    level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
+    category: finalCategory,
+    message: finalAction,
+    userName: userName,
+    userId: userId,
+    page: finalPage,
+    field: finalField,
+    selection: finalSelection,
+    amount: finalAmount,
+    product: finalProduct,
+    receiptDate: finalReceiptDate,
+    documentType: finalDocumentType,
+    counterparty: finalCounterparty,
+    logType: finalLogType,
+    logNature: detectedLogNature,
+    details: finalDetails,
+    ipAddress: activity.ipAddress
+  });
+
+  // Save to userActivities
   const activities = storage.loadData<any[]>('userActivities') || [];
   activities.unshift(activity);
-  storage.saveData('userActivities', activities.slice(0, 1000)); // Keep last 1000
+  storage.saveData('userActivities', activities.slice(0, 1000));
 
   return activity;
 };
