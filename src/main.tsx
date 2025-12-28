@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 import { saveCurrentVersion, checkAndUpdate } from './utils/versionManager';
@@ -24,7 +25,9 @@ import { saveCurrentVersion, checkAndUpdate } from './utils/versionManager';
   // اجرای برنامه
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </StrictMode>
   );
 })();
