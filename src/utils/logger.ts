@@ -16,6 +16,8 @@ export interface LogEntry {
   page?: string;
   field?: string;
   selection?: string;
+  amount?: string | number;
+  product?: string;
   logType?: string;
   logNature?: string;
   details?: any;
@@ -68,6 +70,8 @@ export interface UserActivityEntry {
   details?: any;
   field?: string;
   selection?: string;
+  amount?: string | number;
+  product?: string;
   logType?: string;
   logNature?: string;
   oldValue?: any;
@@ -220,21 +224,25 @@ export const logUserActivity = async (
   let finalStatus = status;
   let finalDetails = details;
   let finalField = '';
-  let finalSelection = '';
-  let finalLogType = 'user';
-  let finalLogNature = '';
-  let finalOldValue = oldValue;
-  let finalNewValue = newValue;
+    let finalSelection = '';
+    let finalAmount = '';
+    let finalProduct = '';
+    let finalLogType = 'user';
+    let finalLogNature = '';
+    let finalOldValue = oldValue;
+    let finalNewValue = newValue;
 
-  if (typeof action === 'object' && action !== null) {
-    finalAction = action.action || '';
-    finalCategory = action.category || category;
-    finalPage = action.page || page;
-    finalStatus = action.status || status;
-    finalDetails = action.details || details;
-    finalField = action.field || '';
-    finalSelection = action.selection || '';
-    finalLogType = action.logType || 'user';
+    if (typeof action === 'object' && action !== null) {
+      finalAction = action.action || '';
+      finalCategory = action.category || category;
+      finalPage = action.page || page;
+      finalStatus = action.status || status;
+      finalDetails = action.details || details;
+      finalField = action.field || '';
+      finalSelection = action.selection || '';
+      finalAmount = action.amount || '';
+      finalProduct = action.product || '';
+      finalLogType = action.logType || 'user';
     finalLogNature = action.logNature || '';
     finalOldValue = action.oldValue || oldValue;
     finalNewValue = action.newValue || newValue;
@@ -264,6 +272,8 @@ export const logUserActivity = async (
     details: finalDetails,
     field: finalField,
     selection: finalSelection,
+    amount: finalAmount,
+    product: finalProduct,
     logType: finalLogType,
     logNature: finalLogNature,
     oldValue: finalOldValue,
@@ -281,6 +291,8 @@ export const logUserActivity = async (
     page: finalPage,
     field: finalField,
     selection: finalSelection,
+    amount: finalAmount,
+    product: finalProduct,
     logType: finalLogType,
     logNature: finalLogNature || finalStatus,
     details: finalDetails,

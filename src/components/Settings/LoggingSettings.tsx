@@ -698,20 +698,22 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     }
 
     try {
-      // Prepare data for Excel export with the 7 required fields + extras
-      const worksheetData = filteredLogs.map(log => ({
-        'نام کاربری': log.userName || '-',
-        'تاریخ': formatPersianDate(new Date(log.timestamp)),
-        'ساعت': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
-        'صفحه عملکرد': log.page || '-',
-        'منو / فیلد': log.field || '-',
-        'گزینه انتخاب شده': log.selection || log.message,
-        'نوع لاگ': log.logType === 'user' ? 'کاربری' : 'سیستمی',
-        'جنس لاگ': log.level === 'error' ? 'خطا' : log.level === 'warn' ? 'هشدار' : 'عملکردی',
-        'دسته‌بندی': LOG_CATEGORIES.find(c => c.id === log.category)?.name || log.category,
-        'آدرس IP': log.ipAddress || '-',
-        'جزئیات': log.details || '-'
-      }));
+        // Prepare data for Excel export with the 7 required fields + extras
+        const worksheetData = filteredLogs.map(log => ({
+          'نام کاربری': log.userName || '-',
+          'تاریخ': formatPersianDate(new Date(log.timestamp)),
+          'ساعت': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
+          'صفحه عملکرد': log.page || '-',
+          'منو / فیلد': log.field || '-',
+          'مقدار': log.amount ? formatPersianNumber(log.amount) : '-',
+          'کالا': log.product || '-',
+          'گزینه انتخاب شده': log.selection || log.message,
+          'نوع لاگ': log.logType === 'user' ? 'کاربری' : 'سیستمی',
+          'جنس لاگ': log.level === 'error' ? 'خطا' : log.level === 'warn' ? 'هشدار' : 'عملکردی',
+          'دسته‌بندی': LOG_CATEGORIES.find(c => c.id === log.category)?.name || log.category,
+          'آدرس IP': log.ipAddress || '-',
+          'جزئیات': log.details || '-'
+        }));
 
       // Create worksheet from JSON data
       const worksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -2012,16 +2014,30 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                                   <span className="mr-1">{new Date(log.timestamp).toLocaleTimeString('fa-IR')}</span>
                                 </div>
 
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
-                                  <Monitor className="h-3 w-3 text-purple-500" />
-                                  <span className="font-medium">صفحه: {log.page || '-'}</span>
-                                </div>
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <Monitor className="h-3 w-3 text-purple-500" />
+                                    <span className="font-medium">صفحه: {log.page || '-'}</span>
+                                  </div>
 
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
-                                  <Edit3 className="h-3 w-3 text-orange-500" />
-                                  <span className="font-medium">فیلد: {log.field || '-'}</span>
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <Edit3 className="h-3 w-3 text-orange-500" />
+                                    <span className="font-medium">فیلد: {log.field || '-'}</span>
+                                  </div>
+
+                                  {log.amount && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                      <Zap className="h-3 w-3 text-yellow-500" />
+                                      <span className="font-medium">مقدار: {formatPersianNumber(log.amount)}</span>
+                                    </div>
+                                  )}
+
+                                  {log.product && (
+                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                      <Archive className="h-3 w-3 text-green-500" />
+                                      <span className="font-medium">کالا: {log.product}</span>
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
                               
                               <p className="text-sm text-gray-900 font-medium">{log.message}</p>
                               
@@ -2217,10 +2233,58 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </div>
               </div>
               
-              <div>
-                <label className="text-sm font-medium text-gray-600">پیام</label>
-                <p className="mt-1 text-gray-900">{selectedLog.message}</p>
-              </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">پیام</label>
+                  <p className="mt-1 text-gray-900">{selectedLog.message}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedLog.amount && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">مقدار</label>
+                      <p className="mt-1 text-gray-900 font-bold text-blue-600">{formatPersianNumber(selectedLog.amount)}</p>
+                    </div>
+                  )}
+                  {selectedLog.product && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">کالا</label>
+                      <p className="mt-1 text-gray-900 font-bold text-green-600">{selectedLog.product}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedLog.page && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">صفحه عملکرد</label>
+                      <p className="mt-1 text-gray-900">{selectedLog.page}</p>
+                    </div>
+                  )}
+                  {selectedLog.field && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">منو / فیلد</label>
+                      <p className="mt-1 text-gray-900">{selectedLog.field}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedLog.logType && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">نوع تراکنش</label>
+                      <p className="mt-1 text-gray-900">
+                        {selectedLog.logType === 'user' ? 'تراکنش کاربر' : 'تراکنش سیستم'}
+                      </p>
+                    </div>
+                  )}
+                  {selectedLog.selection && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">گزینه انتخاب شده</label>
+                      <p className="mt-1 text-gray-900">{selectedLog.selection}</p>
+                    </div>
+                  )}
+                </div>
+
               
                 {selectedLog.details && (
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
