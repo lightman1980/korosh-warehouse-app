@@ -2825,20 +2825,23 @@ export const WarehouseReceiptManager: React.FC = () => {
         
         console.log("? رسيد با موفقيت ذخيره شد");
 
-        // ثبت لاگ فعالیت کاربر
-        if (typeof (window as any).logUserActivity === 'function') {
-          (window as any).logUserActivity({
-            action: editingReceipt ? 'ویرایش رسید انبار' : 'ثبت رسید انبار جدید',
-            category: currentUserType === 'consignment' ? 'receipt' : 'receipt',
-            page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
-            status: 'success',
-            field: editingReceipt ? 'دکمه ویرایش' : 'دکمه ثبت',
-            selection: savedTransactionNumber || '',
-            logType: 'user',
-            logNature: 'عملکردی',
-            details: { transactionNumber: savedTransactionNumber }
-          });
-        }
+          // ثبت لاگ فعالیت کاربر
+          if (typeof (window as any).logUserActivity === 'function') {
+            const oldReceipt = editingReceipt ? receipts.find(r => r.id === editingReceipt) : null;
+            (window as any).logUserActivity({
+              action: editingReceipt ? 'ویرایش رسید انبار' : 'ثبت رسید انبار جدید',
+              category: 'receipt',
+              page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+              status: 'success',
+              field: editingReceipt ? 'دکمه ویرایش' : 'دکمه ثبت',
+              selection: savedTransactionNumber || '',
+              logType: 'user',
+              logNature: 'عملکردی',
+              oldValue: oldReceipt,
+              newValue: updatedReceipts.find(r => r.id === receiptId),
+              details: { transactionNumber: savedTransactionNumber }
+            });
+          }
       } catch (error) {
       console.error("? خطا در ذخيره‌سازي رسيد:", error);
       alert("خطا در ذخيره‌سازي رسيد. لطفاً دوباره تلاش کنيد.");
@@ -2982,6 +2985,12 @@ dispatchWastageTransactions({
       // اطمينان از تنظيم صحيح receiptBasis و receiptBasisAmount
       if (!receiptCopy.receiptBasis) {
         receiptCopy.receiptBasis = 'bill-lading'; // مقدار پيش‌فرض
+      } else {
+        // اگر مقدار ذخیره شده نام است، آن را به ID تبدیل کن تا در select نمایش داده شود
+        const basisOption = receiptBasisOptions.find(opt => opt.name === receiptCopy.receiptBasis);
+        if (basisOption) {
+          receiptCopy.receiptBasis = basisOption.id;
+        }
       }
       
       if (!receiptCopy.receiptBasisAmount) {
@@ -3090,14 +3099,32 @@ dispatchWastageTransactions({
     setErrors({});
   };
   
-  const handleDelete = (receiptId: string) => {
-    if (confirm('آيا از حذف اين رسيد اطمينان داريد؟')) {
-      setReceipts(prev => prev.filter(receipt => receipt.id !== receiptId));
-      
-      // Remove related wastage transactions
-      dispatchWastageTransactions({ type: 'REMOVE_BY_RECEIPT', payload: { receiptId } });
-    }
-  };
+    const handleDelete = (receiptId: string) => {
+      const receiptToDelete = receipts.find(r => r.id === receiptId);
+      if (confirm('آيا از حذف اين رسيد اطمينان داريد؟')) {
+        setReceipts(prev => prev.filter(receipt => receipt.id !== receiptId));
+        
+        // ثبت لاگ حذف
+        if (typeof (window as any).logUserActivity === 'function') {
+          (window as any).logUserActivity({
+            action: 'حذف رسید انبار',
+            category: 'receipt',
+            page: receiptToDelete?.userType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+            status: 'success',
+            field: 'دکمه حذف',
+            selection: receiptToDelete?.transactionNumber || '',
+            logType: 'user',
+            logNature: 'عملکردی',
+            oldValue: receiptToDelete,
+            newValue: null,
+            details: { transactionNumber: receiptToDelete?.transactionNumber }
+          });
+        }
+
+        // Remove related wastage transactions
+        dispatchWastageTransactions({ type: 'REMOVE_BY_RECEIPT', payload: { receiptId } });
+      }
+    };
   
   const handleStatusChange = (receiptId: string, newStatus: WarehouseReceipt['status']) => {
     setReceipts(prev => prev.map(receipt =>

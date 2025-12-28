@@ -70,6 +70,8 @@ export interface UserActivityEntry {
   selection?: string;
   logType?: string;
   logNature?: string;
+  oldValue?: any;
+  newValue?: any;
 }
 
 // ============================================================================
@@ -204,7 +206,9 @@ export const logUserActivity = async (
   category: string = 'general',
   page: string = '',
   status: 'success' | 'failed' | 'warning' = 'success',
-  details: any = null
+  details: any = null,
+  oldValue: any = null,
+  newValue: any = null
 ) => {
   const logger = LoggerService.getInstance();
   const storage = DataStorage.getInstance();
@@ -219,6 +223,8 @@ export const logUserActivity = async (
   let finalSelection = '';
   let finalLogType = 'user';
   let finalLogNature = '';
+  let finalOldValue = oldValue;
+  let finalNewValue = newValue;
 
   if (typeof action === 'object' && action !== null) {
     finalAction = action.action || '';
@@ -230,11 +236,13 @@ export const logUserActivity = async (
     finalSelection = action.selection || '';
     finalLogType = action.logType || 'user';
     finalLogNature = action.logNature || '';
+    finalOldValue = action.oldValue || oldValue;
+    finalNewValue = action.newValue || newValue;
   }
 
   const currentUser = storage.loadData<any>('current_session')?.user || 
                     storage.loadData<any>('currentUser') || 
-                    { username: 'Unknown', id: 'unknown' };
+                    { username: 'Unknown', id: 'unknown', fullName: 'کاربر ناشناس' };
 
   const activity: UserActivityEntry = {
     id: Math.random().toString(36).substring(2, 11),
@@ -250,6 +258,8 @@ export const logUserActivity = async (
     selection: finalSelection,
     logType: finalLogType,
     logNature: finalLogNature,
+    oldValue: finalOldValue,
+    newValue: finalNewValue,
     ipAddress: '127.0.0.1' // In a browser app, IP is usually handled by server
   };
 

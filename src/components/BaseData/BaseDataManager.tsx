@@ -3,6 +3,7 @@ import { Plus, Search, CreditCard as Edit2, Trash2, Save, X, CircleAlert as Aler
 import { DataStorage } from "../../utils/dataStorage";
 import { formatPersianDate, safeParseDate } from "../../utils/persian";
 import { canCreate, canEdit, canDelete } from "../../utils/permissionHelpers";
+import { logSaveAction, logDeleteAction } from "../../hooks/useActivityLogger";
 
 interface BaseDataItem {
   id: string;
@@ -663,106 +664,122 @@ const BaseDataManager = () => {
     }
   };
 
-  const handleSave = () => {
-    if (!currentCategory || !newItem.name?.trim()) return;
-    
-    // اعتبارسنجی برای مخازن
-    if (isTanksCategory) {
-      const capacity = newItem.capacity || "5000000";
-      const minimumStock = newItem.minimumStock || capacity;
+    const handleSave = () => {
+      if (!currentCategory || !newItem.name?.trim()) return;
       
-      // بررسی اینکه حداقل موجودی خالی نباشد
-      if (!minimumStock.trim()) {
-        alert("حداقل موجودی نمی‌تواند خالی باشد.");
-        return;
-      }
-      
-      // بررسی اینکه ظرفیت خالی نباشد
-      if (!capacity.trim()) {
-        alert("ظرفیت مخزن نمی‌تواند خالی باشد.");
-        return;
-      }
-      
-      // تبدیل به عدد برای مقایسه
-      const capacityNumber = parseFloat(capacity.replace(/,/g, ''));
-      const minimumStockNumber = parseFloat(minimumStock.replace(/,/g, ''));
-      
-      // بررسی اینکه مقادیر معتبر باشند
-      if (isNaN(capacityNumber) || capacityNumber <= 0) {
-        alert("ظرفیت مخزن باید عدد مثبت باشد.");
-        return;
-      }
-      
-      if (isNaN(minimumStockNumber) || minimumStockNumber <= 0) {
-        alert("حداقل موجودی باید عدد مثبت باشد.");
-        return;
-      }
-      
-      // بررسی اینکه حداقل موجودی حداقل 1 باشد
-      if (minimumStockNumber < 1) {
-        alert("حداقل موجودی باید حداقل 1 باشد.");
-        return;
-      }
-      
-      // بررسی اینکه حداقل موجودی از ظرفیت بیشتر نباشد
-      if (minimumStockNumber > capacityNumber) {
-        alert("حداقل موجودی نمی‌تواند از ظرفیت مخزن بیشتر باشد.");
-        return;
-      }
-    }
-    
-    const newId = `custom_${Date.now()}`;
-    setCategories((prev) =>
-      prev.map((cat) => {
-        if (cat.id !== selectedCategory) return cat;
-        const updatedItems = [...cat.items];
-        if (editingItem) {
-          const index = updatedItems.findIndex((i) => i.id === editingItem);
-          if (index !== -1) {
-            updatedItems[index] = {
-              ...updatedItems[index],
-              ...newItem,
-              updatedAt: new Date(),
-            };
-          }
-        } else if (isAddingNew) {
-          // تنظیم مقدار پیش‌فرض برای حداقل موجودی
-          const capacity = newItem.capacity || "5000000";
-          const minimumStock = newItem.minimumStock || capacity;
-          const unit = newItem.unit || "کیلوگرم";
-          
-          updatedItems.push({
-            id: newId,
-            name: newItem.name!,
-            code: newItem.code,
-            isActive: true,
-            canDelete: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            address: newItem.address,
-            phone: newItem.phone,
-            postalCode: newItem.postalCode,
-            additionalInfo: newItem.additionalInfo,
-            nationalId: newItem.nationalId,
-            plateNumber: newItem.plateNumber,
-            homeAddress: newItem.homeAddress,
-            capacity: capacity,
-            minimumStock: minimumStock,
-            unit: unit,
-          });
+      // اعتبارسنجی برای مخازن
+      if (isTanksCategory) {
+        const capacity = newItem.capacity || "5000000";
+        const minimumStock = newItem.minimumStock || capacity;
+        
+        // بررسی اینکه حداقل موجودی خالی نباشد
+        if (!minimumStock.trim()) {
+          alert("حداقل موجودی نمی‌تواند خالی باشد.");
+          return;
         }
-        return { ...cat, items: updatedItems };
-      })
-    );
-    setEditingItem(null);
-    setIsAddingNew(false);
-    setNewItem({});
-    
-    // ارسال رویداد به‌روزرسانی داده‌های پایه
-    window.dispatchEvent(new CustomEvent("baseDataUpdated", {
-      detail: { categoryId: selectedCategory, action: editingItem ? "edit" : "add", itemId: editingItem || newId }
-    }));
-  };
+        
+        // بررسی اینکه ظرفیت خالی نباشد
+        if (!capacity.trim()) {
+          alert("ظرفیت مخزن نمی‌تواند خالی باشد.");
+          return;
+        }
+        
+        // تبدیل به عدد برای مقایسه
+        const capacityNumber = parseFloat(capacity.replace(/,/g, ''));
+        const minimumStockNumber = parseFloat(minimumStock.replace(/,/g, ''));
+        
+        // بررسی اینکه مقادیر معتبر باشند
+        if (isNaN(capacityNumber) || capacityNumber <= 0) {
+          alert("ظرفیت مخزن باید عدد مثبت باشد.");
+          return;
+        }
+        
+        if (isNaN(minimumStockNumber) || minimumStockNumber <= 0) {
+          alert("حداقل موجودی باید عدد مثبت باشد.");
+          return;
+        }
+        
+        // بررسی اینکه حداقل موجودی حداقل 1 باشد
+        if (minimumStockNumber < 1) {
+          alert("حداقل موجودی باید حداقل 1 باشد.");
+          return;
+        }
+        
+        // بررسی اینکه حداقل موجودی از ظرفیت بیشتر نباشد
+        if (minimumStockNumber > capacityNumber) {
+          alert("حداقل موجودی نمی‌تواند از ظرفیت مخزن بیشتر باشد.");
+          return;
+        }
+      }
+      
+      const newId = `custom_${Date.now()}`;
+      let oldItemData = null;
+      let newItemData = null;
+
+      setCategories((prev) =>
+        prev.map((cat) => {
+          if (cat.id !== selectedCategory) return cat;
+          const updatedItems = [...cat.items];
+          if (editingItem) {
+            const index = updatedItems.findIndex((i) => i.id === editingItem);
+            if (index !== -1) {
+              oldItemData = { ...updatedItems[index] };
+              updatedItems[index] = {
+                ...updatedItems[index],
+                ...newItem,
+                updatedAt: new Date(),
+              };
+              newItemData = updatedItems[index];
+            }
+          } else if (isAddingNew) {
+            // تنظیم مقدار پیش‌فرض برای حداقل موجودی
+            const capacity = newItem.capacity || "5000000";
+            const minimumStock = newItem.minimumStock || capacity;
+            const unit = newItem.unit || "کیلوگرم";
+            
+            newItemData = {
+              id: newId,
+              name: newItem.name!,
+              code: newItem.code,
+              isActive: true,
+              canDelete: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              address: newItem.address,
+              phone: newItem.phone,
+              postalCode: newItem.postalCode,
+              additionalInfo: newItem.additionalInfo,
+              nationalId: newItem.nationalId,
+              plateNumber: newItem.plateNumber,
+              homeAddress: newItem.homeAddress,
+              capacity: capacity,
+              minimumStock: minimumStock,
+              unit: unit,
+            };
+            updatedItems.push(newItemData);
+          }
+          return { ...cat, items: updatedItems };
+        })
+      );
+
+      // ثبت لاگ
+      logSaveAction(
+        `اطلاعات پایه - ${currentCategory.name}`,
+        'آیتم اطلاعات پایه',
+        newItem.name || '',
+        oldItemData,
+        newItemData
+      );
+
+      setEditingItem(null);
+      setIsAddingNew(false);
+      setNewItem({});
+      
+      // ارسال رویداد به‌روزرسانی داده‌های پایه
+      window.dispatchEvent(new CustomEvent("baseDataUpdated", {
+        detail: { categoryId: selectedCategory, action: editingItem ? "edit" : "add", itemId: editingItem || newId }
+      }));
+    };
 
   const handleCancel = () => {
     setEditingItem(null);
@@ -770,39 +787,50 @@ const BaseDataManager = () => {
     setNewItem({});
   };
 
-  const handleDelete = (itemId: string) => {
-    if (!currentCategory) return;
-    const receipts = storage.loadData("receipts") || [];
-    const deliveries = storage.loadData("deliveries") || [];
-    const receiptsArray = Array.isArray(receipts) ? receipts : [];
-    const deliveriesArray = Array.isArray(deliveries) ? deliveries : [];
-    const isUsed = [...receiptsArray, ...deliveriesArray].some((r: any) =>
-      r.companyId === itemId ||
-      r.productId === itemId ||
-      r.siteId === itemId ||
-      r.tankId === itemId ||
-      r.locationId === itemId ||
-      r.driverId === itemId
-    );
-    if (isUsed) {
-      alert("اين آيتم در سيستم استفاده شده و قابل حذف نيست.");
-      return;
-    }
-    if (confirm("آيا از حذف اين آيتم اطمينان داريد؟")) {
-      setCategories((prev) =>
-        prev.map((cat) =>
-          cat.id === selectedCategory
-            ? { ...cat, items: cat.items.filter((item) => item.id !== itemId) }
-            : cat
-        )
+    const handleDelete = (itemId: string) => {
+      if (!currentCategory) return;
+      const receipts = storage.loadData("receipts") || [];
+      const deliveries = storage.loadData("deliveries") || [];
+      const receiptsArray = Array.isArray(receipts) ? receipts : [];
+      const deliveriesArray = Array.isArray(deliveries) ? deliveries : [];
+      const isUsed = [...receiptsArray, ...deliveriesArray].some((r: any) =>
+        r.companyId === itemId ||
+        r.productId === itemId ||
+        r.siteId === itemId ||
+        r.tankId === itemId ||
+        r.locationId === itemId ||
+        r.driverId === itemId
       );
+      if (isUsed) {
+        alert("اين آيتم در سيستم استفاده شده و قابل حذف نيست.");
+        return;
+      }
       
-      // ارسال رویداد به‌روزرسانی داده‌های پایه
-      window.dispatchEvent(new CustomEvent("baseDataUpdated", {
-        detail: { categoryId: selectedCategory, action: "delete", itemId }
-      }));
-    }
-  };
+      const itemToDelete = currentCategory.items.find(i => i.id === itemId);
+      
+      if (confirm("آيا از حذف اين آيتم اطمينان دريد؟")) {
+        setCategories((prev) =>
+          prev.map((cat) =>
+            cat.id === selectedCategory
+              ? { ...cat, items: cat.items.filter((item) => item.id !== itemId) }
+              : cat
+          )
+        );
+        
+        // ثبت لاگ حذف
+        logDeleteAction(
+          `اطلاعات پایه - ${currentCategory.name}`,
+          'آیتم اطلاعات پایه',
+          itemToDelete?.name || '',
+          itemToDelete
+        );
+        
+        // ارسال رویداد به‌روزرسانی داده‌های پایه
+        window.dispatchEvent(new CustomEvent("baseDataUpdated", {
+          detail: { categoryId: selectedCategory, action: "delete", itemId }
+        }));
+      }
+    };
 
   const handleToggleActive = (itemId: string) => {
     setCategories((prev) =>
