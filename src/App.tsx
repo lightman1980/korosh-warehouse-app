@@ -7,7 +7,6 @@ import { DashboardStats } from './components/Dashboard/DashboardStats';
 import BaseDataManager from './components/BaseData/BaseDataManager';
 import ContractManager from './components/Contracts/ContractManager';
 import { WarehouseReceiptManager } from './components/WarehouseReceipt/WarehouseReceiptManager';
-// تغییر اصلی: وارد کردن ماژول جدید به صورت ماژولار
 import WarehouseDeliveryManager from './components/WarehouseDelivery/WarehouseDeliveryManager';
 import AccountingManager from './components/accounting/AccountingManager';
 import { ReportsManager } from './components/Reports/ReportsManager';
@@ -18,37 +17,24 @@ import MessagingManager from './components/Messaging/MessagingManager';
 import PersianDatePicker from './components/Common/PersianDatePicker';
 import { DateSelectionWrapper } from './components/DateSelectionWrapper';
 import { WorkflowManager } from './components/Workflow/WorkflowManager';
-// 🔧 تغییر از ServerManager به ServerSettings برای سیستم تنظیمات جدید
 import { SystemManager } from './components/System/SystemManager';
 import { InventoryAdjustmentManager } from './components/InventoryAdjustment/InventoryAdjustmentManager';
 import { ProductConversionManager } from './components/ProductConversion/ProductConversionManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PermissionGuard } from './components/Common/PermissionGuard';
 import { canView } from './utils/permissionHelpers';
-
-// Import New Pages
 import CompleteAdvancedSystem from './components/CompleteAdvancedSystem/CompleteAdvancedSystem';
-
-// 🔧 وارد کردن ThemeProvider و کامپوننت جدید - مسیرهای واقعی که کاربر استفاده کرده
 import { ThemeProvider, useTheme } from './components/Contracts/ThemeProvider';
-// ✅ تغییر اصلی: Import کردن SettingsManager به جای GeneralAppearanceAndNotificationsSettings
 import { SettingsManager } from './components/Settings/SettingsManager';
-
-// 🔧 اضافه کردن SettingsProvider برای سیستم تنظیمات سرور
 import { SettingsProvider } from './components/Contracts/SettingsContext';
-
-// 🔧 وارد کردن فایل‌های جدید سیستم تنظیمات
 import { ServerSettings } from './components/Settings/ServerSettings';
-
 import { DataStorage } from './utils/dataStorage';
 import './utils/logger';
 import { useAutoInvoiceChecker } from './hooks/useAutoInvoiceChecker';
 import { useVersionChecker } from './hooks/useVersionChecker';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
-import { initTabManager, updateTabModule, cleanupTabManager } from './utils/tabManager';
 import { useModuleChangeLogger, logLoginAction, logLogoutAction } from './hooks/useActivityLogger';
 
-// Mapping نام منوها برای نمایش در title
 const moduleNames: Record<string, string> = {
   'dashboard': 'داشبورد',
   'base-data': 'اطلاعات پایه',
@@ -71,38 +57,30 @@ const moduleNames: Record<string, string> = {
   'settings': 'تنظیمات'
 };
 
-// ✅ اضافه کردن import CSS برای تم
 import './components/style/theme-support.css';
 
-// کامپوننت داخلی App که به ThemeProvider دسترسی دارد
 const AppContent: React.FC = () => {
   const { isDark, theme } = useTheme();
   
-  // استفاده از version checker برای به‌روزرسانی خودکار
   useVersionChecker({
     enabled: true,
-    checkInterval: 60000, // چک هر 60 ثانیه
+    checkInterval: 60000,
     autoReload: true
   });
   
-  // خواندن ماژول از localStorage یا استفاده از مقدار پیش‌فرض
   const getInitialModule = (): string => {
     try {
-      // ابتدا بررسی hash URL (برای تب‌های جدید)
       const hash = window.location.hash;
       if (hash) {
         const match = hash.match(/#module=([^&]+)/);
         if (match && match[1]) {
           const moduleFromHash = match[1];
-          // پاک کردن hash از URL بعد از خواندن
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          // ذخیره در localStorage
           localStorage.setItem('activeModule', moduleFromHash);
           return moduleFromHash;
         }
       }
       
-      // اگر hash وجود نداشت، از localStorage بخوان
       const savedModule = localStorage.getItem('activeModule');
       if (savedModule && savedModule !== 'dashboard') {
         return savedModule;
@@ -131,42 +109,12 @@ const AppContent: React.FC = () => {
   });
   const [settings, setSettings] = useState<any>(null);
 
-  // لاگ تغییرات منو
   const currentModuleName = moduleNames[activeModule] || activeModule;
   useModuleChangeLogger(activeModule, currentModuleName);
 
-  // استفاده از hook چک خودکار فاکتور
   const { lastCheckTime, isChecking } = useAutoInvoiceChecker(true);
-  
-
   const storage = DataStorage.getInstance();
 
-  // Default users
-  const defaultUsers = [
-    {
-      username: 'admin',
-      password: 'admin123',
-      fullName: 'مدیر سیستم',
-      role: 'admin',
-      department: 'مدیریت',
-    },
-    {
-      username: 'warehouse',
-      password: 'warehouse123',
-      fullName: 'کاربر انبار',
-      role: 'user',
-      department: 'مخازن انزلی',
-    },
-    {
-      username: 'finance',
-      password: 'finance123',
-      fullName: 'کاربر مالی',
-      role: 'user',
-      department: 'مالی',
-    },
-  ];
-
-  // Load shared data from storage - MUST be defined before useEffect
   const loadSharedData = useCallback(async () => {
     try {
       const baseData = storage.loadData('baseData') || {};
@@ -185,25 +133,22 @@ const AppContent: React.FC = () => {
       });
     } catch (error) {
       console.error('خطا در بارگذاری داده‌های مشترک:', error);
-      // Set default empty data on error
       setSharedData({
         baseData: {},
-        contracts: [] as any[],
-        permits: [] as any[],
-        receipts: [] as any[],
-        adjustments: [] as any[],
-        additions: [] as any[],
-        deductions: [] as any[],
+        contracts: [],
+        permits: [],
+        receipts: [],
+        adjustments: [],
+        additions: [],
+        deductions: [],
       });
     }
   }, [storage]);
 
-  // Initialize app data
   useEffect(() => {
     const initializeApp = async () => {
       setIsLoading(true);
       try {
-        // بارگذاری تنظیمات ذخیره شده
         try {
           const savedSettings = storage.loadData('appSettings');
           if (savedSettings) {
@@ -213,7 +158,6 @@ const AppContent: React.FC = () => {
           console.warn('خطا در بارگذاری تنظیمات:', error);
         }
 
-        // بررسی کاربر فعلی از AuthService
         try {
           if (authService.isLoggedIn()) {
             const user = authService.getCurrentUser();
@@ -231,7 +175,6 @@ const AppContent: React.FC = () => {
         setAppInitialized(true);
       } catch (error) {
         console.error('خطا در راه‌اندازی برنامه:', error);
-        // Even on error, set initialized to true so app can continue
         setAppInitialized(true);
       } finally {
         setIsLoading(false);
@@ -241,25 +184,19 @@ const AppContent: React.FC = () => {
     initializeApp();
   }, [loadSharedData, storage]);
 
-  // Update shared data across components
   const updateSharedData = useCallback((key: string, data: any) => {
     setSharedData(prev => ({
       ...prev,
       [key]: data,
     }));
-    
-    // ذخیره در localStorage
     storage.saveData(key, data);
   }, [storage]);
 
-
-  // اعمال تنظیمات
   const applySettings = useCallback((newSettings: any) => {
     setSettings(newSettings);
     storage.saveData('appSettings', newSettings);
   }, [storage]);
 
-  // Handle login using AuthService
   const handleLogin = useCallback(
     async (username: string, password: string): Promise<boolean> => {
       try {
@@ -292,7 +229,6 @@ const AppContent: React.FC = () => {
       localStorage.removeItem('activeModule');
     }, [currentUser]);
 
-    // Session timeout handler
     const getSessionTimeout = useCallback(() => {
       try {
         const securitySettings = localStorage.getItem('securitySettings');
@@ -303,10 +239,9 @@ const AppContent: React.FC = () => {
       } catch (error) {
         console.warn('Failed to load session timeout setting:', error);
       }
-      return 60; // Default 60 minutes
+      return 60;
     }, []);
 
-    // Use session timeout hook
     useSessionTimeout({
       timeoutMinutes: getSessionTimeout(),
       onTimeout: handleLogout,
@@ -315,13 +250,10 @@ const AppContent: React.FC = () => {
 
   const handleDateSelect = useCallback((date: Date | null) => {
     setSelectedDate(date);
-    console.log('Selected date:', date);
   }, []);
 
   const handleRefreshData = useCallback(() => {
-    // بارگذاری مجدد داده‌های مشترک
     loadSharedData();
-    // Trigger data refresh across all components
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('refreshData'));
     }
@@ -335,12 +267,6 @@ const AppContent: React.FC = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>در حال بارگذاری برنامه...</p>
-          {/* نمایش وضعیت تم */}
-          <p className={`text-xs mt-2 ${
-            isDark ? 'text-gray-500' : 'text-gray-400'
-          }`}>
-            تم فعلی: {theme === 'light' ? 'روشن' : theme === 'dark' ? 'تاریک' : 'سیستم'}
-          </p>
         </div>
       </div>
     );
@@ -350,7 +276,6 @@ const AppContent: React.FC = () => {
     return <LoginForm onLogin={handleLogin} />;
   }
 
-  // Mapping بین moduleId در App و permissionModuleId در سیستم دسترسی
   const getPermissionModuleId = (moduleId: string): string => {
     const mapping: Record<string, string> = {
       'dashboard': 'dashboard',
@@ -382,7 +307,6 @@ const AppContent: React.FC = () => {
   const renderActiveModule = () => {
     const permissionModuleId = getPermissionModuleId(activeModule);
     
-    // بررسی دسترسی view قبل از رندر کردن ماژول
     if (!canView(permissionModuleId)) {
       return (
         <div className="p-6">
@@ -488,8 +412,6 @@ const AppContent: React.FC = () => {
             <UserManagementManager />
           </PermissionGuard>
         );
-      
-      // ✅ تغییر اصلی: استفاده از SettingsManager به جای GeneralAppearanceAndNotificationsSettings
       case 'settings':
         return (
           <PermissionGuard moduleId={permissionModuleId} action="view">
@@ -500,15 +422,12 @@ const AppContent: React.FC = () => {
             />
           </PermissionGuard>
         );
-      
       case 'workflow':
         return (
           <PermissionGuard moduleId={permissionModuleId} action="view">
             <WorkflowManager />
           </PermissionGuard>
         );
-      
-      // 🔧 تغییر اصلی: استفاده از ServerSettings با SettingsProvider
       case 'server':
         return (
           <PermissionGuard moduleId={permissionModuleId} action="view">
@@ -567,7 +486,6 @@ const AppContent: React.FC = () => {
         }`}
       >
         <div className="flex">
-          {/* Sidebar */}
           <Sidebar
             activeModule={activeModule}
             setActiveModule={setActiveModule}
@@ -575,10 +493,7 @@ const AppContent: React.FC = () => {
             isDark={isDark}
             settings={settings}
           />
-          
-          {/* Main Content */}
           <div className="flex-1 flex flex-col">
-            {/* Header */}
             <Header
               currentUser={currentUser}
               onLogout={handleLogout}
@@ -587,8 +502,6 @@ const AppContent: React.FC = () => {
               onCalendarClick={() => {}}
               activeModule={activeModule}
             />
-            
-            {/* Floating Calendar */}
             {isFloatingCalendarOpen && (
               <div className="fixed top-20 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
                 <div className="flex justify-between items-center mb-2">
@@ -609,8 +522,6 @@ const AppContent: React.FC = () => {
                 />
               </div>
             )}
-            
-            {/* Page Content */}
             <main className="flex-1 overflow-auto">
               {renderActiveModule()}
             </main>
@@ -621,7 +532,6 @@ const AppContent: React.FC = () => {
   );
 };
 
-// کامپوننت اصلی App با ThemeProvider
 const App: React.FC = () => {
   return (
     <ThemeProvider>
