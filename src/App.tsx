@@ -138,31 +138,6 @@ const AppContent: React.FC = () => {
   // استفاده از hook چک خودکار فاکتور
   const { lastCheckTime, isChecking } = useAutoInvoiceChecker(true);
   
-  // Use session timeout hook
-  const getSessionTimeout = useCallback(() => {
-    try {
-      const securitySettings = localStorage.getItem('securitySettings');
-      if (securitySettings) {
-        const parsed = JSON.parse(securitySettings);
-        return parsed.sessionTimeoutMinutes || 60;
-      }
-    } catch (error) {
-      console.warn('Failed to load session timeout setting:', error);
-    }
-    return 60; // Default 60 minutes
-  }, []);
-
-  useSessionTimeout({
-    timeoutMinutes: getSessionTimeout(),
-    onTimeout: () => {
-      authService.logout();
-      setIsLoggedIn(false);
-      setCurrentUser(null);
-      setActiveModule('dashboard');
-      localStorage.removeItem('activeModule');
-    },
-    enabled: isLoggedIn
-  });
 
   const storage = DataStorage.getInstance();
 
@@ -277,11 +252,6 @@ const AppContent: React.FC = () => {
     storage.saveData(key, data);
   }, [storage]);
 
-  // استفاده از hook چک خودکار فاکتور
-  const {
-    lastCheckTime,
-    isChecking,
-  } = useAutoInvoiceChecker(true);
 
   // اعمال تنظیمات
   const applySettings = useCallback((newSettings: any) => {
