@@ -2202,116 +2202,117 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         </div>
       )}
 
-            {/* Log Details Modal */}
-            {selectedLog && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
-                <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-                  <div className={`p-6 flex items-center justify-between border-b ${getLevelColor(selectedLog.level)}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white/50 rounded-lg">
-                        {getLevelIcon(selectedLog.level)}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-lg">جزئیات کامل تراکنش</h4>
-                        <p className="text-sm opacity-80">{selectedLog.id} #</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSelectedLog(null)}
-                      className="p-2 hover:bg-black/10 rounded-full transition-colors"
-                    >
-                      <X className="h-6 w-6" />
-                    </button>
+      {/* Log Details Modal */}
+      {selectedLog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className={`p-6 flex items-center justify-between border-b ${getLevelColor(selectedLog.level)}`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/50 rounded-lg">
+                  {getLevelIcon(selectedLog.level)}
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg">جزئیات کامل تراکنش</h4>
+                  <p className="text-sm opacity-80">{selectedLog.id} #</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedLog(null)}
+                className="p-2 hover:bg-black/10 rounded-full transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {/* Main Info Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <span className="text-xs text-gray-500 block mb-1">نام کاربر</span>
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-blue-500" />
+                    <span className="font-bold text-gray-900">{selectedLog.userName || 'سیستم'}</span>
                   </div>
-                  
-                  <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                    {/* Main Info Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <span className="text-xs text-gray-500 block mb-1">نام کاربر</span>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-blue-500" />
-                          <span className="font-bold text-gray-900">{selectedLog.userName || 'سیستم'}</span>
-                        </div>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <span className="text-xs text-gray-500 block mb-1">تاریخ و زمان</span>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-blue-500" />
-                          <span className="font-bold text-gray-900">
-                            {formatPersianDate(new Date(selectedLog.timestamp))} - {new Date(selectedLog.timestamp).toLocaleTimeString('fa-IR')}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <span className="text-xs text-gray-500 block mb-1">صفحه / بخش</span>
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4 text-purple-500" />
-                          <span className="font-bold text-gray-900">{selectedLog.page || 'نامشخص'}</span>
-                        </div>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <span className="text-xs text-gray-500 block mb-1">منو / فیلد</span>
-                        <div className="flex items-center gap-2">
-                          <Edit3 className="h-4 w-4 text-purple-500" />
-                          <span className="font-bold text-gray-900">{selectedLog.field || 'سایر'}</span>
-                        </div>
-                      </div>
-                      <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                        <span className="text-xs text-orange-600 block mb-1">نوع تراکنش</span>
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-orange-500" />
-                          <span className="font-bold text-orange-900">{selectedLog.logNature || 'عملیات'}</span>
-                        </div>
-                      </div>
-                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                        <span className="text-xs text-indigo-600 block mb-1">کالا / محصول</span>
-                        <div className="flex items-center gap-2">
-                          <Folder className="h-4 w-4 text-indigo-500" />
-                          <span className="font-bold text-indigo-900">{selectedLog.product || '-'}</span>
-                        </div>
-                      </div>
-                      <div className="bg-green-50 p-4 rounded-xl border border-green-100 col-span-2">
-                        <span className="text-xs text-green-600 block mb-1">مقدار تراکنش</span>
-                        <div className="flex items-center gap-2 text-lg">
-                          <TrendingUp className="h-5 w-5 text-green-500" />
-                          <span className="font-black text-green-900">
-                            {selectedLog.amount ? formatPersianNumber(selectedLog.amount) : '0'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                      <span className="text-xs text-gray-500 block mb-2">شرح پیام</span>
-                      <p className="text-gray-800 leading-relaxed font-medium">
-                        {selectedLog.message}
-                      </p>
-                    </div>
-
-                    {selectedLog.details && (
-                      <div className="bg-gray-900 p-4 rounded-xl border border-gray-700">
-                        <span className="text-xs text-gray-400 block mb-2 font-mono">EXTRA DATA (JSON)</span>
-                        <pre className="text-xs text-blue-300 overflow-x-auto font-mono ltr text-left">
-                          {JSON.stringify(selectedLog.details, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <span className="text-xs text-gray-500 block mb-1">تاریخ و زمان</span>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-500" />
+                    <span className="font-bold text-gray-900">
+                      {formatPersianDate(new Date(selectedLog.timestamp))} - {new Date(selectedLog.timestamp).toLocaleTimeString('fa-IR')}
+                    </span>
                   </div>
-                  
-                  <div className="p-4 bg-gray-50 border-t flex justify-end">
-                    <button
-                      onClick={() => setSelectedLog(null)}
-                      className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-bold"
-                    >
-                      بستن پنجره
-                    </button>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <span className="text-xs text-gray-500 block mb-1">صفحه / بخش</span>
+                  <div className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-purple-500" />
+                    <span className="font-bold text-gray-900">{selectedLog.page || 'نامشخص'}</span>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <span className="text-xs text-gray-500 block mb-1">منو / فیلد</span>
+                  <div className="flex items-center gap-2">
+                    <Edit3 className="h-4 w-4 text-purple-500" />
+                    <span className="font-bold text-gray-900">{selectedLog.field || 'سایر'}</span>
+                  </div>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                  <span className="text-xs text-orange-600 block mb-1">نوع تراکنش</span>
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-orange-500" />
+                    <span className="font-bold text-orange-900">{selectedLog.logNature || 'عملیات'}</span>
+                  </div>
+                </div>
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                  <span className="text-xs text-indigo-600 block mb-1">کالا / محصول</span>
+                  <div className="flex items-center gap-2">
+                    <Folder className="h-4 w-4 text-indigo-500" />
+                    <span className="font-bold text-indigo-900">{selectedLog.product || '-'}</span>
+                  </div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-xl border border-green-100 col-span-2">
+                  <span className="text-xs text-green-600 block mb-1">مقدار تراکنش</span>
+                  <div className="flex items-center gap-2 text-lg">
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    <span className="font-black text-green-900">
+                      {selectedLog.amount ? formatPersianNumber(selectedLog.amount) : '0'}
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
-      </div>
-    );
-  };
+
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <span className="text-xs text-gray-500 block mb-2">شرح پیام</span>
+                <p className="text-gray-800 leading-relaxed font-medium">
+                  {selectedLog.message}
+                </p>
+              </div>
+
+              {selectedLog.details && (
+                <div className="bg-gray-900 p-4 rounded-xl border border-gray-700">
+                  <span className="text-xs text-gray-400 block mb-2 font-mono">EXTRA DATA (JSON)</span>
+                  <pre className="text-xs text-blue-300 overflow-x-auto font-mono ltr text-left">
+                    {JSON.stringify(selectedLog.details, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 bg-gray-50 border-t flex justify-end">
+              <button
+                onClick={() => setSelectedLog(null)}
+                className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-bold"
+              >
+                بستن پنجره
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default LoggingSettings;
+
