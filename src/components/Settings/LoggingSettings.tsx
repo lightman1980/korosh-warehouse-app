@@ -51,7 +51,7 @@ import {
 } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
-import { logUserActivity, UserActivityEntry as UtilityUserActivityEntry } from '../../utils/logger';
+import { logUserActivity, UserActivityEntry as UtilityUserActivityEntry, LoggerService, LogFileInfo, LogEntry as UtilityLogEntry, LogFieldConfig, LogPathConfig, StoragePathConfig } from '../../utils/logger';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 
 // ============================================================================
@@ -67,67 +67,7 @@ interface LoggingSettingsProps {
   downloadLogs: () => void;
 }
 
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: 'error' | 'warn' | 'info' | 'debug';
-  category: string;
-  message: string;
-  details?: string;
-  userId?: string;
-  userName?: string;
-  ipAddress?: string;
-  userAgent?: string;
-  page?: string;
-  field?: string;
-  selection?: string;
-  logType: 'system' | 'user';
-  logNature: string;
-}
-
-interface UserActivityEntry {
-  id: string;
-  timestamp: string;
-  userId: string;
-  userName: string;
-  action: string;
-  category: string;
-  status: 'success' | 'failed' | 'warning';
-  details?: any;
-  ipAddress: string;
-  page: string;
-  field?: string;
-  selection?: string;
-  logType: 'system' | 'user';
-  logNature: string;
-}
-
-interface LogFieldConfig {
-  userName: boolean;
-  timestamp: boolean;
-  page: boolean;
-  field: boolean;
-  selection: boolean;
-  logType: boolean;
-  logNature: boolean;
-  ipAddress: boolean;
-}
-
-interface LogPathConfig {
-  path: string;
-  createDailyFiles: boolean;
-  maxFilesPerCategory: number;
-  compressOldLogs: boolean;
-  backupCount: number;
-  exportFormat: 'xlsx' | 'txt' | 'log';
-}
-
-interface StoragePathConfig {
-  type: 'local' | 'server';
-  localPath: string;
-  serverUrl: string;
-  serverHost: string;
-}
+type LogEntry = UtilityLogEntry;
 
 // حالت‌های نمایش فعالیت‌های کاربر
 type ActivityViewMode = 
@@ -150,13 +90,6 @@ interface FilterState {
   dateFrom: Date | null;
   dateTo: Date | null;
   userId: string;
-}
-
-interface LogFileInfo {
-  path: string;
-  size: number;
-  lastModified: Date;
-  entryCount: number;
 }
 
 // دسته‌بندی‌های لاگ برای انتخاب کاربر
@@ -220,346 +153,6 @@ const DEFAULT_ACTIVITY_VIEW_SETTINGS: ActivityViewSettings = {
 };
 
 // ============================================================================
-// Logger Service Class
-// ============================================================================
-
-class LoggerService {
-  private static instance: LoggerService;
-  private config: LogPathConfig | null = null;
-  private storageConfig: StoragePathConfig | null = null;
-  private logBuffer: LogEntry[] = [];
-  private bufferFlushInterval: NodeJS.Timeout | null = null;
-  private readonly BUFFER_FLUSH_INTERVAL = 30000; // 30 seconds
-  private readonly MAX_BUFFER_SIZE = 100;
-
-  private constructor() {
-    this.initializeBufferFlush();
-  }
-
-  static getInstance(): LoggerService {
-    if (!LoggerService.instance) {
-      LoggerService.instance = new LoggerService();
-    }
-    return LoggerService.instance;
-  }
-
-  private initializeBufferFlush(): void {
-    this.bufferFlushInterval = setInterval(() => {
-      this.flushBuffer();
-    }, this.BUFFER_FLUSH_INTERVAL);
-  }
-
-  setConfig(config: LogPathConfig): void {
-    this.config = config;
-    this.ensureDirectoryExists(config.path);
-  }
-
-  setStorageConfig(config: StoragePathConfig): void {
-    this.storageConfig = config;
-  }
-
-  getConfig(): LogPathConfig | null {
-    return this.config;
-  }
-
-  getStorageConfig(): StoragePathConfig | null {
-    return this.storageConfig;
-  }
-
-  private ensureDirectoryExists(path: string): void {
-    // In browser environment, we use localStorage as virtual directory
-    // In a real Node.js environment, you would use fs.mkdir
-    try {
-      const storage = DataStorage.getInstance();
-      const directories = storage.loadData('logDirectories') as string[] | null;
-      if (!directories?.includes(path)) {
-        storage.saveData('logDirectories', [...(directories || []), path]);
-      }
-    } catch (error) {
-      console.warn('Could not create directory:', path);
-    }
-  }
-
-  private getLogFilePath(category: string, date?: Date): string {
-    if (!this.config) {
-      return './logs/default.log';
-    }
-
-    const targetDate = date || new Date();
-    const year = targetDate.getFullYear();
-    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const day = String(targetDate.getDate() + 1).padStart(2, '0');
-
-    if (this.config.createDailyFiles) {
-      return `${this.config.path}/${category}_${year}-${month}-${day}.log`;
-    }
-    return `${this.config.path}/${category}.log`;
-  }
-
-  private formatLogEntry(entry: LogEntry, fieldConfig: LogFieldConfig = DEFAULT_LOG_FIELD_CONFIG): string {
-    const fields: string[] = [];
-    
-    if (fieldConfig.timestamp) fields.push(`[${new Date(entry.timestamp).toISOString()}]`);
-    fields.push(`[${entry.level.toUpperCase()}]`);
-    
-    if (fieldConfig.logType) fields.push(`[Type: ${entry.logType}]`);
-    if (fieldConfig.logNature) fields.push(`[Nature: ${entry.logNature}]`);
-    
-    fields.push(`[${entry.category}]`);
-    fields.push(entry.message);
-    
-    if (fieldConfig.userName && entry.userName) fields.push(`[User: ${entry.userName}]`);
-    if (fieldConfig.page && entry.page) fields.push(`[Page: ${entry.page}]`);
-    if (fieldConfig.field && entry.field) fields.push(`[Field: ${entry.field}]`);
-    if (fieldConfig.selection && entry.selection) fields.push(`[Selection: ${entry.selection}]`);
-    if (fieldConfig.ipAddress && entry.ipAddress) fields.push(`[IP: ${entry.ipAddress}]`);
-    
-    const details = entry.details ? `\n    Details: ${entry.details}` : '';
-    
-    return `${fields.join(' ')}${details}\n`;
-  }
-
-  async log(entry: Omit<LogEntry, 'id' | 'timestamp' | 'logType' | 'logNature'> & Partial<Pick<LogEntry, 'logType' | 'logNature'>>): Promise<void> {
-    const fullEntry: LogEntry = {
-      ...entry,
-      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
-      logType: entry.logType || 'system',
-      logNature: entry.logNature || entry.level
-    };
-
-    this.logBuffer.push(fullEntry);
-
-    if (this.logBuffer.length >= this.MAX_BUFFER_SIZE) {
-      await this.flushBuffer();
-    }
-  }
-
-  async logToFile(entry: Omit<LogEntry, 'id' | 'timestamp' | 'logType' | 'logNature'> & Partial<Pick<LogEntry, 'logType' | 'logNature'>>): Promise<void> {
-    await this.log(entry);
-  }
-
-  async flushBuffer(): Promise<void> {
-    if (this.logBuffer.length === 0) return;
-
-    const entriesToFlush = [...this.logBuffer];
-    this.logBuffer = [];
-
-    const storage = DataStorage.getInstance();
-    const activitySettings = storage.loadData('activityViewSettings') as ActivityViewSettings | null;
-    const settings = storage.loadData('settings') as any;
-    
-    // Check if we should save to file
-    // The user wants file creation to depend on the "Live Log" setting
-    const enableLiveView = settings?.logging?.enableLiveView !== false;
-    const saveToPath = activitySettings?.saveToPath !== false;
-    
-    if (!enableLiveView || !saveToPath) {
-      console.log('File logging skipped: Live View or Save to Path is disabled');
-      return;
-    }
-
-    const fieldConfig = activitySettings?.fieldConfig || DEFAULT_LOG_FIELD_CONFIG;
-    
-    // Group entries by category and date
-    const groupedEntries = new Map<string, LogEntry[]>();
-    
-    entriesToFlush.forEach(entry => {
-      // Respect field config even when writing to file
-      const filteredEntry = { ...entry };
-      if (!fieldConfig.userName) delete filteredEntry.userName;
-      if (!fieldConfig.ipAddress) delete filteredEntry.ipAddress;
-      if (!fieldConfig.page) delete filteredEntry.page;
-      if (!fieldConfig.field) delete filteredEntry.field;
-      if (!fieldConfig.selection) delete filteredEntry.selection;
-
-      const filePath = this.getLogFilePath(entry.category);
-      if (!groupedEntries.has(filePath)) {
-        groupedEntries.set(filePath, []);
-      }
-      groupedEntries.get(filePath)!.push(filteredEntry as LogEntry);
-    });
-
-    // Write to files in the selected format
-    const format = activitySettings?.exportFormat || this.config?.exportFormat || 'log';
-
-    groupedEntries.forEach((entries, filePath) => {
-      let logContent = '';
-      if (format === 'xlsx') {
-        // For XLSX on local storage, we still save as formatted text but with marker
-        logContent = entries.map(e => this.formatLogEntry(e, fieldConfig)).join('');
-      } else if (format === 'txt') {
-        logContent = entries.map(e => `[${e.timestamp}] ${e.message}`).join('\n') + '\n';
-      } else {
-        logContent = entries.map(e => this.formatLogEntry(e, fieldConfig)).join('');
-      }
-      this.appendToFile(filePath, logContent);
-    });
-  }
-
-  private appendToFile(filePath: string, content: string): void {
-    try {
-      const storage = DataStorage.getInstance();
-      const key = `logfile_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const existingContent = storage.loadData(key) as string | null;
-      storage.saveData(key, (existingContent || '') + content);
-      
-      // Update file metadata
-      this.updateFileMetadata(filePath);
-    } catch (error) {
-      console.error('Error writing to log file:', error);
-    }
-  }
-
-  private updateFileMetadata(filePath: string): void {
-    try {
-      const storage = DataStorage.getInstance();
-      const metadataKey = `logmeta_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      
-      const newMetadata = {
-        path: filePath,
-        lastModified: new Date().toISOString(),
-        lastEntry: new Date().toISOString()
-      };
-      
-      storage.saveData(metadataKey, newMetadata);
-    } catch (error) {
-      console.warn('Could not update file metadata:', error);
-    }
-  }
-
-  async readLogFile(filePath: string): Promise<string> {
-    try {
-      const storage = DataStorage.getInstance();
-      const key = `logfile_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      return (storage.loadData(key) as string) || '';
-    } catch (error) {
-      console.error('Error reading log file:', error);
-      return '';
-    }
-  }
-
-  async parseLogEntries(content: string): Promise<LogEntry[]> {
-    const entries: LogEntry[] = [];
-    const lines = content.split('\n').filter(line => line.trim());
-    
-    lines.forEach((line, index) => {
-      try {
-        const timestampMatch = line.match(/\[(.*?)\]/);
-        const levelMatch = line.match(/\[(ERROR|WARN|INFO|DEBUG)\]/i);
-        const typeMatch = line.match(/\[Type: (.*?)\]/);
-        const natureMatch = line.match(/\[Nature: (.*?)\]/);
-        const categoryMatch = line.match(/\[([^\]]*?)\]/g);
-        
-        let category = 'system';
-        if (categoryMatch) {
-          const skipTags = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'Type:', 'Nature:'];
-          for (const tag of categoryMatch) {
-            const cleanTag = tag.replace(/[\[\]]/g, '');
-            if (!skipTags.some(skip => cleanTag.includes(skip)) && !cleanTag.includes(':')) {
-              category = cleanTag;
-              break;
-            }
-          }
-        }
-
-        const userMatch = line.match(/\[User: (.*?)\]/);
-        const pageMatch = line.match(/\[Page: (.*?)\]/);
-        const fieldMatch = line.match(/\[Field: (.*?)\]/);
-        const selectionMatch = line.match(/\[Selection: (.*?)\]/);
-        const ipMatch = line.match(/\[IP: (.*?)\]/);
-        
-        let message = line;
-        [timestampMatch, levelMatch, typeMatch, natureMatch, userMatch, pageMatch, fieldMatch, selectionMatch, ipMatch].forEach(m => {
-          if (m) message = message.replace(m[0], '');
-        });
-        if (categoryMatch) {
-          categoryMatch.forEach(tag => {
-            if (tag.includes(category)) message = message.replace(tag, '');
-          });
-        }
-
-        entries.push({
-          id: `parsed-${index}-${Date.now()}`,
-          timestamp: timestampMatch ? timestampMatch[1] : new Date().toISOString(),
-          level: (levelMatch ? levelMatch[1].toLowerCase() : 'info') as LogEntry['level'],
-          logType: (typeMatch ? typeMatch[1] : 'system') as any,
-          logNature: natureMatch ? natureMatch[1] : 'info',
-          category,
-          message: message.trim(),
-          userName: userMatch ? userMatch[1] : undefined,
-          page: pageMatch ? pageMatch[1] : undefined,
-          field: fieldMatch ? fieldMatch[1] : undefined,
-          selection: selectionMatch ? selectionMatch[1] : undefined,
-          ipAddress: ipMatch ? ipMatch[1] : undefined
-        });
-      } catch (e) {
-        console.warn('Error parsing log line:', line, e);
-      }
-    });
-    
-    return entries;
-  }
-
-  async getLogFiles(): Promise<LogFileInfo[]> {
-    const files: LogFileInfo[] = [];
-    const storage = DataStorage.getInstance();
-    
-    try {
-      const directories = storage.loadData('logDirectories') as string[] | null;
-      if (!directories) return files;
-      
-      directories.forEach(dirPath => {
-        const allKeys = Object.keys(localStorage).filter(key => key.startsWith('logfile_'));
-        
-        allKeys.forEach(key => {
-          const content = storage.loadData(key) as string;
-          const metadataKey = key.replace('logfile_', 'logmeta_');
-          const metadata = storage.loadData(metadataKey) as any;
-          
-          if (content) {
-            const entryCount = content.split('\n').filter((l: string) => l.trim()).length;
-            files.push({
-              path: key.replace('logfile_', '').replace(/_/g, '/'),
-              size: new Blob([content]).size,
-              lastModified: metadata?.lastModified ? new Date(metadata.lastModified) : new Date(),
-              entryCount
-            });
-          }
-        });
-      });
-    } catch (error) {
-      console.error('Error getting log files:', error);
-    }
-    
-    return files.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
-  }
-
-  async cleanupOldLogs(keepCount: number = 5): Promise<void> {
-    const files = await this.getLogFiles();
-    const sortedFiles = files.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
-    
-    const filesToDelete = sortedFiles.slice(keepCount);
-    
-    filesToDelete.forEach(file => {
-      const storage = DataStorage.getInstance();
-      const key = `logfile_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const metaKey = `logmeta_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      
-      storage.saveData(key, '');
-      storage.saveData(metaKey, null);
-    });
-  }
-
-  destroy(): void {
-    if (this.bufferFlushInterval) {
-      clearInterval(this.bufferFlushInterval);
-    }
-    this.flushBuffer();
-  }
-}
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -616,6 +209,53 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   
   // Online users count (simulated)
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);
+
+  // ============================================================================
+  // Filtering Logic
+  // ============================================================================
+
+  useEffect(() => {
+    let result = [...logs];
+
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      result = result.filter(log => 
+        log.message.toLowerCase().includes(searchLower) ||
+        (log.userName && log.userName.toLowerCase().includes(searchLower)) ||
+        (log.page && log.page.toLowerCase().includes(searchLower)) ||
+        (log.field && log.field.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Level filter
+    if (filters.level.length > 0) {
+      result = result.filter(log => filters.level.includes(log.level));
+    }
+
+    // Category filter
+    if (filters.category.length > 0) {
+      result = result.filter(log => filters.category.includes(log.category));
+    }
+
+    // Date range filter
+    if (filters.dateFrom) {
+      const fromTime = filters.dateFrom.getTime();
+      result = result.filter(log => new Date(log.timestamp).getTime() >= fromTime);
+    }
+    if (filters.dateTo) {
+      const toTime = filters.dateTo.getTime() + (24 * 60 * 60 * 1000) - 1; // End of day
+      result = result.filter(log => new Date(log.timestamp).getTime() <= toTime);
+    }
+
+    // User filter
+    if (filters.userId) {
+      result = result.filter(log => log.userId === filters.userId);
+    }
+
+    setFilteredLogs(result);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [logs, filters]);
 
   // ============================================================================
   // Helper Functions
