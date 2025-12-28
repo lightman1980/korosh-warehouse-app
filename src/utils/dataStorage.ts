@@ -857,20 +857,33 @@ export class DataStorage {
 
 // Initialize BaseDataManager compatible storage when module loads
 if (typeof window !== 'undefined') {
+  // Make DataStorage available globally for legacy scripts and debugging
+  (window as any).DataStorage = DataStorage;
+
   // Initialize storage compatibility on app start
-  document.addEventListener('DOMContentLoaded', () => {
-    const storage = DataStorage.getInstance();
-    storage.initializeBaseDataStorage();
-    
-    // Log storage compatibility status
-    const compatibility = storage.checkBaseDataCompatibility();
-    if (!compatibility.isCompatible) {
-      console.warn('⚠️ BaseDataManager compatibility issues detected:', compatibility.missingKeys);
-      compatibility.recommendations.forEach(rec => console.warn('💡 Recommendation:', rec));
-    } else {
-      console.log('✅ DataStorage is fully compatible with BaseDataManager');
+  const initStorage = () => {
+    try {
+      const storage = DataStorage.getInstance();
+      storage.initializeBaseDataStorage();
+      
+      // Log storage compatibility status
+      const compatibility = storage.checkBaseDataCompatibility();
+      if (!compatibility.isCompatible) {
+        console.warn('⚠️ BaseDataManager compatibility issues detected:', compatibility.missingKeys);
+        compatibility.recommendations.forEach(rec => console.warn('💡 Recommendation:', rec));
+      } else {
+        console.log('✅ DataStorage is fully compatible with BaseDataManager');
+      }
+    } catch (e) {
+      console.error('Failed to initialize storage compatibility:', e);
     }
-  });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initStorage);
+  } else {
+    initStorage();
+  }
 }
 
 // Export default instance for easy importing

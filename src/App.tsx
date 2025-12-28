@@ -120,57 +120,6 @@ const AppContent: React.FC = () => {
   const [isFloatingCalendarOpen, setIsFloatingCalendarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [appInitialized, setAppInitialized] = useState(false);
-  
-    // لاگ تغییرات منو
-    const currentModuleName = moduleNames[activeModule] || activeModule;
-    useModuleChangeLogger(activeModule, currentModuleName);
-    
-    // ذخیره ماژول فعلی در localStorage هر زمان که تغییر کند
-
-  useEffect(() => {
-    if (isLoggedIn && appInitialized) {
-      try {
-        localStorage.setItem('activeModule', activeModule);
-      } catch (error) {
-        console.warn('خطا در ذخیره ماژول در localStorage:', error);
-      }
-    }
-  }, [activeModule, isLoggedIn, appInitialized]);
-  
-  // Initialize Tab Manager و تنظیم title
-  useEffect(() => {
-    if (isLoggedIn && appInitialized) {
-      // Initialize tab manager
-      initTabManager(activeModule, () => {
-        window.focus();
-      });
-      
-      // تنظیم title صفحه
-      const moduleName = moduleNames[activeModule] || 'سیستم انبار';
-      document.title = `${moduleName} - سیستم انبار`;
-      
-      return () => {
-        cleanupTabManager();
-      };
-    }
-  }, [isLoggedIn, appInitialized, activeModule]);
-  
-  // به‌روزرسانی ماژول در tab manager وقتی تغییر می‌کند
-  useEffect(() => {
-    if (isLoggedIn && appInitialized) {
-      updateTabModule(activeModule);
-      // به‌روزرسانی title
-      const moduleName = moduleNames[activeModule] || 'سیستم انبار';
-      document.title = `${moduleName} - سیستم انبار`;
-    }
-  }, [activeModule, isLoggedIn, appInitialized]);
-  
-  // Debug: Log module changes
-  useEffect(() => {
-    console.log('Active module changed to:', activeModule);
-  }, [activeModule]);
-
-  // اضافه کردن state برای مدیریت داده‌های مشترک بین کامپوننت‌ها
   const [sharedData, setSharedData] = useState<any>({
     baseData: {},
     contracts: [],
@@ -180,9 +129,40 @@ const AppContent: React.FC = () => {
     additions: [],
     deductions: [],
   });
-
-  // اضافه کردن state برای تنظیمات
   const [settings, setSettings] = useState<any>(null);
+
+  // لاگ تغییرات منو
+  const currentModuleName = moduleNames[activeModule] || activeModule;
+  useModuleChangeLogger(activeModule, currentModuleName);
+
+  // استفاده از hook چک خودکار فاکتور
+  const { lastCheckTime, isChecking } = useAutoInvoiceChecker(true);
+  
+  // Use session timeout hook
+  const getSessionTimeout = useCallback(() => {
+    try {
+      const securitySettings = localStorage.getItem('securitySettings');
+      if (securitySettings) {
+        const parsed = JSON.parse(securitySettings);
+        return parsed.sessionTimeoutMinutes || 60;
+      }
+    } catch (error) {
+      console.warn('Failed to load session timeout setting:', error);
+    }
+    return 60; // Default 60 minutes
+  }, []);
+
+  useSessionTimeout({
+    timeoutMinutes: getSessionTimeout(),
+    onTimeout: () => {
+      authService.logout();
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setActiveModule('dashboard');
+      localStorage.removeItem('activeModule');
+    },
+    enabled: isLoggedIn
+  });
 
   const storage = DataStorage.getInstance();
 
