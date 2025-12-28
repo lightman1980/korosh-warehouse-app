@@ -2272,9 +2272,24 @@ const ConsignmentDeliverySlip: React.FC<Props> = ({
       // به‌روزرسانی state محلی
       setSelectedSlipInfo(updatedSlipInfo);
 
-      console.log('✅ حواله با موفقیت صادر شد:', updatedSlipInfo);
+        console.log('✅ حواله با موفقیت صادر شد:', updatedSlipInfo);
 
-      alert('✅ حواله با موفقیت صادر شد!\n\nوضعیت حواله به "صادر شده" تغییر کرد.');
+        // ثبت لاگ فعالیت کاربر
+        if (typeof (window as any).logUserActivity === 'function') {
+          const user = storage.loadData('currentUser') as any;
+          (window as any).logUserActivity(
+            user?.id || 'unknown',
+            user?.fullName || 'کاربر سیستم',
+            'صدور حواله امانی',
+            'release',
+            'success',
+            'حواله امانی',
+            'دکمه صدور',
+            { transactionNumber: updatedSlipInfo.transactionNumber }
+          );
+        }
+
+        alert('✅ حواله با موفقیت صادر شد!\n\nوضعیت حواله به "صادر شده" تغییر کرد.');
       
       // refresh صفحه برای نمایش تغییرات
       setTimeout(() => {
@@ -2585,9 +2600,24 @@ const handleSaveSlip = async () => {
       ? `✅ حواله امانی با موفقیت ویرایش شد\n\nداده‌ها اکنون در جدول "تراکنش‌های ثبت شده امانی" به‌روزرسانی می‌شوند.`
       : `✅ حواله امانی جدید با موفقیت ایجاد شد\n\nداده‌ها اکنون در جدول نمایش داده می‌شوند.`;
     
-    alert(successMessage);
-    
-    // 🔄 راه حل قطعی: بعد از ذخیره، بازگشت به لیست و اجبار به refresh
+      alert(successMessage);
+
+      // ثبت لاگ فعالیت کاربر
+      if (typeof (window as any).logUserActivity === 'function') {
+        const user = storage.loadData('currentUser') as any;
+        (window as any).logUserActivity(
+          user?.id || 'unknown',
+          user?.fullName || 'کاربر سیستم',
+          isEditMode ? 'ویرایش حواله امانی' : 'ثبت حواله امانی جدید',
+          'release',
+          'success',
+          'حواله امانی',
+          isEditMode ? 'دکمه ویرایش' : 'دکمه ثبت',
+          { transactionNumber: finalSlipInfo.transactionNumber }
+        );
+      }
+      
+      // 🔄 راه حل قطعی: بعد از ذخیره، بازگشت به لیست و اجبار به refresh
     // این باعث می‌شود کامپوننت والد داده‌های جدید را از storage بخواند
     setIsSaving(false);
     

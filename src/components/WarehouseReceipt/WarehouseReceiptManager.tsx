@@ -2821,8 +2821,23 @@ export const WarehouseReceiptManager: React.FC = () => {
       setContractRemainderWarning(null);
       setTankCapacityWarning(null);
       
-      console.log("? رسيد با موفقيت ذخيره شد");
-    } catch (error) {
+        console.log("? رسيد با موفقيت ذخيره شد");
+
+        // ثبت لاگ فعالیت کاربر
+        if (typeof (window as any).logUserActivity === 'function') {
+          const user = storage.loadData('currentUser') as any;
+          (window as any).logUserActivity(
+            user?.id || 'unknown',
+            user?.fullName || 'کاربر سیستم',
+            editingReceipt ? 'ویرایش رسید انبار' : 'ثبت رسید انبار جدید',
+            'receipt',
+            'success',
+            'رسید انبار',
+            editingReceipt ? 'دکمه ویرایش' : 'دکمه ثبت',
+            { transactionNumber: transactionNumber || newReceipt.transactionNumber }
+          );
+        }
+      } catch (error) {
       console.error("? خطا در ذخيره‌سازي رسيد:", error);
       alert("خطا در ذخيره‌سازي رسيد. لطفاً دوباره تلاش کنيد.");
     } finally {

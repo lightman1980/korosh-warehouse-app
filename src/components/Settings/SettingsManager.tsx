@@ -659,85 +659,35 @@ setLogs(sampleLogs);
 console.error('Error loading logs:', error);
 }
 };
-const loadUserActivityLogs = () => {
-try {
-// Generate sample user activity logs for demonstration
-const sampleLogs: UserActivityLog[] = [
-{
-id: '1',
-userId: 'admin',
-userName: 'مدیر سیستم',
-userEmail: 'admin@example.com',
-action: 'ورود به سیستم',
-actionType: 'login',
-timestamp: new Date(Date.now() - 3600000).toISOString(),
-ipAddress: '192.168.1.100',
-userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-category: 'security',
-status: 'success'
-},
-{
-id: '2',
-userId: 'user1',
-userName: 'کاربر انبار',
-userEmail: 'user1@example.com',
-action: 'تغییر تنظیمات سیستم',
-actionType: 'settings',
-timestamp: new Date(Date.now() - 1800000).toISOString(),
-ipAddress: '192.168.1.101',
-userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-details: 'تغییر در بخش تنظیمات سرور',
-category: 'settings',
-status: 'success'
-},
-{
-id: '3',
-userId: 'user2',
-userName: 'کاربر مالی',
-userEmail: 'user2@example.com',
-action: 'تلاش برای دسترسی غیرمجاز',
-actionType: 'view',
-timestamp: new Date(Date.now() - 600000).toISOString(),
-ipAddress: '192.168.1.102',
-userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-details: 'تلاش برای مشاهده گزارش‌های محافظت شده',
-category: 'security',
-status: 'failed'
-},
-{
-id: '4',
-userId: 'admin',
-userName: 'مدیر سیستم',
-userEmail: 'admin@example.com',
-action: 'ایجاد پشتیبان',
-actionType: 'create',
-timestamp: new Date(Date.now() - 300000).toISOString(),
-ipAddress: '192.168.1.100',
-userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-details: 'ایجاد پشتیبان از پایگاه داده',
-category: 'system',
-status: 'success'
-},
-{
-id: '5',
-userId: 'user1',
-userName: 'کاربر انبار',
-userEmail: 'user1@example.com',
-action: 'به‌روزرسانی موجودی',
-actionType: 'update',
-timestamp: new Date(Date.now() - 120000).toISOString(),
-ipAddress: '192.168.1.101',
-userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-details: 'به‌روزرسانی موجودی محصول شماره 12345',
-category: 'inventory',
-status: 'success'
-}
-];
-setUserActivityLogs(sampleLogs);
-} catch (error) {
-console.error('Error loading user activity logs:', error);
-}
-};
+  const loadUserActivityLogs = () => {
+    try {
+      const storage = DataStorage.getInstance();
+      const storedActivities = storage.loadData('userActivities') as UserActivityLog[] | null;
+      if (storedActivities && Array.isArray(storedActivities)) {
+        setUserActivityLogs(storedActivities);
+      } else {
+        // Fallback to sample data only if no real data exists
+        const sampleLogs: UserActivityLog[] = [
+          {
+            id: '1',
+            userId: 'admin',
+            userName: 'مدیر سیستم',
+            userEmail: 'admin@example.com',
+            action: 'ورود به سیستم',
+            actionType: 'login',
+            timestamp: new Date(Date.now() - 3600000).toISOString(),
+            ipAddress: '192.168.1.100',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            category: 'security',
+            status: 'success'
+          }
+        ];
+        setUserActivityLogs(sampleLogs);
+      }
+    } catch (error) {
+      console.error('Error loading user activity logs:', error);
+    }
+  };
 // Apply settings function
 const applySettings = (settingsToApply: AppSettings) => {
 // Apply theme changes immediately

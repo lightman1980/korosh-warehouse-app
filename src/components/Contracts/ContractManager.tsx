@@ -2274,13 +2274,28 @@ export const ContractManager: React.FC = () => {
       updatedAt: new Date()
     } as Contract;
     
-    if (editingContract) {
-      setContracts(prev => prev.map(c => c.id === editingContract ? contractData : c));
-    } else {
-      setContracts(prev => [...prev, contractData]);
-    }
-    
-    setEditingContract(null);
+      if (editingContract) {
+        setContracts(prev => prev.map(c => c.id === editingContract ? contractData : c));
+      } else {
+        setContracts(prev => [...prev, contractData]);
+      }
+
+      // ثبت لاگ فعالیت کاربر
+      if (typeof (window as any).logUserActivity === 'function') {
+        const user = storage.loadData('currentUser') as any;
+        (window as any).logUserActivity(
+          user?.id || 'unknown',
+          user?.fullName || 'کاربر سیستم',
+          editingContract ? 'ویرایش قرارداد' : 'ثبت قرارداد جدید',
+          'contracts',
+          'success',
+          'مدیریت قراردادها',
+          editingContract ? 'دکمه بروزرسانی' : 'دکمه ثبت',
+          { contractNumber: contractData.contractNumber }
+        );
+      }
+      
+      setEditingContract(null);
     setIsAddingNew(false);
     setNewContract({});
     setValidationErrors([]);

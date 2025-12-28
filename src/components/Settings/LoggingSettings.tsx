@@ -49,8 +49,9 @@ import {
   Server,
   Link
 } from 'lucide-react';
-import { formatPersianDate } from '../../utils/persian';
+import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
+import { PersianDatePicker } from '../Common/PersianDatePicker';
 
 // ============================================================================
 // Types and Interfaces
@@ -76,6 +77,22 @@ interface LogEntry {
   userName?: string;
   ipAddress?: string;
   userAgent?: string;
+  page?: string;
+  field?: string;
+}
+
+interface UserActivityEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  action: string;
+  category: string;
+  status: 'success' | 'failed' | 'warning';
+  details?: any;
+  ipAddress: string;
+  page: string;
+  field?: string;
 }
 
 interface LogPathConfig {
@@ -86,17 +103,11 @@ interface LogPathConfig {
   backupCount: number;
 }
 
-// روش‌های ذخیره‌سازی
-type StorageType = 'local' | 'server';
-
 interface StoragePathConfig {
-  type: StorageType;
+  type: 'local' | 'server';
   localPath: string;
   serverUrl: string;
   serverHost: string;
-  serverPort: number;
-  useHttps: boolean;
-  apiKey: string;
 }
 
 // حالت‌های نمایش فعالیت‌های کاربر
@@ -116,8 +127,8 @@ interface FilterState {
   search: string;
   level: ('error' | 'warn' | 'info' | 'debug')[];
   category: string[];
-  dateFrom: string;
-  dateTo: string;
+  dateFrom: Date | null;
+  dateTo: Date | null;
   userId: string;
 }
 
@@ -165,10 +176,7 @@ const DEFAULT_STORAGE_PATH_CONFIG: StoragePathConfig = {
   type: 'local',
   localPath: './logs',
   serverUrl: '',
-  serverHost: '',
-  serverPort: 443,
-  useHttps: true,
-  apiKey: ''
+  serverHost: ''
 };
 
 const DEFAULT_ACTIVITY_VIEW_SETTINGS: ActivityViewSettings = {
@@ -466,7 +474,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([]);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
-  const [activeTab, setActiveTab] = useState<'settings' | 'viewer' | 'activity' | 'path'>(showLogViewer ? 'viewer' : 'settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'viewer' | 'path'>(showLogViewer ? 'viewer' : 'settings');
   const [realTimeMode, setRealTimeMode] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [logsPerPage, setLogsPerPage] = useState(50);
@@ -482,15 +490,15 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   const [pathSuccess, setPathSuccess] = useState(false);
   const [logFiles, setLogFiles] = useState<LogFileInfo[]>([]);
   
-  // Filter state
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    level: ['error', 'warn', 'info', 'debug'],
-    category: [],
-    dateFrom: '',
-    dateTo: '',
-    userId: ''
-  });
+    // Filter state
+    const [filters, setFilters] = useState<FilterState>({
+      search: '',
+      level: ['error', 'warn', 'info', 'debug'],
+      category: [],
+      dateFrom: null,
+      dateTo: null,
+      userId: ''
+    });
 
   // Folder picker ref
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -1064,7 +1072,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
 
     // Date filter
     if (filters.dateFrom) {
-      filtered = filtered.filter(log => new Date(log.timestamp) >= new Date(filters.dateFrom));
+      filtered = filtered.filter(log => new Date(log.timestamp) >= filters.dateFrom!);
     }
     if (filters.dateTo) {
       const toDate = new Date(filters.dateTo);
@@ -1135,9 +1143,11 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     action: string,
     category: string,
     status: 'success' | 'failed' | 'warning',
+    page: string,
+    field?: string,
     details?: any
   ) => {
-    const activity = {
+    const activity: UserActivityEntry = {
       id: `activity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       userId,
@@ -1146,6 +1156,8 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
       category,
       status,
       details,
+      page,
+      field,
       ipAddress: '192.168.1.' + Math.floor(Math.random() * 255) // Get actual IP in real app
     };
 
@@ -1154,9 +1166,9 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     const activities = storedActivities || [];
     activities.unshift(activity);
     
-    // Keep only last 500 activities in memory
-    if (activities.length > 500) {
-      activities.splice(500);
+    // Keep only last 1000 activities
+    if (activities.length > 1000) {
+      activities.splice(1000);
     }
     
     storage.saveData('userActivities', activities);
@@ -1165,11 +1177,13 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     await logger.log({
       level: status === 'failed' ? 'error' : status === 'warning' ? 'warn' : 'info',
       category: category || 'user',
-      message: `${userName} - ${action}`,
+      message: `${userName} - ${action} در صفحه ${page}${field ? ` فیلد ${field}` : ''}`,
       details: JSON.stringify(activity, null, 2),
       userId,
       userName,
-      ipAddress: activity.ipAddress
+      ipAddress: activity.ipAddress,
+      page,
+      field
     });
 
     return activity;
@@ -1229,9 +1243,9 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         extension = 'json';
         break;
       case 'csv':
-        content = 'ID,Timestamp,Level,Category,Message,Details,User,IP Address\n';
+        content = 'ID,Timestamp,Level,Category,Message,User,Page,Field,IP Address\n';
         logsToExport.forEach(log => {
-          content += `"${log.id}","${log.timestamp}","${log.level}","${log.category}","${log.message}","${log.details || ''}","${log.userName || ''}","${log.ipAddress || ''}"\n`;
+          content += `"${log.id}","${log.timestamp}","${log.level}","${log.category}","${log.message}","${log.userName || ''}","${log.page || ''}","${log.field || ''}","${log.ipAddress || ''}"\n`;
         });
         mimeType = 'text/csv';
         extension = 'csv';
@@ -1241,8 +1255,9 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         logsToExport.forEach(log => {
           content += `  <log id="${log.id}" timestamp="${log.timestamp}" level="${log.level}" category="${log.category}">\n`;
           content += `    <message><![CDATA[${log.message}]]></message>\n`;
-          if (log.details) content += `    <details><![CDATA[${log.details}]]></details>\n`;
           if (log.userName) content += `    <user>${log.userName}</user>\n`;
+          if (log.page) content += `    <page>${log.page}</page>\n`;
+          if (log.field) content += `    <field>${log.field}</field>\n`;
           if (log.ipAddress) content += `    <ip>${log.ipAddress}</ip>\n`;
           content += `  </log>\n`;
         });
@@ -1253,8 +1268,9 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
       case 'txt':
         logsToExport.forEach(log => {
           content += `[${new Date(log.timestamp).toLocaleString('fa-IR')}] [${log.level.toUpperCase()}] [${log.category}] ${log.message}\n`;
-          if (log.details) content += `  Details: ${log.details}\n`;
           if (log.userName) content += `  User: ${log.userName}\n`;
+          if (log.page) content += `  Page: ${log.page}\n`;
+          if (log.field) content += `  Field: ${log.field}\n`;
           if (log.ipAddress) content += `  IP: ${log.ipAddress}\n`;
           content += '\n';
         });
@@ -1436,358 +1452,95 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
               مشاهده لاگ‌ها ({filteredLogs.length})
             </div>
           </button>
-          <button
-            onClick={() => setActiveTab('activity')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-              activeTab === 'activity'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              فعالیت کاربران ({userActivityLogs.length})
-            </div>
-          </button>
         </div>
       </div>
 
-      {/* Path Configuration Tab */}
-      {activeTab === 'path' && (
-        <div className="space-y-6">
-          {/* Main Path Configuration Card */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-            {/* Header */}
-            <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
-              <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                <FolderOpen className="h-6 w-6" />
-                مسیر فعلی ذخیره‌سازی
-              </h3>
-              <p className="text-blue-100 text-sm mt-1">
-                تعیین محل ذخیره‌سازی لاگ‌ها (لوکال یا سرور)
-              </p>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Storage Type Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  نوع ذخیره‌سازی
-                  <span className="text-xs text-gray-500 block mt-1">
-                    انتخاب کنید که لاگ‌ها در کجا ذخیره شوند
-                  </span>
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Local Storage Option */}
-                  <label 
-                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      storagePathConfig.type === 'local'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      name="storageType"
-                      value="local"
-                      checked={storagePathConfig.type === 'local'}
-                      onChange={() => updateStoragePathConfig({ type: 'local' })}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-3">
-                      <div className={`p-3 rounded-lg ${
-                        storagePathConfig.type === 'local' ? 'bg-blue-100' : 'bg-gray-100'
-                      }`}>
-                        <HardDrive className={`h-6 w-6 ${
-                          storagePathConfig.type === 'local' ? 'text-blue-600' : 'text-gray-500'
-                        }`} />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">ذخیره‌سازی محلی</div>
-                        <div className="text-sm text-gray-500">ذخیره در کامپیوتر</div>
-                      </div>
-                    </div>
-                  </label>
-                  
-                  {/* Server Storage Option */}
-                  <label 
-                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      storagePathConfig.type === 'server'
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      name="storageType"
-                      value="server"
-                      checked={storagePathConfig.type === 'server'}
-                      onChange={() => updateStoragePathConfig({ type: 'server' })}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-3">
-                      <div className={`p-3 rounded-lg ${
-                        storagePathConfig.type === 'server' ? 'bg-green-100' : 'bg-gray-100'
-                      }`}>
-                        <Server className={`h-6 w-6 ${
-                          storagePathConfig.type === 'server' ? 'text-green-600' : 'text-gray-500'
-                        }`} />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">ذخیره‌سازی در سرور</div>
-                        <div className="text-sm text-gray-500">ارسال به سایت و سرور</div>
-                      </div>
-                    </div>
-                  </label>
-                </div>
+        {/* Path Configuration Tab */}
+        {activeTab === 'path' && (
+          <div className="space-y-6">
+            {/* Local Storage Card */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
+                <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                  <HardDrive className="h-6 w-6" />
+                  مسیر ذخیره‌سازی محلی
+                </h3>
+                <p className="text-blue-100 text-sm mt-1">
+                  تعیین محل ذخیره‌سازی لاگ‌ها روی سیستم لوکال
+                </p>
               </div>
 
-              {/* Local Path Configuration */}
-              {storagePathConfig.type === 'local' && (
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <HardDrive className="h-5 w-5 text-blue-600" />
-                    مسیر محلی
-                  </h4>
-                  
-                  {/* Current Path Display */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FolderOpen className="h-8 w-8 text-blue-500" />
-                        <div>
-                          <div className="text-sm text-gray-500">مسیر فعلی:</div>
-                          <div className="font-mono text-gray-900">{logPathConfig.path}</div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={openPathEditor}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                        تغییر مسیر
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Path Editor (shown when editing) */}
-                  {isEditingPath && (
-                    <div className="bg-white rounded-lg border border-blue-200 p-4 mt-4">
-                      <div className="flex items-center gap-3 mb-4">
-                        <FolderOpen className="h-5 w-5 text-blue-600" />
-                        <span className="font-medium text-gray-900">ویرایش مسیر</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            مسیر جدید
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={tempPath}
-                              onChange={(e) => {
-                                setTempPath(e.target.value);
-                                setIsEditingPath(true);
-                                validatePath(e.target.value);
-                              }}
-                              placeholder="مثال: C:\Logs\Makhazen"
-                              className={`flex-1 px-4 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                                pathValidationError ? 'border-red-400' : 'border-gray-300'
-                              }`}
-                            />
-                            <button
-                              onClick={handleSelectPath}
-                              className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-                            >
-                              <FolderOpen className="h-4 w-4" />
-                              انتخاب پوشه
-                            </button>
-                          </div>
-                          {pathValidationError && (
-                            <div className="mt-2 flex items-center gap-2 text-red-600 text-sm">
-                              <AlertCircle className="h-4 w-4" />
-                              {pathValidationError}
-                            </div>
-                          )}
-                          {pathSuccess && (
-                            <div className="mt-2 flex items-center gap-2 text-green-600 text-sm">
-                              <CheckCircle className="h-4 w-4" />
-                              مسیر با موفقیت ذخیره شد!
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Quick paths */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            مسیرهای پیشنهادی
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {[
-                              { label: 'پیش‌فرض', path: './logs' },
-                              { label: 'داکیومنت‌ها', path: './documents/logs' },
-                              { label: 'دایرکتوری داده', path: './data/logs' }
-                            ].map((quickPath) => (
-                              <button
-                                key={quickPath.path}
-                                onClick={() => {
-                                  setTempPath(quickPath.path);
-                                  validatePath(quickPath.path);
-                                }}
-                                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-                              >
-                                {quickPath.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200">
-                        <button
-                          onClick={saveLogPath}
-                          disabled={!!pathValidationError || !tempPath.trim()}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Check className="h-4 w-4" />
-                          تأیید
-                        </button>
-                        <button
-                          onClick={cancelPathEdit}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                          انصراف
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Server Path Configuration */}
-              {storagePathConfig.type === 'server' && (
-                <div className="bg-green-50 rounded-xl p-6 border border-green-200">
-                  <h4 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <Server className="h-5 w-5 text-green-600" />
-                    تنظیمات سرور
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Server URL */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        آدرس سرور
-                        <span className="text-xs text-gray-500 block mt-1">
-                          آدرس کامل API سرور برای ارسال لاگ‌ها
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <Globe className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <input
-                          type="url"
-                          value={storagePathConfig.serverUrl}
-                          onChange={(e) => updateStoragePathConfig({ serverUrl: e.target.value })}
-                          placeholder="https://api.example.com/logs"
-                          className="w-full pr-10 pl-4 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Server Host */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        هاست سرور
-                        <span className="text-xs text-gray-500 block mt-1">
-                          آدرس هاست یا دامنه سرور
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <Link className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <input
-                          type="text"
-                          value={storagePathConfig.serverHost}
-                          onChange={(e) => updateStoragePathConfig({ serverHost: e.target.value })}
-                          placeholder="api.example.com"
-                          className="w-full pr-10 pl-4 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Server Port */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        پورت سرور
-                        <span className="text-xs text-gray-500 block mt-1">
-                          پورت اتصال به سرور
-                        </span>
-                      </label>
-                      <input
-                        type="number"
-                        value={storagePathConfig.serverPort}
-                        onChange={(e) => updateStoragePathConfig({ serverPort: parseInt(e.target.value) || 443 })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                        min="1"
-                        max="65535"
-                      />
-                    </div>
-
-                    {/* API Key */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        کلید API
-                        <span className="text-xs text-gray-500 block mt-1">
-                          کلید احراز هویت برای ارسال لاگ‌ها
-                        </span>
-                      </label>
-                      <input
-                        type="password"
-                        value={storagePathConfig.apiKey}
-                        onChange={(e) => updateStoragePathConfig({ apiKey: e.target.value })}
-                        placeholder="کلید API را وارد کنید"
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* HTTPS Toggle */}
-                  <div className="mt-4">
-                    <label className="flex items-center gap-3 p-4 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={storagePathConfig.useHttps}
-                        onChange={(e) => updateStoragePathConfig({ useHttps: e.target.checked })}
-                        className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-green-600" />
-                        <div>
-                          <div className="font-medium text-gray-900">استفاده از HTTPS</div>
-                          <div className="text-sm text-gray-500">اتصال امن به سرور</div>
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Test Connection Button */}
-                  <div className="mt-4 flex items-center gap-3">
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    آدرس فولدر ذخیره‌سازی
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={storagePathConfig.localPath}
+                      onChange={(e) => updateStoragePathConfig({ localPath: e.target.value })}
+                      placeholder="مثال: C:\Logs\Makhazen"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                     <button
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      onClick={handleSelectPath}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                     >
-                      <Activity className="h-4 w-4" />
-                      تست اتصال
+                      <FolderOpen className="h-4 w-4" />
+                      انتخاب فولدر
                     </button>
-                    <span className="text-sm text-gray-500">
-                      قبل از شروع ذخیره‌سازی، اتصال سرور را بررسی کنید
-                    </span>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
+
+            {/* Server Storage Card */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="px-6 py-5 bg-gradient-to-r from-green-600 to-green-700">
+                <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                  <Globe className="h-6 w-6" />
+                  آدرس هاست و سرور
+                </h3>
+                <p className="text-green-100 text-sm mt-1">
+                  تعیین آدرس سایت و هاست برای ذخیره‌سازی ابری لاگ‌ها
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      آدرس سایت یا سرور
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={storagePathConfig.serverUrl}
+                        onChange={(e) => updateStoragePathConfig({ serverUrl: e.target.value })}
+                        placeholder="مثال: https://logs.mysite.com"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      />
+                      <div className="px-4 py-2 bg-gray-100 text-gray-500 rounded-lg flex items-center gap-2 border border-gray-200">
+                        <Link className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      آدرس هاست (IP/Domain)
+                    </label>
+                    <input
+                      type="text"
+                      value={storagePathConfig.serverHost}
+                      onChange={(e) => updateStoragePathConfig({ serverHost: e.target.value })}
+                      placeholder="مثال: 192.168.1.50 یا logs.server.local"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
 
           {/* Advanced Path Settings */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -2230,22 +1983,6 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                     />
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={settings.logging.logToDatabase}
-                      onChange={(e) => updateLoggingSettings({ logToDatabase: e.target.checked })}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <Database className="h-5 w-5 text-gray-600" />
-                    <div>
-                      <div className="font-medium text-gray-900">ذخیره در پایگاه داده</div>
-                      <div className="text-sm text-gray-600">ذخیره لاگ‌ها در پایگاه داده</div>
-                    </div>
-                  </label>
-                </div>
               </div>
             )}
           </div>
@@ -2528,26 +2265,30 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">از تاریخ</label>
-                    <input
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">تا تاریخ</label>
-                    <input
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  {users.length > 0 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-blue-500" />
+                        از تاریخ
+                      </label>
+                      <PersianDatePicker
+                        value={filters.dateFrom}
+                        onChange={(date) => setFilters({ ...filters, dateFrom: date })}
+                        placeholder="تاریخ شروع"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-blue-500" />
+                        تا تاریخ
+                      </label>
+                      <PersianDatePicker
+                        value={filters.dateTo}
+                        onChange={(date) => setFilters({ ...filters, dateTo: date })}
+                        placeholder="تاریخ پایان"
+                      />
+                    </div>
+                    {users.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">کاربر</label>
                       <select
@@ -2603,49 +2344,64 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
-                  {paginatedLogs.map(log => (
-                    <div
-                      key={log.id}
-                      onClick={() => setSelectedLog(log)}
-                      className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={`p-2 rounded-lg ${getLevelColor(log.level)}`}>
-                            {getLevelIcon(log.level)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
-                                {log.level.toUpperCase()}
-                              </span>
-                              <span className="text-xs text-gray-500">{log.category}</span>
-                              {log.userName && (
-                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                    {paginatedLogs.map(log => (
+                      <div
+                        key={log.id}
+                        onClick={() => setSelectedLog(log)}
+                        className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1">
+                            <div className={`p-2 rounded-lg ${getLevelColor(log.level)}`}>
+                              {getLevelIcon(log.level)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
+                                    {log.level.toUpperCase()}
+                                  </span>
+                                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    {LOG_CATEGORIES.find(c => c.id === log.category)?.name || log.category}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 text-xs text-gray-600">
                                   <User className="h-3 w-3" />
-                                  {log.userName}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-900 mb-1">{log.message}</p>
-                            <div className="flex items-center gap-4 text-xs text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {formatPersianDate(new Date(log.timestamp))} {new Date(log.timestamp).toLocaleTimeString('fa-IR')}
-                              </span>
+                                  <span className="font-medium">{log.userName || 'ناشناس'}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{formatPersianDate(new Date(log.timestamp))}</span>
+                                  <span className="mr-1">{new Date(log.timestamp).toLocaleTimeString('fa-IR')}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-xs text-gray-600">
+                                  <Monitor className="h-3 w-3 text-purple-500" />
+                                  <span className="font-medium">صفحه: {log.page || '-'}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-xs text-gray-600">
+                                  <Edit3 className="h-3 w-3 text-orange-500" />
+                                  <span className="font-medium">فیلد: {log.field || '-'}</span>
+                                </div>
+                              </div>
+                              
+                              <p className="text-sm text-gray-900 font-medium">{log.message}</p>
+                              
                               {log.ipAddress && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {log.ipAddress}
-                                </span>
+                                <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
+                                  <MapPin className="h-2.5 w-2.5" />
+                                  <span>{log.ipAddress}</span>
+                                </div>
                               )}
                             </div>
                           </div>
+                          <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />
                         </div>
-                        <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
@@ -2672,129 +2428,6 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Activity Logs Tab */}
-      {activeTab === 'activity' && (
-        <div className="space-y-4">
-          {/* Real-time indicator */}
-          <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                realTimeMode 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-gray-100 text-gray-700'
-              }`}>
-                {realTimeMode ? (
-                  <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-sm font-medium">حالت زنده فعال</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                    <span className="text-sm font-medium">حالت زنده غیرفعال</span>
-                  </>
-                )}
-              </div>
-              <span className="text-sm text-gray-500">
-                {userActivityLogs.length} فعالیت ثبت شده
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  // Refresh activities from storage
-                  const storedActivities = storage.loadData('userActivities') as any[] | null;
-                  if (storedActivities) {
-                    // Trigger update
-                  }
-                }}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm"
-              >
-                <RefreshCw className="h-4 w-4" />
-                بروزرسانی
-              </button>
-            </div>
-          </div>
-
-          {/* Activity Logs List */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-blue-600" />
-                تاریخچه فعالیت‌های کاربران
-              </h4>
-              {realTimeMode && (
-                <div className="flex items-center gap-2 text-green-600">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-xs">در حال دریافت...</span>
-                </div>
-              )}
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {userActivityLogs.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <Activity className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>فعالیتی ثبت نشده است</p>
-                  <p className="text-sm mt-1">
-                    {realTimeMode 
-                      ? 'در انتظار ثبت فعالیت‌های کاربران...' 
-                      : 'فعایت‌های کاربران در اینجا نمایش داده می‌شوند'}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-200">
-                  {userActivityLogs.map((log: any) => (
-                    <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={`p-2 rounded-lg ${
-                            log.status === 'success' ? 'bg-green-50 text-green-600' :
-                            log.status === 'failed' ? 'bg-red-50 text-red-600' :
-                            'bg-yellow-50 text-yellow-600'
-                          }`}>
-                            {log.status === 'success' ? <CheckCircle className="h-4 w-4" /> :
-                             log.status === 'failed' ? <XCircle className="h-4 w-4" /> :
-                             <AlertTriangle className="h-4 w-4" />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-gray-900">{log.userName}</span>
-                              <span className="text-sm text-gray-500">-</span>
-                              <span className="text-sm text-gray-700">{log.action}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {formatPersianDate(new Date(log.timestamp))}
-                              </span>
-                              {log.ipAddress && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {log.ipAddress}
-                                </span>
-                              )}
-                              <span className="capitalize">{log.category}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className={`px-2 py-1 text-xs rounded ${
-                          log.status === 'success' ? 'bg-green-100 text-green-700' :
-                          log.status === 'failed' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {log.status === 'success' ? 'موفق' : 
-                           log.status === 'failed' ? 'ناموفق' : 'هشدار'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}

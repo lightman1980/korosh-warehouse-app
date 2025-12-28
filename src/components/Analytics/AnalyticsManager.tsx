@@ -1193,16 +1193,27 @@ export const AnalyticsManager: React.FC = () => {
       .filter(item => item.amount > 0)
       .sort((a, b) => b.amount - a.amount);
     
-    // Calculate trends based on selected period
+    // Calculate trends based on selected period and date range
     const trends = [];
     const monthNames = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
     const quarterNames = ['بهار', 'تابستان', 'پاییز', 'زمستان'];
     
     if (selectedPeriod === 'month') {
-      // Monthly trends for last 6 months
-      for (let i = 5; i >= 0; i--) {
-        const targetDate = new Date(currentYear, currentMonth - i, 1);
+      // Calculate months between startDate and endDate
+      const months = [];
+      let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+      
+      while (current <= end) {
+        months.push(new Date(current));
+        current.setMonth(current.getMonth() + 1);
+        // Limit to prevent infinite loop or too many bars
+        if (months.length > 24) break;
+      }
+      
+      months.forEach(targetDate => {
         const monthName = monthNames[targetDate.getMonth()];
+        const year = targetDate.getFullYear();
         
         const monthReceipts = periodFilteredReceipts.filter(r => {
           const receiptDate = new Date(r.receiptDate || r.createdAt);
@@ -1229,16 +1240,26 @@ export const AnalyticsManager: React.FC = () => {
             .reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0);
         
         trends.push({
-          period: monthName,
+          period: `${monthName} ${year}`,
           receipts: monthReceipts,
           deliveries: monthDeliveries
         });
-      }
+      });
     } else if (selectedPeriod === 'quarter') {
-      // Quarterly trends for last 4 quarters
-      for (let i = 3; i >= 0; i--) {
-        const quarter = Math.floor((currentMonth - i * 3) / 3);
-        const year = currentYear - Math.floor((currentMonth - i * 3) / 12);
+      // Calculate quarters between startDate and endDate
+      const quarters = [];
+      let current = new Date(startDate.getFullYear(), Math.floor(startDate.getMonth() / 3) * 3, 1);
+      const end = new Date(endDate.getFullYear(), Math.floor(endDate.getMonth() / 3) * 3, 1);
+      
+      while (current <= end) {
+        quarters.push(new Date(current));
+        current.setMonth(current.getMonth() + 3);
+        if (quarters.length > 12) break;
+      }
+      
+      quarters.forEach(targetDate => {
+        const quarter = Math.floor(targetDate.getMonth() / 3);
+        const year = targetDate.getFullYear();
         const quarterName = quarterNames[quarter % 4];
         
         const quarterReceipts = periodFilteredReceipts.filter(r => {
@@ -1274,12 +1295,20 @@ export const AnalyticsManager: React.FC = () => {
           receipts: quarterReceipts,
           deliveries: quarterDeliveries
         });
-      }
+      });
     } else {
-      // Yearly trends for last 5 years
-      for (let i = 4; i >= 0; i--) {
-        const year = currentYear - i;
-        
+      // Yearly trends
+      const years = [];
+      let current = startDate.getFullYear();
+      const end = endDate.getFullYear();
+      
+      while (current <= end) {
+        years.push(current);
+        current++;
+        if (years.length > 10) break;
+      }
+      
+      years.forEach(year => {
         const yearReceipts = periodFilteredReceipts.filter(r => {
           const receiptDate = new Date(r.receiptDate || r.createdAt);
           return receiptDate.getFullYear() === year;
@@ -1309,7 +1338,7 @@ export const AnalyticsManager: React.FC = () => {
           receipts: yearReceipts,
           deliveries: yearDeliveries
         });
-      }
+      });
     }
     
     // Calculate top companies
