@@ -691,48 +691,48 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     prevRealTimeModeRef.current = realTimeMode;
   }, [realTimeMode, handleExportActivitiesToExcel]);
 
-  const handleExportLogsToExcel = useCallback(() => {
-    if (filteredLogs.length === 0) {
-      alert('هیچ لاگی برای خروجی گرفتن وجود ندارد');
-      return;
-    }
+    const handleExportLogsToExcel = useCallback(() => {
+      if (filteredLogs.length === 0) {
+        alert('هیچ لاگی برای خروجی گرفتن وجود ندارد');
+        return;
+      }
 
-    try {
-        // Prepare data for Excel export with the 7 required fields + extras
-        const worksheetData = filteredLogs.map(log => ({
-          'نام کاربری': log.userName || '-',
-          'تاریخ': formatPersianDate(new Date(log.timestamp)),
-          'ساعت': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
-          'صفحه عملکرد': log.page || '-',
-          'منو / فیلد': log.field || '-',
-          'مقدار': log.amount ? formatPersianNumber(log.amount) : '-',
-          'کالا': log.product || '-',
-          'گزینه انتخاب شده': log.selection || log.message,
-          'نوع لاگ': log.logType === 'user' ? 'کاربری' : 'سیستمی',
-          'جنس لاگ': log.level === 'error' ? 'خطا' : log.level === 'warn' ? 'هشدار' : 'عملکردی',
-          'دسته‌بندی': LOG_CATEGORIES.find(c => c.id === log.category)?.name || log.category,
-          'آدرس IP': log.ipAddress || '-',
-          'جزئیات': log.details || '-'
-        }));
+      try {
+          // Prepare data for Excel export with the 7 required fields precisely
+          const worksheetData = filteredLogs.map(log => ({
+            'نام کاربر': log.userName || 'سیستم',
+            'نام صفحه': log.page || 'نامشخص',
+            'منو و فیلد': log.field || 'سایر',
+            'نوع تراکنش': log.logNature || 'عملیات',
+            'مقدار': log.amount ? formatPersianNumber(log.amount) : '0',
+            'کالا / محصول': log.product || '-',
+            'تاریخ تراکنش': formatPersianDate(new Date(log.timestamp)),
+            'زمان تراکنش': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
+            'شرح کامل': log.message
+          }));
 
-      // Create worksheet from JSON data
-      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        // Create worksheet from JSON data
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
 
-      // Create workbook
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'لاگ‌های سیستم');
+        // Set right-to-left for Persian support in Excel
+        if (!worksheet['!cols']) worksheet['!cols'] = [];
+        worksheet['!dir'] = 'rtl';
 
-      // Generate filename with current date
-      const dateStr = new Date().toISOString().split('T')[0];
-      const filename = `system_logs_${dateStr}.xlsx`;
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'گزارش تراکنش‌ها');
 
-      // Write and download the file
-      XLSX.writeFile(workbook, filename);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('خطا در تهیه فایل اکسل');
-    }
-  }, [filteredLogs]);
+        // Generate filename with current date
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `Transactions_Log_${dateStr}.xlsx`;
+
+        // Write and download the file
+        XLSX.writeFile(workbook, filename);
+      } catch (error) {
+        console.error('Error exporting to Excel:', error);
+        alert('خطا در تهیه فایل اکسل');
+      }
+    }, [filteredLogs]);
 
   const exportLogs = (format: 'json' | 'csv' | 'xml' | 'txt') => {
     const logsToExport = filteredLogs.length > 0 ? filteredLogs : logs;
@@ -1992,16 +1992,55 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                             <div className={`p-2 rounded-lg ${getLevelColor(log.level)}`}>
                               {getLevelIcon(log.level)}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
-                                    {log.level.toUpperCase()}
-                                  </span>
-                                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                    {LOG_CATEGORIES.find(c => c.id === log.category)?.name || log.category}
-                                  </span>
+                          <div className="flex-1 min-w-0">
+                                <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
+                                      {log.level.toUpperCase()}
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-900 truncate">
+                                      {log.userName || 'سیستم'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Monitor className="h-4 w-4 text-gray-400" />
+                                    <span className="truncate">{log.page || 'نامشخص'}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Edit3 className="h-4 w-4 text-gray-400" />
+                                    <span className="truncate">{log.field || 'سایر'}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Zap className="h-4 w-4 text-orange-400" />
+                                    <span className={`font-bold ${
+                                      log.logNature?.includes('حذف') ? 'text-red-600' : 
+                                      log.logNature?.includes('ایجاد') ? 'text-green-600' : 
+                                      log.logNature?.includes('ویرایش') ? 'text-blue-600' : 
+                                      'text-gray-700'
+                                    }`}>
+                                      {log.logNature || 'عملیات'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-sm text-indigo-600 font-bold">
+                                    <span className="truncate">{log.product || '-'}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-sm text-green-700 font-bold">
+                                    <span className="truncate">{log.amount ? formatPersianNumber(log.amount) : '-'}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 text-xs text-gray-400 justify-end">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{new Date(log.timestamp).toLocaleTimeString('fa-IR')}</span>
+                                    <span>{formatPersianDate(new Date(log.timestamp))}</span>
+                                  </div>
                                 </div>
+                                <p className="text-sm text-gray-600 line-clamp-1">{log.message}</p>
+                              </div>
                                 
                                 <div className="flex items-center gap-1 text-xs text-gray-600">
                                   <User className="h-3 w-3" />
@@ -2198,53 +2237,114 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         </div>
       )}
 
-      {/* Log Details Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => {
-          setSelectedLog(null);
-          setShowLogViewer(false);
-        }}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">جزئیات لاگ</h3>
-              <button
-                onClick={() => {
-                  setSelectedLog(null);
-                  setShowLogViewer(false);
-                }}
-                className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-white/50 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">سطح</label>
-                  <div className={`mt-1 px-3 py-2 rounded-lg inline-flex items-center gap-2 ${getLevelColor(selectedLog.level)}`}>
-                    {getLevelIcon(selectedLog.level)}
-                    <span className="font-medium">{selectedLog.level.toUpperCase()}</span>
+            {/* Log Details Modal */}
+            {selectedLog && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                  <div className={`p-6 flex items-center justify-between border-b ${getLevelColor(selectedLog.level)}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/50 rounded-lg">
+                        {getLevelIcon(selectedLog.level)}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-lg">جزئیات کامل تراکنش</h4>
+                        <p className="text-sm opacity-80">{selectedLog.id} #</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedLog(null)}
+                      className="p-2 hover:bg-black/10 rounded-full transition-colors"
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    {/* Main Info Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <span className="text-xs text-gray-500 block mb-1">نام کاربر</span>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-blue-500" />
+                          <span className="font-bold text-gray-900">{selectedLog.userName || 'سیستم'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <span className="text-xs text-gray-500 block mb-1">تاریخ و زمان</span>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-blue-500" />
+                          <span className="font-bold text-gray-900">
+                            {formatPersianDate(new Date(selectedLog.timestamp))} - {new Date(selectedLog.timestamp).toLocaleTimeString('fa-IR')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <span className="text-xs text-gray-500 block mb-1">صفحه / بخش</span>
+                        <div className="flex items-center gap-2">
+                          <Monitor className="h-4 w-4 text-purple-500" />
+                          <span className="font-bold text-gray-900">{selectedLog.page || 'نامشخص'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <span className="text-xs text-gray-500 block mb-1">منو / فیلد</span>
+                        <div className="flex items-center gap-2">
+                          <Edit3 className="h-4 w-4 text-purple-500" />
+                          <span className="font-bold text-gray-900">{selectedLog.field || 'سایر'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                        <span className="text-xs text-orange-600 block mb-1">نوع تراکنش</span>
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-orange-500" />
+                          <span className="font-bold text-orange-900">{selectedLog.logNature || 'عملیات'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <span className="text-xs text-indigo-600 block mb-1">کالا / محصول</span>
+                        <div className="flex items-center gap-2">
+                          <Folder className="h-4 w-4 text-indigo-500" />
+                          <span className="font-bold text-indigo-900">{selectedLog.product || '-'}</span>
+                        </div>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-xl border border-green-100 col-span-2">
+                        <span className="text-xs text-green-600 block mb-1">مقدار تراکنش</span>
+                        <div className="flex items-center gap-2 text-lg">
+                          <TrendingUp className="h-5 w-5 text-green-500" />
+                          <span className="font-black text-green-900">
+                            {selectedLog.amount ? formatPersianNumber(selectedLog.amount) : '0'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                      <span className="text-xs text-gray-500 block mb-2">شرح پیام</span>
+                      <p className="text-gray-800 leading-relaxed font-medium">
+                        {selectedLog.message}
+                      </p>
+                    </div>
+
+                    {selectedLog.details && (
+                      <div className="bg-gray-900 p-4 rounded-xl border border-gray-700">
+                        <span className="text-xs text-gray-400 block mb-2 font-mono">EXTRA DATA (JSON)</span>
+                        <pre className="text-xs text-blue-300 overflow-x-auto font-mono ltr text-left">
+                          {JSON.stringify(selectedLog.details, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 border-t flex justify-end">
+                    <button
+                      onClick={() => setSelectedLog(null)}
+                      className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-bold"
+                    >
+                      بستن پنجره
+                    </button>
                   </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">دسته‌بندی</label>
-                  <p className="mt-1 text-gray-900">{selectedLog.category}</p>
-                </div>
               </div>
-              
-                <div>
-                  <label className="text-sm font-medium text-gray-600">پیام</label>
-                  <p className="mt-1 text-gray-900">{selectedLog.message}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedLog.amount && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">مقدار</label>
-                      <p className="mt-1 text-gray-900 font-bold text-blue-600">{formatPersianNumber(selectedLog.amount)}</p>
-                    </div>
-                  )}
+            )}
                   {selectedLog.product && (
                     <div>
                       <label className="text-sm font-medium text-gray-600">کالا</label>

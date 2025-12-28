@@ -248,56 +248,85 @@ export const logUserActivity = async (
     finalNewValue = action.newValue || newValue;
   }
 
-  const session = storage.loadData<any>('current_session');
-  const currentUser = session || 
-                    storage.loadData<any>('currentUser') || 
-                    storage.loadData<any>('user') ||
-                    JSON.parse(localStorage.getItem('currentUser') || 'null') ||
-                    JSON.parse(localStorage.getItem('user') || 'null') ||
-                    { username: 'Unknown', id: 'unknown', fullName: 'کاربر ناشناس' };
+    const session = storage.loadData<any>('current_session');
+    const authUser = storage.loadData<any>('authUser');
+    const currentUser = session || 
+                      authUser ||
+                      storage.loadData<any>('currentUser') || 
+                      storage.loadData<any>('user') ||
+                      JSON.parse(localStorage.getItem('currentUser') || 'null') ||
+                      JSON.parse(localStorage.getItem('user') || 'null') ||
+                      { username: 'سیستم', id: 'system', fullName: 'مدیر سیستم' };
 
-  // اطمینان از وجود فیلدهای لازم در شی کاربر
-  const userId = currentUser.userId || currentUser.id || currentUser.username || 'unknown';
-  const userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.username || 'کاربر ناشناس';
+    // اطمینان از وجود فیلدهای لازم در شی کاربر
+    const userId = currentUser.userId || currentUser.id || currentUser.uid || currentUser.username || 'system';
+    const userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.displayName || currentUser.username || 'مدیر سیستم';
 
-  const activity: UserActivityEntry = {
-    id: Math.random().toString(36).substring(2, 11),
-    timestamp: new Date().toISOString(),
-    userId: userId,
-    userName: userName,
-    action: finalAction,
-    category: finalCategory,
-    page: finalPage,
-    status: finalStatus,
-    details: finalDetails,
-    field: finalField,
-    selection: finalSelection,
-    amount: finalAmount,
-    product: finalProduct,
-    logType: finalLogType,
-    logNature: finalLogNature,
-    oldValue: finalOldValue,
-    newValue: finalNewValue,
-    ipAddress: '127.0.0.1' // In a browser app, IP is usually handled by server
-  };
+    // تعیین نوع تراکنش بر اساس متن پیام اگر مستقیماً ارسال نشده باشد
+    let detectedLogNature = finalLogNature;
+    if (!detectedLogNature) {
+      const actionText = (finalAction || '').toLowerCase();
+      if (actionText.includes('ایجاد') || actionText.includes('ثبت') || actionText.includes('اضافه') || actionText.includes('create') || actionText.includes('add')) {
+        detectedLogNature = 'ایجاد';
+      } else if (actionText.includes('ویرایش') || actionText.includes('تغییر') || actionText.includes('اصلاح') || actionText.includes('edit') || actionText.includes('update')) {
+        detectedLogNature = 'ویرایش';
+      } else if (actionText.includes('حذف') || actionText.includes('delete') || actionText.includes('remove')) {
+        detectedLogNature = 'حذف';
+      } else if (actionText.includes('امانی')) {
+        detectedLogNature = 'حواله امانی';
+      } else if (actionText.includes('تملیکی')) {
+        detectedLogNature = 'حواله تملیکی';
+      } else {
+        detectedLogNature = finalStatus === 'failed' ? 'خطا' : finalStatus === 'warning' ? 'هشدار' : 'عملیات';
+      }
+    }
 
-  // Log via LoggerService
-  await logger.log({
-    level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
-    category: finalCategory,
-    message: finalAction,
-    userName: userName,
-    userId: userId,
-    page: finalPage,
-    field: finalField,
-    selection: finalSelection,
-    amount: finalAmount,
-    product: finalProduct,
-    logType: finalLogType,
-    logNature: finalLogNature || finalStatus,
-    details: finalDetails,
-    ipAddress: activity.ipAddress
-  });
+    // شناسایی خودکار حواله‌های امانی و تملیکی در فیلد صفحه یا اکشن
+    if (finalPage.includes('امانی') || finalAction.includes('امانی')) {
+      if (!detectedLogNature.includes('امانی')) detectedLogNature = `امانی - ${detectedLogNature}`;
+    }
+    if (finalPage.includes('تملیکی') || finalAction.includes('تملیکی')) {
+      if (!detectedLogNature.includes('تملیکی')) detectedLogNature = `تملیکی - ${detectedLogNature}`;
+    }
+
+    const activity: UserActivityEntry = {
+      id: Math.random().toString(36).substring(2, 11),
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      userName: userName,
+      action: finalAction,
+      category: finalCategory,
+      page: finalPage,
+      status: finalStatus,
+      details: finalDetails,
+      field: finalField,
+      selection: finalSelection,
+      amount: finalAmount,
+      product: finalProduct,
+      logType: finalLogType,
+      logNature: detectedLogNature,
+      oldValue: finalOldValue,
+      newValue: finalNewValue,
+      ipAddress: '127.0.0.1' // In a browser app, IP is usually handled by server
+    };
+
+    // Log via LoggerService
+    await logger.log({
+      level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
+      category: finalCategory,
+      message: finalAction,
+      userName: userName,
+      userId: userId,
+      page: finalPage,
+      field: finalField,
+      selection: finalSelection,
+      amount: finalAmount,
+      product: finalProduct,
+      logType: finalLogType,
+      logNature: detectedLogNature,
+      details: finalDetails,
+      ipAddress: activity.ipAddress
+    });
 
   // Save to userActivities for immediate UI update in LoggingSettings
   const activities = storage.loadData<any[]>('userActivities') || [];
