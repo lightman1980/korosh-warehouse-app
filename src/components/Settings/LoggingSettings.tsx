@@ -1992,100 +1992,66 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                             <div className={`p-2 rounded-lg ${getLevelColor(log.level)}`}>
                               {getLevelIcon(log.level)}
                             </div>
-                          <div className="flex-1 min-w-0">
-                                <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
-                                      {log.level.toUpperCase()}
-                                    </span>
-                                    <span className="text-sm font-bold text-gray-900 truncate">
-                                      {log.userName || 'سیستم'}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Monitor className="h-4 w-4 text-gray-400" />
-                                    <span className="truncate">{log.page || 'نامشخص'}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Edit3 className="h-4 w-4 text-gray-400" />
-                                    <span className="truncate">{log.field || 'سایر'}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Zap className="h-4 w-4 text-orange-400" />
-                                    <span className={`font-bold ${
-                                      log.logNature?.includes('حذف') ? 'text-red-600' : 
-                                      log.logNature?.includes('ایجاد') ? 'text-green-600' : 
-                                      log.logNature?.includes('ویرایش') ? 'text-blue-600' : 
-                                      'text-gray-700'
-                                    }`}>
-                                      {log.logNature || 'عملیات'}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-sm text-indigo-600 font-bold">
-                                    <span className="truncate">{log.product || '-'}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-sm text-green-700 font-bold">
-                                    <span className="truncate">{log.amount ? formatPersianNumber(log.amount) : '-'}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-xs text-gray-400 justify-end">
-                                    <Clock className="h-3 w-3" />
-                                    <span>{new Date(log.timestamp).toLocaleTimeString('fa-IR')}</span>
-                                    <span>{formatPersianDate(new Date(log.timestamp))}</span>
-                                  </div>
-                                </div>
-                                <p className="text-sm text-gray-600 line-clamp-1">{log.message}</p>
-                              </div>
-                                
-                                <div className="flex items-center gap-1 text-xs text-gray-600">
-                                  <User className="h-3 w-3" />
-                                  <span className="font-medium">{log.userName || 'ناشناس'}</span>
-                                </div>
-
-                                <div className="flex items-center gap-1 text-xs text-gray-500">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{formatPersianDate(new Date(log.timestamp))}</span>
-                                  <span className="mr-1">{new Date(log.timestamp).toLocaleTimeString('fa-IR')}</span>
-                                </div>
-
-                                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                                    <Monitor className="h-3 w-3 text-purple-500" />
-                                    <span className="font-medium">صفحه: {log.page || '-'}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                                    <Edit3 className="h-3 w-3 text-orange-500" />
-                                    <span className="font-medium">فیلد: {log.field || '-'}</span>
-                                  </div>
-
-                                  {log.amount && (
-                                    <div className="flex items-center gap-1 text-xs text-gray-600">
-                                      <Zap className="h-3 w-3 text-yellow-500" />
-                                      <span className="font-medium">مقدار: {formatPersianNumber(log.amount)}</span>
+                            <div className="flex-1 min-w-0">
+                                  <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
+                                        {log.level.toUpperCase()}
+                                      </span>
+                                      <span className="text-sm font-bold text-gray-900 truncate">
+                                        {log.userName || 'سیستم'}
+                                      </span>
                                     </div>
-                                  )}
-
-                                  {log.product && (
-                                    <div className="flex items-center gap-1 text-xs text-gray-600">
-                                      <Archive className="h-3 w-3 text-green-500" />
-                                      <span className="font-medium">کالا: {log.product}</span>
+  
+                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                      <Monitor className="h-4 w-4 text-gray-400" />
+                                      <span className="truncate">{log.page || 'نامشخص'}</span>
+                                    </div>
+  
+                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                      <Edit3 className="h-4 w-4 text-gray-400" />
+                                      <span className="truncate">{log.field || 'سایر'}</span>
+                                    </div>
+  
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Zap className="h-4 w-4 text-orange-400" />
+                                      <span className={`font-bold ${
+                                        log.logNature?.includes('حذف') ? 'text-red-600' : 
+                                        log.logNature?.includes('ایجاد') ? 'text-green-600' : 
+                                        log.logNature?.includes('ویرایش') ? 'text-blue-600' : 
+                                        log.logNature?.includes('امانی') ? 'text-purple-600' :
+                                        log.logNature?.includes('تملیکی') ? 'text-indigo-600' :
+                                        'text-gray-700'
+                                      }`}>
+                                        {log.logNature || 'عملیات'}
+                                      </span>
+                                    </div>
+  
+                                    <div className="flex items-center gap-2 text-sm text-indigo-600 font-bold">
+                                      <Archive className="h-4 w-4 text-indigo-400" />
+                                      <span className="truncate">{log.product || '-'}</span>
+                                    </div>
+  
+                                    <div className="flex items-center gap-2 text-sm text-green-700 font-bold">
+                                      <TrendingUp className="h-4 w-4 text-green-400" />
+                                      <span className="truncate">{log.amount ? formatPersianNumber(log.amount) : '-'}</span>
+                                    </div>
+  
+                                    <div className="flex items-center gap-2 text-xs text-gray-400 justify-end">
+                                      <Clock className="h-3 w-3" />
+                                      <span>{new Date(log.timestamp).toLocaleTimeString('fa-IR')}</span>
+                                      <span>{formatPersianDate(new Date(log.timestamp))}</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-sm text-gray-900 font-medium">{log.message}</p>
+                                  
+                                  {log.ipAddress && (
+                                    <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
+                                      <MapPin className="h-2.5 w-2.5" />
+                                      <span>{log.ipAddress}</span>
                                     </div>
                                   )}
                                 </div>
-                              
-                              <p className="text-sm text-gray-900 font-medium">{log.message}</p>
-                              
-                              {log.ipAddress && (
-                                <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
-                                  <MapPin className="h-2.5 w-2.5" />
-                                  <span>{log.ipAddress}</span>
-                                </div>
-                              )}
                             </div>
                           </div>
                           <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />

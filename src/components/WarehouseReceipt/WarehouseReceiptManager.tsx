@@ -2716,14 +2716,16 @@ export const WarehouseReceiptManager: React.FC = () => {
             // ثبت لاگ فعالیت کاربر برای ویرایش
             if (typeof (window as any).logUserActivity === 'function') {
               (window as any).logUserActivity({
-                action: 'ویرایش رسید انبار',
+                action: `ویرایش رسید انبار - شماره ${transactionNumber}`,
                 category: 'receipt',
                 page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
                 status: 'success',
+                amount: updatedReceipt.receiptBasisAmount || updatedReceipt.finalAmount,
+                product: updatedReceipt.productName,
+                logNature: `ویرایش - ${currentUserType === 'consignment' ? 'امانی' : 'تملیکی'}`,
                 field: 'دکمه ویرایش',
                 selection: transactionNumber || '',
                 logType: 'user',
-                logNature: 'عملکردی',
                 oldValue: existingReceipt,
                 newValue: updatedReceipt,
                 details: { transactionNumber: transactionNumber }
@@ -2761,14 +2763,16 @@ export const WarehouseReceiptManager: React.FC = () => {
           // ثبت لاگ فعالیت کاربر برای جدید
           if (typeof (window as any).logUserActivity === 'function') {
             (window as any).logUserActivity({
-              action: 'ثبت رسید انبار جدید',
+              action: `ثبت رسید انبار جدید - شماره ${transactionNumber}`,
               category: 'receipt',
               page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
               status: 'success',
+              amount: newReceiptObj.receiptBasisAmount || newReceiptObj.finalAmount,
+              product: newReceiptObj.productName,
+              logNature: `ایجاد - ${currentUserType === 'consignment' ? 'امانی' : 'تملیکی'}`,
               field: 'دکمه ثبت',
               selection: transactionNumber || '',
               logType: 'user',
-              logNature: 'عملکردی',
               oldValue: null,
               newValue: newReceiptObj,
               details: { transactionNumber: transactionNumber }

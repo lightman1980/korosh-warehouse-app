@@ -2294,20 +2294,25 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
     }
       saveDataWithNotification(slipType, updatedSlips);
 
-      // ثبت در لاگ سیستم
-      logUserActivity({
-        action: `${isEditMode ? 'ویرایش' : 'ثبت'} حواله انبار - شماره ${newDelivery.transactionNumber}`,
-        category: 'release',
-        status: 'success',
-        page: 'مدیریت حواله انبار',
-        details: {
-          transactionNumber: newDelivery.transactionNumber,
-          productName: newDelivery.productName,
+        // ثبت در لاگ سیستم
+        logUserActivity({
+          action: `${isEditMode ? 'ویرایش' : 'ثبت'} حواله انبار - شماره ${newDelivery.transactionNumber}`,
+          category: 'release',
+          status: 'success',
+          page: 'مدیریت حواله انبار',
           amount: newDelivery.amount,
-          site: newDelivery.siteName,
-          tank: newDelivery.tankName
-        }
-      });
+          product: newDelivery.productName,
+          logNature: (newDelivery.contractNumber || newDelivery.permitId) ? 
+            `حواله امانی - ${isEditMode ? 'ویرایش' : 'ایجاد'}` : 
+            `حواله تملیکی - ${isEditMode ? 'ویرایش' : 'ایجاد'}`,
+          details: {
+            transactionNumber: newDelivery.transactionNumber,
+            productName: newDelivery.productName,
+            amount: newDelivery.amount,
+            site: newDelivery.siteName,
+            tank: newDelivery.tankName
+          }
+        });
 
       // 3. به‌روزرساني موجودي مجوز (فقط براي مجوزهاي اماني) - بهبود یافته
     if (newDelivery.permitId) {

@@ -250,17 +250,21 @@ export const logUserActivity = async (
 
     const session = storage.loadData<any>('current_session');
     const authUser = storage.loadData<any>('authUser');
+    const storedUser = JSON.parse(localStorage.getItem('currentUser') || 'null') || JSON.parse(localStorage.getItem('user') || 'null');
     const currentUser = session || 
                       authUser ||
                       storage.loadData<any>('currentUser') || 
                       storage.loadData<any>('user') ||
-                      JSON.parse(localStorage.getItem('currentUser') || 'null') ||
-                      JSON.parse(localStorage.getItem('user') || 'null') ||
+                      storedUser ||
                       { username: 'سیستم', id: 'system', fullName: 'مدیر سیستم' };
 
-    // اطمینان از وجود فیلدهای لازم در شی کاربر
+    // اطمینان از وجود فیلدهای لازم در شی کاربر و عدم نمایش Unknown
     const userId = currentUser.userId || currentUser.id || currentUser.uid || currentUser.username || 'system';
-    const userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.displayName || currentUser.username || 'مدیر سیستم';
+    let userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.displayName || currentUser.username || 'مدیر سیستم';
+    
+    if (userName.toLowerCase() === 'unknown' || userName === 'ناشناس') {
+      userName = 'مدیر سیستم';
+    }
 
     // تعیین نوع تراکنش بر اساس متن پیام اگر مستقیماً ارسال نشده باشد
     let detectedLogNature = finalLogNature;
@@ -283,10 +287,22 @@ export const logUserActivity = async (
 
     // شناسایی خودکار حواله‌های امانی و تملیکی در فیلد صفحه یا اکشن
     if (finalPage.includes('امانی') || finalAction.includes('امانی')) {
-      if (!detectedLogNature.includes('امانی')) detectedLogNature = `امانی - ${detectedLogNature}`;
+      if (!detectedLogNature.includes('امانی')) {
+        if (detectedLogNature === 'ایجاد' || detectedLogNature === 'ویرایش' || detectedLogNature === 'حذف') {
+          detectedLogNature = `حواله امانی - ${detectedLogNature}`;
+        } else {
+          detectedLogNature = 'حواله امانی';
+        }
+      }
     }
     if (finalPage.includes('تملیکی') || finalAction.includes('تملیکی')) {
-      if (!detectedLogNature.includes('تملیکی')) detectedLogNature = `تملیکی - ${detectedLogNature}`;
+      if (!detectedLogNature.includes('تملیکی')) {
+        if (detectedLogNature === 'ایجاد' || detectedLogNature === 'ویرایش' || detectedLogNature === 'حذف') {
+          detectedLogNature = `حواله تملیکی - ${detectedLogNature}`;
+        } else {
+          detectedLogNature = 'حواله تملیکی';
+        }
+      }
     }
 
     const activity: UserActivityEntry = {
