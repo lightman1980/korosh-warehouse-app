@@ -2389,36 +2389,33 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
       }
     }
 
-    // 4. به‌روزرساني state براي نمايش صحيح در جدول
-    const reloadedConsignmentSlips = (storage.loadData('consignment-delivery-slips') || []) as any[];
-    const reloadedOwnershipSlips = (storage.loadData('ownership-delivery-slips') || []) as any[];
-    setExistingSlips([...reloadedConsignmentSlips, ...reloadedOwnershipSlips]);
+      // 4. به‌روزرساني state براي نمايش صحيح در جدول
+      const reloadedConsignmentSlips = (storage.loadData('consignment-delivery-slips') || []) as any[];
+      const reloadedOwnershipSlips = (storage.loadData('ownership-delivery-slips') || []) as any[];
+      setExistingSlips([...reloadedConsignmentSlips, ...reloadedOwnershipSlips]);
 
-    // به‌روزرسانی inventoryRefreshKey برای refresh محاسبات موجودی
-    setInventoryRefreshKey(prev => prev + 1);
+      // به‌روزرسانی inventoryRefreshKey برای refresh محاسبات موجودی
+      setInventoryRefreshKey(prev => prev + 1);
 
-    // Reset form
-    setIsAddingDelivery(false);
-    setIsEditingDelivery(false);
-    setCurrentDelivery({});
-    setErrors({});
-    setCurrentView('list');
-    console.log('🎉 ذخیره تراکنش امانی با موفقیت انجام شد:', {
-      transactionNumber: newDelivery.transactionNumber,
-      permitId: newDelivery.permitId,
-      amount: newDelivery.amount,
-      status: newDelivery.status
-    });
-    
-    // بازگشت به لیست حواله‌ها بعد از ذخیره موفق
-    if (!isEditMode) {
-      // فقط در حالت ایجاد جدید، به صورت خودکار برگرد (حالت ویرایش دستی کاربر است)
-      setTimeout(() => {
-        handleBackToList();
-      }, 1000); // 1 ثانیه تاخیر برای نمایش پیام موفقیت
-    }
-    
+      // Reset form
+      setIsAddingDelivery(false);
+      setIsEditingDelivery(false);
+      setCurrentDelivery({});
+      setErrors({});
+      setCurrentView('list');
+      
+      console.log('🎉 ذخیره تراکنش با موفقیت انجام شد:', {
+        transactionNumber: newDelivery.transactionNumber,
+        permitId: newDelivery.permitId,
+        amount: newDelivery.amount,
+        status: newDelivery.status
+      });
+      
+      // بازگشت به لیست حواله‌ها بعد از ذخیره موفق
+      handleBackToList();
+      
       alert(isEditMode ? '✅ تراکنش با موفقيت ويرايش شد.' : '✅ تراکنش جديد با موفقيت ذخيره شد.');
+
 
       // ثبت لاگ فعالیت کاربر
       if (typeof (window as any).logUserActivity === 'function') {
@@ -3402,66 +3399,67 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
           )}
 
 
-          {/* Table 9: Registered Transactions */}
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden lg:col-span-2">
-            <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">تراکنش‌های ثبت شده امانی</h2>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={showExtraInfoInConsignmentTable}
-                    onChange={(e) => setShowExtraInfoInConsignmentTable(e.target.checked)}
-                    className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                  />
-                  <span className="text-sm text-white font-medium">نمایش اطلاعات تکمیلی</span>
-                </label>
-                <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsConsignmentTableMinimized(!isConsignmentTableMinimized)}
-                  className="flex items-center gap-2 px-3 py-1 text-sm bg-white text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
-                >
-                  {isConsignmentTableMinimized ? (
-                    <>
-                      <Maximize2 className="h-4 w-4" />
-                      <span>باز کردن</span>
-                    </>
-                  ) : (
-                    <>
-                      <Minimize2 className="h-4 w-4" />
-                      <span>جمع کردن</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      if ('caches' in window) {
-                        const keys = await caches.keys();
-                        await Promise.all(keys.map(k => caches.delete(k)));
+            {/* Table 9: Registered Transactions */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden lg:col-span-2">
+              <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold">تراکنش‌های ثبت شده امانی</h2>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={showExtraInfoInConsignmentTable}
+                      onChange={(e) => setShowExtraInfoInConsignmentTable(e.target.checked)}
+                      className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-white font-medium">نمایش اطلاعات تکمیلی</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsConsignmentTableMinimized(!isConsignmentTableMinimized)}
+                    className="flex items-center gap-2 px-3 py-1 text-sm bg-white text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
+                  >
+                    {isConsignmentTableMinimized ? (
+                      <>
+                        <Maximize2 className="h-4 w-4" />
+                        <span>باز کردن</span>
+                      </>
+                    ) : (
+                      <>
+                        <Minimize2 className="h-4 w-4" />
+                        <span>جمع کردن</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        if ('caches' in window) {
+                          const keys = await caches.keys();
+                          await Promise.all(keys.map(k => caches.delete(k)));
+                        }
+                        if ('serviceWorker' in navigator) {
+                          const regs = await navigator.serviceWorker.getRegistrations();
+                          await Promise.all(regs.map(r => r.unregister()));
+                        }
+                        alert('کش برنامه پاک شد. صفحه اکنون رفرش می‌شود.');
+                        window.location.reload();
+                      } catch (e) {
+                        alert('پاکسازی کش با خطا مواجه شد. لطفاً یکبار دیگر تلاش کنید.');
+                        console.warn('Cache clear error', e);
                       }
-                      if ('serviceWorker' in navigator) {
-                        const regs = await navigator.serviceWorker.getRegistrations();
-                        await Promise.all(regs.map(r => r.unregister()));
-                      }
-                      alert('کش برنامه پاک شد. صفحه اکنون رفرش می‌شود.');
-                      window.location.reload();
-                    } catch (e) {
-                      alert('پاکسازی کش با خطا مواجه شد. لطفاً یکبار دیگر تلاش کنید.');
-                      console.warn('Cache clear error', e);
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-md bg-white text-teal-700 hover:bg-teal-50 transition-colors text-sm"
-                  title="پاکسازی کش برنامه (داده‌های شما حذف نمی‌شود)"
-                >
-                  پاکسازی کش برنامه
-                </button>
+                    }}
+                    className="px-3 py-1.5 rounded-md bg-white text-teal-700 hover:bg-teal-50 transition-colors text-sm"
+                    title="پاکسازی کش برنامه (داده‌های شما حذف نمی‌شود)"
+                  >
+                    پاکسازی کش برنامه
+                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
-            {!isConsignmentTableMinimized && (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+              {!isConsignmentTableMinimized && (
+              <div className="overflow-auto max-h-[600px]">
+                <table className="w-full">
+
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">شماره تراکنش</th>

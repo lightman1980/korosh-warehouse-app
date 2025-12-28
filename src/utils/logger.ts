@@ -242,12 +242,14 @@ export const logUserActivity = async (
 
   const currentUser = storage.loadData<any>('current_session')?.user || 
                     storage.loadData<any>('currentUser') || 
+                    storage.loadData<any>('user') ||
                     JSON.parse(localStorage.getItem('currentUser') || 'null') ||
+                    JSON.parse(localStorage.getItem('user') || 'null') ||
                     { username: 'Unknown', id: 'unknown', fullName: 'کاربر ناشناس' };
 
   // اطمینان از وجود فیلدهای لازم در شی کاربر
   const userId = currentUser.id || currentUser.username || 'unknown';
-  const userName = currentUser.fullName || currentUser.username || 'کاربر ناشناس';
+  const userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.username || 'کاربر ناشناس';
 
   const activity: UserActivityEntry = {
     id: Math.random().toString(36).substring(2, 11),
