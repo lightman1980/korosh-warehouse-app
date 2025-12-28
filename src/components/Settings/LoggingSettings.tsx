@@ -332,19 +332,56 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   }, [logger]);
 
   const updateLoggingSettings = (updates: any) => {
+    const defaultLogging = {
+      logLevel: 'info',
+      logToFile: true,
+      logToDatabase: true,
+      maxLogSize: 100,
+      logRetention: 90,
+      logCategories: ['system', 'security', 'inventory', 'user']
+    };
+    
+    const currentLogging = settings.logging || defaultLogging;
+    
     const newLogging = {
-      ...(settings.logging || {}),
+      ...currentLogging,
       ...updates
     };
     setSettings({
       ...settings,
       logging: newLogging
     });
-    // Also update logger service if needed
-    if (updates.logLevel) {
-      // Logic to update logger service level
-    }
   };
+
+  if (!settings || !settings.logging) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Settings className="h-8 w-8 text-blue-600 animate-pulse" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">در حال آماده‌سازی تنظیمات لاگ...</h3>
+        <p className="text-gray-600 mb-6">سیستم در حال بازسازی تنظیمات مفقود شده است. لطفا لحظاتی صبر کنید.</p>
+        <button 
+          onClick={() => {
+            setSettings({
+              ...settings,
+              logging: {
+                logLevel: 'info',
+                logToFile: true,
+                logToDatabase: true,
+                maxLogSize: 100,
+                logRetention: 90,
+                logCategories: ['system', 'security', 'inventory', 'user']
+              }
+            });
+          }}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          بازسازی دستی تنظیمات
+        </button>
+      </div>
+    );
+  }
 
   const updateStoragePathConfig = (updates: Partial<StoragePathConfig>) => {
     const newConfig = { ...storagePathConfig, ...updates };

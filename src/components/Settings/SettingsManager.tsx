@@ -589,16 +589,25 @@ const loadSettings = async () => {
     }
 
     // ۲) اگر از سرور چیزی نبود، از localStorage (DataStorage) استفاده می‌کنیم
-    const storage = DataStorage.getInstance();
-    const savedSettings = storage.loadData('settings') as AppSettings | null;
-    if (savedSettings) {
-      // Ensure default theme is always set correctly
-      const finalSettings: AppSettings = { 
-        ...initialSettings, 
-        ...savedSettings,
-        theme: (savedSettings as any).theme || 'Microsoft Dynamic 365'
-      };
-      setSettings(finalSettings);
+      const storage = DataStorage.getInstance();
+      const savedSettings = storage.loadData('settings') as AppSettings | null;
+      if (savedSettings) {
+        // Ensure all top-level properties from initialSettings are present
+        // and do a shallow merge for second-level objects to prevent undefined errors
+        const finalSettings: AppSettings = { 
+          ...initialSettings, 
+          ...savedSettings,
+          security: { ...initialSettings.security, ...(savedSettings.security || {}) },
+          performance: { ...initialSettings.performance, ...(savedSettings.performance || {}) },
+          integration: { ...initialSettings.integration, ...(savedSettings.integration || {}) },
+          userManagement: { ...initialSettings.userManagement, ...(savedSettings.userManagement || {}) },
+          backup: { ...initialSettings.backup, ...(savedSettings.backup || {}) },
+          logging: { ...initialSettings.logging, ...(savedSettings.logging || {}) },
+          sync: { ...initialSettings.sync, ...(savedSettings.sync || {}) },
+          theme: (savedSettings as any).theme || 'Microsoft Dynamic 365'
+        };
+        setSettings(finalSettings);
+
       if (externalSetSettings) {
         externalSetSettings(finalSettings);
       }
