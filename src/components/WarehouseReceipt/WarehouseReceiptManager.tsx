@@ -2713,24 +2713,28 @@ export const WarehouseReceiptManager: React.FC = () => {
             } as WarehouseReceipt;
             updatedReceipts[index] = updatedReceipt;
 
-            // ثبت لاگ فعالیت کاربر برای ویرایش
-            if (typeof (window as any).logUserActivity === 'function') {
-              (window as any).logUserActivity({
-                action: `ویرایش رسید انبار - شماره ${transactionNumber}`,
-                category: 'receipt',
-                page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
-                status: 'success',
-                amount: updatedReceipt.receiptBasisAmount || updatedReceipt.finalAmount,
-                product: updatedReceipt.productName,
-                logNature: `ویرایش - ${currentUserType === 'consignment' ? 'امانی' : 'تملیکی'}`,
-                field: 'دکمه ویرایش',
-                selection: transactionNumber || '',
-                logType: 'user',
-                oldValue: existingReceipt,
-                newValue: updatedReceipt,
-                details: { transactionNumber: transactionNumber }
-              });
-            }
+              // ثبت لاگ فعالیت کاربر برای ویرایش
+              if (typeof (window as any).logUserActivity === 'function') {
+                (window as any).logUserActivity({
+                  action: `ویرایش رسید انبار - شماره ${transactionNumber}`,
+                  category: 'receipt',
+                  page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+                  status: 'success',
+                  amount: updatedReceipt.receiptBasisAmount || updatedReceipt.finalAmount,
+                  product: updatedReceipt.productName,
+                  receiptDate: updatedReceipt.receiptDate ? formatPersianDate(updatedReceipt.receiptDate) : '',
+                  documentType: updatedReceipt.contractId ? 'سیستمی (قراردادی)' : 'دستی',
+                  counterparty: updatedReceipt.counterpartyName || updatedReceipt.companyName || '',
+                  logNature: `${currentUserType === 'consignment' ? 'امانی' : 'تملیکی'} - ویرایش`,
+                  field: 'دکمه ویرایش',
+                  selection: transactionNumber || '',
+                  logType: 'user',
+                  oldValue: existingReceipt,
+                  newValue: updatedReceipt,
+                  details: { transactionNumber: transactionNumber }
+                });
+              }
+
           }
         } else if (isAddingNew) {
           receiptIdToLog = `receipt_${Date.now()}`;
@@ -2760,24 +2764,28 @@ export const WarehouseReceiptManager: React.FC = () => {
           
           updatedReceipts.push(newReceiptObj);
 
-          // ثبت لاگ فعالیت کاربر برای جدید
-          if (typeof (window as any).logUserActivity === 'function') {
-            (window as any).logUserActivity({
-              action: `ثبت رسید انبار جدید - شماره ${transactionNumber}`,
-              category: 'receipt',
-              page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
-              status: 'success',
-              amount: newReceiptObj.receiptBasisAmount || newReceiptObj.finalAmount,
-              product: newReceiptObj.productName,
-              logNature: `ایجاد - ${currentUserType === 'consignment' ? 'امانی' : 'تملیکی'}`,
-              field: 'دکمه ثبت',
-              selection: transactionNumber || '',
-              logType: 'user',
-              oldValue: null,
-              newValue: newReceiptObj,
-              details: { transactionNumber: transactionNumber }
-            });
-          }
+            // ثبت لاگ فعالیت کاربر برای جدید
+            if (typeof (window as any).logUserActivity === 'function') {
+              (window as any).logUserActivity({
+                action: `ثبت رسید انبار جدید - شماره ${transactionNumber}`,
+                category: 'receipt',
+                page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+                status: 'success',
+                amount: newReceiptObj.receiptBasisAmount || newReceiptObj.finalAmount,
+                product: newReceiptObj.productName,
+                receiptDate: newReceiptObj.receiptDate ? formatPersianDate(newReceiptObj.receiptDate) : '',
+                documentType: newReceiptObj.contractId ? 'سیستمی (قراردادی)' : 'دستی',
+                counterparty: newReceiptObj.counterpartyName || newReceiptObj.companyName || '',
+                logNature: `${currentUserType === 'consignment' ? 'امانی' : 'تملیکی'} - ایجاد`,
+                field: 'دکمه ثبت',
+                selection: transactionNumber || '',
+                logType: 'user',
+                oldValue: null,
+                newValue: newReceiptObj,
+                details: { transactionNumber: transactionNumber }
+              });
+            }
+
         } else {
           setIsSaving(false);
           return updatedReceipts;

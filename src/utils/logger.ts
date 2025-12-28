@@ -14,14 +14,18 @@ export interface LogEntry {
   userId?: string;
   ipAddress?: string;
   page?: string;
-  field?: string;
-  selection?: string;
-  amount?: string | number;
-  product?: string;
-  logType?: string;
-  logNature?: string;
-  details?: any;
-}
+    field?: string;
+    selection?: string;
+    amount?: string | number;
+    product?: string;
+    receiptDate?: string;
+    documentType?: string;
+    counterparty?: string;
+    logType?: string;
+    logNature?: string;
+    details?: any;
+  }
+
 
 export interface LogFileInfo {
   path: string;
@@ -72,6 +76,9 @@ export interface UserActivityEntry {
   selection?: string;
   amount?: string | number;
   product?: string;
+  receiptDate?: string;
+  documentType?: string;
+  counterparty?: string;
   logType?: string;
   logNature?: string;
   oldValue?: any;
@@ -242,109 +249,58 @@ export const logUserActivity = async (
       finalSelection = action.selection || '';
       finalAmount = action.amount || '';
       finalProduct = action.product || '';
+      const finalReceiptDate = action.receiptDate || '';
+      const finalDocumentType = action.documentType || '';
+      const finalCounterparty = action.counterparty || '';
       finalLogType = action.logType || 'user';
-    finalLogNature = action.logNature || '';
-    finalOldValue = action.oldValue || oldValue;
-    finalNewValue = action.newValue || newValue;
-  }
+      finalLogNature = action.logNature || '';
+      finalOldValue = action.oldValue || oldValue;
+      finalNewValue = action.newValue || newValue;
 
-    const session = storage.loadData<any>('current_session');
-    const authUser = storage.loadData<any>('authUser');
-    const storedUser = JSON.parse(localStorage.getItem('currentUser') || 'null') || JSON.parse(localStorage.getItem('user') || 'null');
-    const currentUser = session || 
-                      authUser ||
-                      storage.loadData<any>('currentUser') || 
-                      storage.loadData<any>('user') ||
-                      storedUser ||
-                      { username: 'سیستم', id: 'system', fullName: 'مدیر سیستم' };
+      const activity: UserActivityEntry = {
+        id: Math.random().toString(36).substring(2, 11),
+        timestamp: new Date().toISOString(),
+        userId: userId,
+        userName: userName,
+        action: finalAction,
+        category: finalCategory,
+        page: finalPage,
+        status: finalStatus,
+        details: finalDetails,
+        field: finalField,
+        selection: finalSelection,
+        amount: finalAmount,
+        product: finalProduct,
+        receiptDate: finalReceiptDate,
+        documentType: finalDocumentType,
+        counterparty: finalCounterparty,
+        logType: finalLogType,
+        logNature: detectedLogNature,
+        oldValue: finalOldValue,
+        newValue: finalNewValue,
+        ipAddress: '127.0.0.1' // In a browser app, IP is usually handled by server
+      };
 
-    // اطمینان از وجود فیلدهای لازم در شی کاربر و عدم نمایش Unknown
-    const userId = currentUser.userId || currentUser.id || currentUser.uid || currentUser.username || 'system';
-    let userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.displayName || currentUser.username || currentUser.fullName_fa || 'مدیر سیستم';
-    
-    if (!userName || userName.toLowerCase() === 'unknown' || userName === 'ناشناس' || userName === 'undefined') {
-      userName = currentUser.username || 'مدیر سیستم';
-    }
-    
-    if (userName === 'admin') userName = 'مدیر سیستم';
-
-    // تعیین نوع تراکنش بر اساس متن پیام اگر مستقیماً ارسال نشده باشد
-    let detectedLogNature = finalLogNature;
-    if (!detectedLogNature) {
-      const actionText = (finalAction || '').toLowerCase();
-      if (actionText.includes('ایجاد') || actionText.includes('ثبت') || actionText.includes('اضافه') || actionText.includes('create') || actionText.includes('add')) {
-        detectedLogNature = 'ایجاد';
-      } else if (actionText.includes('ویرایش') || actionText.includes('تغییر') || actionText.includes('اصلاح') || actionText.includes('edit') || actionText.includes('update')) {
-        detectedLogNature = 'ویرایش';
-      } else if (actionText.includes('حذف') || actionText.includes('delete') || actionText.includes('remove')) {
-        detectedLogNature = 'حذف';
-      } else if (actionText.includes('امانی')) {
-        detectedLogNature = 'حواله امانی';
-      } else if (actionText.includes('تملیکی')) {
-        detectedLogNature = 'حواله تملیکی';
-      } else {
-        detectedLogNature = finalStatus === 'failed' ? 'خطا' : finalStatus === 'warning' ? 'هشدار' : 'عملیات';
-      }
-    }
-
-    // شناسایی خودکار حواله‌های امانی و تملیکی در فیلد صفحه یا اکشن
-    if (finalPage.includes('امانی') || finalAction.includes('امانی')) {
-      if (!detectedLogNature.includes('امانی')) {
-        if (detectedLogNature === 'ایجاد' || detectedLogNature === 'ویرایش' || detectedLogNature === 'حذف') {
-          detectedLogNature = `حواله امانی - ${detectedLogNature}`;
-        } else {
-          detectedLogNature = 'حواله امانی';
-        }
-      }
-    }
-    if (finalPage.includes('تملیکی') || finalAction.includes('تملیکی')) {
-      if (!detectedLogNature.includes('تملیکی')) {
-        if (detectedLogNature === 'ایجاد' || detectedLogNature === 'ویرایش' || detectedLogNature === 'حذف') {
-          detectedLogNature = `حواله تملیکی - ${detectedLogNature}`;
-        } else {
-          detectedLogNature = 'حواله تملیکی';
-        }
-      }
-    }
-
-    const activity: UserActivityEntry = {
-      id: Math.random().toString(36).substring(2, 11),
-      timestamp: new Date().toISOString(),
-      userId: userId,
-      userName: userName,
-      action: finalAction,
-      category: finalCategory,
-      page: finalPage,
-      status: finalStatus,
-      details: finalDetails,
-      field: finalField,
-      selection: finalSelection,
-      amount: finalAmount,
-      product: finalProduct,
-      logType: finalLogType,
-      logNature: detectedLogNature,
-      oldValue: finalOldValue,
-      newValue: finalNewValue,
-      ipAddress: '127.0.0.1' // In a browser app, IP is usually handled by server
-    };
-
-    // Log via LoggerService
-    await logger.log({
-      level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
-      category: finalCategory,
-      message: finalAction,
-      userName: userName,
-      userId: userId,
-      page: finalPage,
-      field: finalField,
-      selection: finalSelection,
-      amount: finalAmount,
-      product: finalProduct,
-      logType: finalLogType,
-      logNature: detectedLogNature,
-      details: finalDetails,
-      ipAddress: activity.ipAddress
-    });
+      // Log via LoggerService
+      await logger.log({
+        level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
+        category: finalCategory,
+        message: finalAction,
+        userName: userName,
+        userId: userId,
+        page: finalPage,
+        field: finalField,
+        selection: finalSelection,
+        amount: finalAmount,
+        product: finalProduct,
+        receiptDate: finalReceiptDate,
+        documentType: finalDocumentType,
+        counterparty: finalCounterparty,
+        logType: finalLogType,
+        logNature: detectedLogNature,
+        details: finalDetails,
+        ipAddress: activity.ipAddress
+      });
 
   // Save to userActivities for immediate UI update in LoggingSettings
   const activities = storage.loadData<any[]>('userActivities') || [];

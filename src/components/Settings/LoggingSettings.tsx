@@ -1993,15 +1993,48 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                                 {getLevelIcon(log.level)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
-                                      {log.level.toUpperCase()}
-                                    </span>
-                                    <span className="text-sm font-bold text-gray-900 truncate">
+                                  <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
+                                        {log.level.toUpperCase()}
+                                      </span>
+                                      <span className="text-xs text-gray-500 font-mono">
+                                        {new Date(log.timestamp).toLocaleTimeString('fa-IR')}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="text-sm font-bold text-gray-900 truncate" title={log.userName}>
                                       {log.userName || 'سیستم'}
-                                    </span>
+                                    </div>
+
+                                    <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded truncate">
+                                      {log.page || 'نامشخص'}
+                                    </div>
+
+                                    <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded truncate">
+                                      {log.logNature || 'عملیات'}
+                                    </div>
+
+                                    <div className="text-xs text-gray-600 font-mono">
+                                      {log.receiptDate || '-'}
+                                    </div>
+
+                                    <div className="text-sm font-bold text-green-600">
+                                      {log.amount ? formatPersianNumber(log.amount) : '-'}
+                                    </div>
+
+                                    <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded truncate">
+                                      {log.documentType || '-'}
+                                    </div>
+
+                                    <div className="text-xs text-gray-700 truncate" title={log.counterparty}>
+                                      {log.counterparty || '-'}
+                                    </div>
                                   </div>
+                                  <div className="text-sm text-gray-600 mt-1 line-clamp-1">
+                                    {log.message}
+                                  </div>
+
 
                                   <div className="flex items-center gap-2 text-sm text-gray-600">
                                     <Monitor className="h-4 w-4 text-gray-400" />
