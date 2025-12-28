@@ -2403,8 +2403,23 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
       }, 1000); // 1 ثانیه تاخیر برای نمایش پیام موفقیت
     }
     
-    alert(isEditMode ? '✅ تراکنش با موفقيت ويرايش شد.' : '✅ تراکنش جديد با موفقيت ذخيره شد.');
-  }, [currentDelivery, deliveries, saveDeliveries, storage, isEditingDelivery, formatPersianNumber, handleBackToList]);
+      alert(isEditMode ? '✅ تراکنش با موفقيت ويرايش شد.' : '✅ تراکنش جديد با موفقيت ذخيره شد.');
+
+      // ثبت لاگ فعالیت کاربر
+      if (typeof (window as any).logUserActivity === 'function') {
+        const user = storage.loadData('currentUser') as any;
+        (window as any).logUserActivity(
+          user?.id || 'unknown',
+          user?.fullName || 'کاربر سیستم',
+          isEditMode ? 'ویرایش حواله انبار' : 'ثبت حواله انبار جدید',
+          'delivery',
+          'success',
+          'حواله انبار',
+          isEditMode ? 'دکمه ویرایش' : 'دکمه ثبت',
+          { transactionNumber: newDelivery.transactionNumber }
+        );
+      }
+    }, [currentDelivery, deliveries, saveDeliveries, storage, isEditingDelivery, formatPersianNumber, handleBackToList]);
 
   // Handle transaction delete - اصلاح شده براي بازگرداني مانده مجوز
   const handleDeleteTransaction = useCallback((transactionToDelete: any) => {
