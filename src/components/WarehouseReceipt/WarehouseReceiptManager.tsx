@@ -2679,16 +2679,16 @@ export const WarehouseReceiptManager: React.FC = () => {
       
       setReceipts(prev => {
         const updatedReceipts = [...prev];
-        let receiptId: string;
+        let receiptIdToLog: string = '';
         let transactionNumber: string = '';
         
         if (editingReceipt) {
-          receiptId = editingReceipt;
+          receiptIdToLog = editingReceipt;
           const index = updatedReceipts.findIndex(receipt => receipt.id === editingReceipt);
           if (index !== -1) {
             const existingReceipt = updatedReceipts[index];
             transactionNumber = existingReceipt.transactionNumber;
-            updatedReceipts[index] = {
+            const updatedReceipt = {
               ...existingReceipt,
               ...newReceipt,
             additionalInfo: receiptExtraInfo,
@@ -2705,17 +2705,35 @@ export const WarehouseReceiptManager: React.FC = () => {
               gainedProductName: gainedProductName,
               updatedAt: new Date()
             } as WarehouseReceipt;
+            updatedReceipts[index] = updatedReceipt;
+
+            // ثبت لاگ فعالیت کاربر برای ویرایش
+            if (typeof (window as any).logUserActivity === 'function') {
+              (window as any).logUserActivity({
+                action: 'ویرایش رسید انبار',
+                category: 'receipt',
+                page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+                status: 'success',
+                field: 'دکمه ویرایش',
+                selection: transactionNumber || '',
+                logType: 'user',
+                logNature: 'عملکردی',
+                oldValue: existingReceipt,
+                newValue: updatedReceipt,
+                details: { transactionNumber: transactionNumber }
+              });
+            }
           }
         } else if (isAddingNew) {
-          receiptId = `receipt_${Date.now()}`;
+          receiptIdToLog = `receipt_${Date.now()}`;
           transactionNumber = currentUserType === 'consignment' 
             ? generateTransactionNumber('consignment_receipt') 
             : generateTransactionNumber('owned_receipt');
           
           const newReceiptObj: WarehouseReceipt = {
             ...newReceipt,
-            id: receiptId,
-            transactionNumber, // اصلاح: تعريف transactionNumber
+            id: receiptIdToLog,
+            transactionNumber,
             additionalInfo: receiptExtraInfo,
             productName: selectedProduct?.name || '',
             productCode: productCode || '',
@@ -2733,6 +2751,23 @@ export const WarehouseReceiptManager: React.FC = () => {
           } as WarehouseReceipt;
           
           updatedReceipts.push(newReceiptObj);
+
+          // ثبت لاگ فعالیت کاربر برای جدید
+          if (typeof (window as any).logUserActivity === 'function') {
+            (window as any).logUserActivity({
+              action: 'ثبت رسید انبار جدید',
+              category: 'receipt',
+              page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+              status: 'success',
+              field: 'دکمه ثبت',
+              selection: transactionNumber || '',
+              logType: 'user',
+              logNature: 'عملکردی',
+              oldValue: null,
+              newValue: newReceiptObj,
+              details: { transactionNumber: transactionNumber }
+            });
+          }
         } else {
           setIsSaving(false);
           return updatedReceipts;
@@ -2741,43 +2776,43 @@ export const WarehouseReceiptManager: React.FC = () => {
         // کنترل فراخواني‌هاي تکراري با useRef
         const now = Date.now();
         if (lastProcessedReceiptRef.current && 
-            lastProcessedReceiptRef.current.receiptId === receiptId &&
+            lastProcessedReceiptRef.current.receiptId === receiptIdToLog &&
             now - lastProcessedReceiptRef.current.timestamp < 1000) {
-          console.warn(`?? فراخواني تکراري براي رسيد ${receiptId} ناديده گرفته شد`);
+          console.warn(`?? فراخواني تکراري براي رسيد ${receiptIdToLog} ناديده گرفته شد`);
           setIsSaving(false);
           return updatedReceipts;
         }
         
-        lastProcessedReceiptRef.current = { receiptId, timestamp: now };
+        lastProcessedReceiptRef.current = { receiptId: receiptIdToLog, timestamp: now };
         
         // براي رسيدهاي اماني با وزن افت، هشدارها را نمايش مي‌دهيم (فقط در صورت فعال بودن افت اتوماتیک)
         if (currentUserType === 'consignment' && newReceipt.gainedWeight && newReceipt.gainedWeight > 0 && automaticLossEnabled) {
-          console.log(`?? نمايش هشدارهاي افت براي رسيد ${receiptId}`);
+          console.log(`?? نمايش هشدارهاي افت براي رسيد ${receiptIdToLog}`);
           
           // بررسي اينکه آيا براي اين رسيد قبلاً تراکنش افت ثبت شده است
-          const existingTransactions = wastageTransactions.filter(t => t.referenceId === receiptId);
+          const existingTransactions = wastageTransactions.filter(t => t.referenceId === receiptIdToLog);
           if (existingTransactions.length === 0) {
             // ذخيره اطلاعات رسيد فعلي در ref
             currentReceiptRef.current = {
-  ...newReceipt,
-  id: receiptId,
-  transactionNumber: transactionNumber || newReceipt.transactionNumber,
-  productName: selectedProduct?.name || '',
-  productCode: productCode || '',
-  siteName: selectedSite?.name || '',
-  tankName: selectedTank?.name || '',
-  companyName: selectedCompany?.name,
-  counterpartyName: selectedCompany?.name, // اين خط اضافه شد
-  contractNumber: selectedContract?.contractNumber || '',
-  gainedProductCode: gainedProductCode,
-  gainedProductName: gainedProductName,
-  createdAt: new Date()
-};
+              ...newReceipt,
+              id: receiptIdToLog,
+              transactionNumber: transactionNumber || newReceipt.transactionNumber,
+              productName: selectedProduct?.name || '',
+              productCode: productCode || '',
+              siteName: selectedSite?.name || '',
+              tankName: selectedTank?.name || '',
+              companyName: selectedCompany?.name,
+              counterpartyName: selectedCompany?.name,
+              contractNumber: selectedContract?.contractNumber || '',
+              gainedProductCode: gainedProductCode,
+              gainedProductName: gainedProductName,
+              createdAt: new Date()
+            };
             
             setShowWastageAlerts(true);
             setWastageAlertStep(1);
           } else {
-            console.log(`?? براي رسيد ${receiptId} قبلاً تراکنش افت ثبت شده است`);
+            console.log(`?? براي رسيد ${receiptIdToLog} قبلاً تراکنش افت ثبت شده است`);
             
             // به‌روزرساني تراکنش‌هاي موجود
             existingTransactions.forEach(transaction => {
@@ -2785,7 +2820,7 @@ export const WarehouseReceiptManager: React.FC = () => {
                 dispatchWastageTransactions({
                   type: 'UPDATE_TRANSACTION',
                   payload: {
-                    receiptId,
+                    receiptId: receiptIdToLog,
                     transactionData: {
                       ...newReceipt,
                       gainedWeight: newReceipt.gainedWeight
@@ -2797,7 +2832,7 @@ export const WarehouseReceiptManager: React.FC = () => {
                 dispatchWastageTransactions({
                   type: 'UPDATE_TRANSACTION',
                   payload: {
-                    receiptId,
+                    receiptId: receiptIdToLog,
                     transactionData: {
                       ...newReceipt,
                       gainedWeight: newReceipt.gainedWeight
@@ -2813,8 +2848,6 @@ export const WarehouseReceiptManager: React.FC = () => {
         return updatedReceipts;
       });
       
-        const savedTransactionNumber = newReceipt.transactionNumber;
-        
         setEditingReceipt(null);
         setIsAddingNew(false);
         setNewReceipt({});
@@ -2825,23 +2858,6 @@ export const WarehouseReceiptManager: React.FC = () => {
         
         console.log("? رسيد با موفقيت ذخيره شد");
 
-          // ثبت لاگ فعالیت کاربر
-          if (typeof (window as any).logUserActivity === 'function') {
-            const oldReceipt = editingReceipt ? receipts.find(r => r.id === editingReceipt) : null;
-            (window as any).logUserActivity({
-              action: editingReceipt ? 'ویرایش رسید انبار' : 'ثبت رسید انبار جدید',
-              category: 'receipt',
-              page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
-              status: 'success',
-              field: editingReceipt ? 'دکمه ویرایش' : 'دکمه ثبت',
-              selection: savedTransactionNumber || '',
-              logType: 'user',
-              logNature: 'عملکردی',
-              oldValue: oldReceipt,
-              newValue: updatedReceipts.find(r => r.id === receiptId),
-              details: { transactionNumber: savedTransactionNumber }
-            });
-          }
       } catch (error) {
       console.error("? خطا در ذخيره‌سازي رسيد:", error);
       alert("خطا در ذخيره‌سازي رسيد. لطفاً دوباره تلاش کنيد.");
@@ -3965,11 +3981,38 @@ dispatchWastageTransactions({
       }
     }
     
-    if (fieldName === 'contractId') {
-      handleContractChange(value);
-    }
-    
-    if (fieldName === 'receiptBasis') {
+      if (fieldName === 'contractId') {
+        handleContractChange(value);
+      }
+      
+      // Update receiptBasisAmount when weight fields change if they are the current basis
+      if (['shipBillOfLadingAmount', 'shipUnloadingAmount', 'tankShoreAmount', 'weightGross'].includes(fieldName)) {
+        const currentBasis = newReceipt.receiptBasis;
+        const shouldUpdate = 
+          (fieldName === 'shipBillOfLadingAmount' && currentBasis === 'bill-lading') ||
+          (fieldName === 'shipUnloadingAmount' && currentBasis === 'ullage') ||
+          (fieldName === 'tankShoreAmount' && currentBasis === 'shore-tank') ||
+          (fieldName === 'weightGross' && currentBasis === 'gross');
+        
+        if (shouldUpdate) {
+          setTimeout(() => {
+            const numericValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
+            setNewReceipt(prev => ({
+              ...prev,
+              receiptBasisAmount: numericValue
+            }));
+            
+            calculateAmounts({
+              ...newReceipt,
+              [fieldName]: numericValue,
+              receiptBasisAmount: numericValue
+            });
+          }, 50);
+        }
+      }
+      
+      if (fieldName === 'receiptBasis') {
+
       console.log(`?? تغيير مبناي رسيد به: ${value}`);
       
       setTimeout(() => {

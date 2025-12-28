@@ -3326,10 +3326,11 @@ export const ContractManager: React.FC = () => {
             </div>
           )}
           
-          {/* Contracts Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+            {/* Contracts Table */}
+            <div className="overflow-x-auto overflow-y-auto max-h-[60vh] border border-gray-200 rounded-lg shadow-sm">
+              <table className="w-full border-collapse">
+                <thead className={`sticky top-0 z-10 shadow-sm ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+
                 <tr>
                   <th className={`px-6 py-4 text-right text-xs font-medium uppercase tracking-wider ${
                     isDarkMode ? 'text-gray-300' : 'text-gray-500'

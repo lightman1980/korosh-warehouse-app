@@ -76,16 +76,11 @@ export const DataTable = <T extends Record<string, any>>({
     }, 0);
   };
 
-  return (
-    <div className="overflow-x-auto">
-      {showRowCount && rowCount !== undefined && (
-        <div className="mb-4 text-sm text-gray-600">
-          تعداد تراکنش‌ها: <span className="font-bold">{rowCount.toLocaleString('fa-IR')}</span>
-        </div>
-      )}
-      
-      <table className="w-full">
-        <thead className="bg-gray-50">
+    return (
+      <div className="overflow-x-auto overflow-y-auto max-h-[600px] border border-gray-200 rounded-lg shadow-sm">
+        <table className="w-full border-collapse">
+          <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+
           {/* ردیف مجموع ستون‌ها */}
           {showColumnSum && (
             <tr className={sumRowClassName}>
