@@ -79,6 +79,9 @@ interface LogEntry {
   userAgent?: string;
   page?: string;
   field?: string;
+  selection?: string;
+  logType: 'system' | 'user';
+  logNature: string;
 }
 
 interface UserActivityEntry {
@@ -93,6 +96,20 @@ interface UserActivityEntry {
   ipAddress: string;
   page: string;
   field?: string;
+  selection?: string;
+  logType: 'system' | 'user';
+  logNature: string;
+}
+
+interface LogFieldConfig {
+  userName: boolean;
+  timestamp: boolean;
+  page: boolean;
+  field: boolean;
+  selection: boolean;
+  logType: boolean;
+  logNature: boolean;
+  ipAddress: boolean;
 }
 
 interface LogPathConfig {
@@ -101,6 +118,7 @@ interface LogPathConfig {
   maxFilesPerCategory: number;
   compressOldLogs: boolean;
   backupCount: number;
+  exportFormat: 'xlsx' | 'txt' | 'log';
 }
 
 interface StoragePathConfig {
@@ -121,6 +139,7 @@ interface ActivityViewSettings {
   selectedUserId: string | null;  // کاربر انتخاب شده برای مشاهده لاگ‌های تکی
   showInRealTime: boolean;        // نمایش در زمان واقعی
   saveToPath: boolean;            // ذخیره در مسیر انتخابی
+  fieldConfig: LogFieldConfig;    // پیکربندی فیلدهای لاگ
 }
 
 interface FilterState {
@@ -164,17 +183,29 @@ const LOG_CATEGORIES: LogCategory[] = [
 // Default Configuration
 // ============================================================================
 
+const DEFAULT_LOG_FIELD_CONFIG: LogFieldConfig = {
+  userName: true,
+  timestamp: true,
+  page: true,
+  field: true,
+  selection: true,
+  logType: true,
+  logNature: true,
+  ipAddress: true
+};
+
 const DEFAULT_LOG_PATH_CONFIG: LogPathConfig = {
-  path: './logs',
+  path: 'C:\\Logs\\Makhazen',
   createDailyFiles: true,
   maxFilesPerCategory: 10,
   compressOldLogs: true,
-  backupCount: 5
+  backupCount: 5,
+  exportFormat: 'xlsx'
 };
 
 const DEFAULT_STORAGE_PATH_CONFIG: StoragePathConfig = {
   type: 'local',
-  localPath: './logs',
+  localPath: 'C:\\Logs\\Makhazen',
   serverUrl: '',
   serverHost: ''
 };
@@ -183,7 +214,8 @@ const DEFAULT_ACTIVITY_VIEW_SETTINGS: ActivityViewSettings = {
   viewMode: 'individual',
   selectedUserId: null,
   showInRealTime: true,
-  saveToPath: true
+  saveToPath: true,
+  fieldConfig: DEFAULT_LOG_FIELD_CONFIG
 };
 
 // ============================================================================
@@ -263,20 +295,36 @@ class LoggerService {
     return `${this.config.path}/${category}.log`;
   }
 
-  private formatLogEntry(entry: LogEntry): string {
-    const timestamp = new Date(entry.timestamp).toISOString();
-    const userInfo = entry.userName ? ` [User: ${entry.userName}]` : '';
-    const ipInfo = entry.ipAddress ? ` [IP: ${entry.ipAddress}]` : '';
+  private formatLogEntry(entry: LogEntry, fieldConfig: LogFieldConfig = DEFAULT_LOG_FIELD_CONFIG): string {
+    const fields: string[] = [];
+    
+    if (fieldConfig.timestamp) fields.push(`[${new Date(entry.timestamp).toISOString()}]`);
+    fields.push(`[${entry.level.toUpperCase()}]`);
+    
+    if (fieldConfig.logType) fields.push(`[Type: ${entry.logType}]`);
+    if (fieldConfig.logNature) fields.push(`[Nature: ${entry.logNature}]`);
+    
+    fields.push(`[${entry.category}]`);
+    fields.push(entry.message);
+    
+    if (fieldConfig.userName && entry.userName) fields.push(`[User: ${entry.userName}]`);
+    if (fieldConfig.page && entry.page) fields.push(`[Page: ${entry.page}]`);
+    if (fieldConfig.field && entry.field) fields.push(`[Field: ${entry.field}]`);
+    if (fieldConfig.selection && entry.selection) fields.push(`[Selection: ${entry.selection}]`);
+    if (fieldConfig.ipAddress && entry.ipAddress) fields.push(`[IP: ${entry.ipAddress}]`);
+    
     const details = entry.details ? `\n    Details: ${entry.details}` : '';
     
-    return `[${timestamp}] [${entry.level.toUpperCase()}] [${entry.category}] ${entry.message}${userInfo}${ipInfo}${details}\n`;
+    return `${fields.join(' ')}${details}\n`;
   }
 
-  async log(entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<void> {
+  async log(entry: Omit<LogEntry, 'id' | 'timestamp' | 'logType' | 'logNature'> & Partial<Pick<LogEntry, 'logType' | 'logNature'>>): Promise<void> {
     const fullEntry: LogEntry = {
       ...entry,
       id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      logType: entry.logType || 'system',
+      logNature: entry.logNature || entry.level
     };
 
     this.logBuffer.push(fullEntry);
@@ -286,7 +334,7 @@ class LoggerService {
     }
   }
 
-  async logToFile(entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<void> {
+  async logToFile(entry: Omit<LogEntry, 'id' | 'timestamp' | 'logType' | 'logNature'> & Partial<Pick<LogEntry, 'logType' | 'logNature'>>): Promise<void> {
     await this.log(entry);
   }
 
@@ -297,6 +345,8 @@ class LoggerService {
     this.logBuffer = [];
 
     const storage = DataStorage.getInstance();
+    const activitySettings = storage.loadData('activityViewSettings') as ActivityViewSettings | null;
+    const fieldConfig = activitySettings?.fieldConfig || DEFAULT_LOG_FIELD_CONFIG;
     
     // Group entries by category and date
     const groupedEntries = new Map<string, LogEntry[]>();
@@ -311,7 +361,7 @@ class LoggerService {
 
     // Write to files
     groupedEntries.forEach((entries, filePath) => {
-      const logContent = entries.map(e => this.formatLogEntry(e)).join('');
+      const logContent = entries.map(e => this.formatLogEntry(e, fieldConfig)).join('');
       this.appendToFile(filePath, logContent);
     });
   }
@@ -334,7 +384,6 @@ class LoggerService {
     try {
       const storage = DataStorage.getInstance();
       const metadataKey = `logmeta_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const existingMetadata = storage.loadData(metadataKey) as any;
       
       const newMetadata = {
         path: filePath,
@@ -363,34 +412,58 @@ class LoggerService {
     const entries: LogEntry[] = [];
     const lines = content.split('\n').filter(line => line.trim());
     
-    const timestampRegex = /\[(.*?)\]/;
-    const levelRegex = /\[(ERROR|WARN|INFO|DEBUG)\]/i;
-    const categoryRegex = /\[(.*?)\]/;
-    
     lines.forEach((line, index) => {
-      const timestampMatch = line.match(timestampRegex);
-      const levelMatch = line.match(levelRegex);
-      const categoryMatch = line.match(categoryRegex);
-      
-      if (timestampMatch && levelMatch && categoryMatch) {
-        const messageStart = line.indexOf('] [', line.indexOf(categoryMatch[0]) + categoryMatch[0].length) + 3;
-        const messageEnd = line.indexOf(' [User:', messageStart);
-        const message = messageEnd > -1 ? line.substring(messageStart, messageEnd) : line.substring(messageStart);
+      try {
+        const timestampMatch = line.match(/\[(.*?)\]/);
+        const levelMatch = line.match(/\[(ERROR|WARN|INFO|DEBUG)\]/i);
+        const typeMatch = line.match(/\[Type: (.*?)\]/);
+        const natureMatch = line.match(/\[Nature: (.*?)\]/);
+        const categoryMatch = line.match(/\[([^\]]*?)\]/g);
         
+        let category = 'system';
+        if (categoryMatch) {
+          const skipTags = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'Type:', 'Nature:'];
+          for (const tag of categoryMatch) {
+            const cleanTag = tag.replace(/[\[\]]/g, '');
+            if (!skipTags.some(skip => cleanTag.includes(skip)) && !cleanTag.includes(':')) {
+              category = cleanTag;
+              break;
+            }
+          }
+        }
+
         const userMatch = line.match(/\[User: (.*?)\]/);
+        const pageMatch = line.match(/\[Page: (.*?)\]/);
+        const fieldMatch = line.match(/\[Field: (.*?)\]/);
+        const selectionMatch = line.match(/\[Selection: (.*?)\]/);
         const ipMatch = line.match(/\[IP: (.*?)\]/);
-        const detailsMatch = line.match(/Details: (.*)/);
         
-        entries.push({
-          id: `parsed-${index}`,
-          timestamp: timestampMatch[1],
-          level: levelMatch[1].toLowerCase() as LogEntry['level'],
-          category: categoryMatch[1],
-          message: message.trim(),
-          details: detailsMatch?.[1],
-          userName: userMatch?.[1],
-          ipAddress: ipMatch?.[1]
+        let message = line;
+        [timestampMatch, levelMatch, typeMatch, natureMatch, userMatch, pageMatch, fieldMatch, selectionMatch, ipMatch].forEach(m => {
+          if (m) message = message.replace(m[0], '');
         });
+        if (categoryMatch) {
+          categoryMatch.forEach(tag => {
+            if (tag.includes(category)) message = message.replace(tag, '');
+          });
+        }
+
+        entries.push({
+          id: `parsed-${index}-${Date.now()}`,
+          timestamp: timestampMatch ? timestampMatch[1] : new Date().toISOString(),
+          level: (levelMatch ? levelMatch[1].toLowerCase() : 'info') as LogEntry['level'],
+          logType: (typeMatch ? typeMatch[1] : 'system') as any,
+          logNature: natureMatch ? natureMatch[1] : 'info',
+          category,
+          message: message.trim(),
+          userName: userMatch ? userMatch[1] : undefined,
+          page: pageMatch ? pageMatch[1] : undefined,
+          field: fieldMatch ? fieldMatch[1] : undefined,
+          selection: selectionMatch ? selectionMatch[1] : undefined,
+          ipAddress: ipMatch ? ipMatch[1] : undefined
+        });
+      } catch (e) {
+        console.warn('Error parsing log line:', line, e);
       }
     });
     
@@ -1260,6 +1333,85 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     }
   };
 
+  const deleteLogFile = async (filePath: string) => {
+    if (confirm(`آیا از حذف فایل لاگ ${filePath} اطمینان دارید؟`)) {
+      try {
+        const storage = DataStorage.getInstance();
+        const key = `logfile_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const metaKey = `logmeta_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        storage.saveData(key, '');
+        storage.saveData(metaKey, null);
+        
+        await refreshLogFiles();
+        alert('فایل لاگ با موفقیت حذف شد');
+      } catch (error) {
+        console.error('Error deleting log file:', error);
+        alert('خطا در حذف فایل لاگ');
+      }
+    }
+  };
+
+  const downloadLogFile = async (file: LogFileInfo) => {
+    try {
+      const content = await logger.readLogFile(file.path);
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.path.split('/').pop() || 'log.txt';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading log file:', error);
+      alert('خطا در دانلود فایل لاگ');
+    }
+  };
+
+  const handleExportToExcel = useCallback(() => {
+    if (filteredLogs.length === 0) {
+      alert('هیچ لاگی برای خروجی گرفتن وجود ندارد');
+      return;
+    }
+
+    try {
+      // Prepare data for Excel export with the 7 required fields + extras
+      const worksheetData = filteredLogs.map(log => ({
+        'نام کاربری': log.userName || '-',
+        'تاریخ': formatPersianDate(new Date(log.timestamp)),
+        'ساعت': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
+        'صفحه عملکرد': log.page || '-',
+        'منو / فیلد': log.field || '-',
+        'گزینه انتخاب شده': log.selection || log.message,
+        'نوع لاگ': log.logType === 'user' ? 'کاربری' : 'سیستمی',
+        'جنس لاگ': log.level === 'error' ? 'خطا' : log.level === 'warn' ? 'هشدار' : 'عملکردی',
+        'دسته‌بندی': LOG_CATEGORIES.find(c => c.id === log.category)?.name || log.category,
+        'آدرس IP': log.ipAddress || '-',
+        'جزئیات': log.details || '-'
+      }));
+
+      // Create worksheet from JSON data
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+      // Set right-to-left for Persian support if possible
+      if (!worksheet['!cols']) worksheet['!cols'] = [];
+      
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'لاگ‌های سیستم');
+
+      // Generate filename with current date
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `system_logs_${dateStr}.xlsx`;
+
+      // Write and download the file
+      XLSX.writeFile(workbook, filename);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('خطا در تهیه فایل اکسل');
+    }
+  }, [filteredLogs]);
+
   const exportLogs = (format: 'json' | 'csv' | 'xml' | 'txt') => {
     const logsToExport = filteredLogs.length > 0 ? filteredLogs : logs;
     
@@ -1274,11 +1426,26 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         extension = 'json';
         break;
       case 'csv':
-        content = 'ID,Timestamp,Level,Category,Message,User,Page,Field,IP Address\n';
+        // Fix CSV format: add BOM and proper headers
+        const headers = ['نام کاربری', 'تاریخ', 'ساعت', 'صفحه', 'فیلد', 'پیام', 'نوع', 'جنس', 'IP'];
+        content = headers.join(',') + '\n';
         logsToExport.forEach(log => {
-          content += `"${log.id}","${log.timestamp}","${log.level}","${log.category}","${log.message}","${log.userName || ''}","${log.page || ''}","${log.field || ''}","${log.ipAddress || ''}"\n`;
+          const row = [
+            log.userName || '',
+            formatPersianDate(new Date(log.timestamp)),
+            new Date(log.timestamp).toLocaleTimeString('fa-IR'),
+            log.page || '',
+            log.field || '',
+            log.message.replace(/,/g, ' '),
+            log.logType || 'system',
+            log.level,
+            log.ipAddress || ''
+          ];
+          content += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
         });
-        mimeType = 'text/csv';
+        // Add BOM for Persian support in Excel
+        content = '\uFEFF' + content;
+        mimeType = 'text/csv;charset=utf-8';
         extension = 'csv';
         break;
       case 'xml':
@@ -1693,24 +1860,45 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                   <p className="text-sm mt-1">لاگ‌های جدید پس از اولین ثبت نمایش داده می‌شوند</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
-                  {logFiles.slice(0, 10).map((file, index) => (
-                    <div key={index} className="px-6 py-3 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-blue-500" />
+                  <div className="divide-y divide-gray-200">
+                    {logFiles.slice(0, 15).map((file, index) => (
+                      <div key={index} className="px-6 py-4 hover:bg-gray-50 transition-all flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                            <FileText className="h-6 w-6 text-blue-600" />
+                          </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{file.path}</p>
-                            <p className="text-xs text-gray-500">
-                              {file.entryCount} ورودی • آخرین تغییر: {formatPersianDate(file.lastModified)}
+                            <p className="text-sm font-bold text-gray-900">{file.path}</p>
+                            <p className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                              <span className="bg-gray-100 px-2 py-0.5 rounded">{file.entryCount} ورودی</span>
+                              <span>•</span>
+                              <span>تغییر: {formatPersianDate(file.lastModified)}</span>
+                              <span>•</span>
+                              <span className="font-mono">{formatFileSize(file.size)}</span>
                             </p>
                           </div>
                         </div>
-                        <span className="text-sm text-gray-500">{formatFileSize(file.size)}</span>
+                        
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => downloadLogFile(file)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="دانلود فایل"
+                          >
+                            <Download className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteLogFile(file.path)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="حذف فایل"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+
               )}
             </div>
 
@@ -1796,55 +1984,139 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
             )}
           </div>
 
-          {/* Log Storage Settings */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <button
-              onClick={() => toggleSection('logStorage')}
-              className="w-full px-6 py-4 bg-gradient-to-r from-green-50 to-green-100 border-b border-gray-200 flex items-center justify-between hover:bg-green-200 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <HardDrive className="h-5 w-5 text-green-600" />
-                <span className="font-semibold text-gray-900">ذخیره‌سازی لاگ‌ها</span>
-              </div>
-              {expandedSections.includes('logStorage') ? 
-                <ChevronUp className="h-5 w-5 text-gray-400" /> : 
-                <ChevronDown className="h-5 w-5 text-gray-400" />
-              }
-            </button>
-            
-            {expandedSections.includes('logStorage') && (
-              <div className="p-6 space-y-6">
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                  <label className="flex items-center gap-4 cursor-pointer">
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={settings.logging?.logToFile !== false}
-                        onChange={(e) => updateLoggingSettings({ logToFile: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-600"></div>
-                    </div>
+            {/* Log Field Configuration Settings */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <button
+                onClick={() => toggleSection('fieldConfig')}
+                className="w-full px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 flex items-center justify-between hover:bg-blue-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Sliders className="h-5 w-5 text-indigo-600" />
+                  <span className="font-semibold text-gray-900">پیکربندی فیلدهای لاگ (انتخاب فیلدهای ثبت‌شونده)</span>
+                </div>
+                {expandedSections.includes('fieldConfig') ? 
+                  <ChevronUp className="h-5 w-5 text-gray-400" /> : 
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                }
+              </button>
+              
+              {expandedSections.includes('fieldConfig') && (
+                <div className="p-6 space-y-6">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${settings.logging?.logToFile !== false ? 'bg-green-100' : 'bg-gray-100'}`}>
-                        <Database className={`h-5 w-5 ${settings.logging?.logToFile !== false ? 'text-green-600' : 'text-gray-500'}`} />
-                      </div>
+                      <Info className="h-5 w-5 text-indigo-600" />
                       <div>
-                        <div className="font-medium text-gray-900">فعال‌سازی ذخیره‌سازی لاگ‌ها</div>
-                        <div className="text-sm text-gray-500">
-                          با فعال کردن این گزینه، لاگ‌های انتخاب شده در مسیر تعیین شده ذخیره می‌شوند
+                        <div className="font-medium text-indigo-900">تعیین فیلدهای اطلاعاتی لاگ</div>
+                        <div className="text-sm text-indigo-700">
+                          در این بخش مشخص کنید که کدامیک از ۷ مورد زیر در لاگ برنامه ثبت شوند
                         </div>
                       </div>
                     </div>
-                  </label>
+                  </div>
+  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { id: 'userName', name: 'نام کاربری', icon: User },
+                      { id: 'timestamp', name: 'تاریخ و ساعت عملکرد', icon: Clock },
+                      { id: 'page', name: 'صفحه عملکرد', icon: Monitor },
+                      { id: 'field', name: 'منو و یا فیلد انتخابی', icon: Edit3 },
+                      { id: 'selection', name: 'گزینه انتخاب شده', icon: CheckCircle },
+                      { id: 'logType', name: 'نوع یا دسته‌بندی لاگ', icon: Folder },
+                      { id: 'logNature', name: 'جنس لاگ (هشدار/خطا/...)', icon: AlertCircle },
+                      { id: 'ipAddress', name: 'آدرس IP و سیستم', icon: Globe }
+                    ].map((field) => {
+                      const isEnabled = activityViewSettings.fieldConfig[field.id as keyof LogFieldConfig];
+                      const Icon = field.icon;
+                      return (
+                        <label
+                          key={field.id}
+                          className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                            isEnabled
+                              ? 'border-indigo-500 bg-indigo-50 shadow-sm'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isEnabled}
+                              onChange={(e) => {
+                                updateActivityViewSettings({
+                                  fieldConfig: {
+                                    ...activityViewSettings.fieldConfig,
+                                    [field.id]: e.target.checked
+                                  }
+                                });
+                              }}
+                              className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Icon className={`h-4 w-4 ${isEnabled ? 'text-indigo-600' : 'text-gray-400'}`} />
+                              <span className={`text-sm font-medium ${isEnabled ? 'text-indigo-900' : 'text-gray-600'}`}>
+                                {field.name}
+                              </span>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+            </div>
 
-                <p className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
-                  <strong>راهنما:</strong> با فعال کردن این گزینه، تمام لاگ‌های صفحات انتخاب شده در قسمت «دسته‌بندی‌های فعال» در مسیری که در تب «مسیر ذخیره‌سازی» تعیین شده (لوکال یا سرور) ذخیره می‌شوند. با غیرفعال کردن این گزینه، برنامه لاگ‌ها را ذخیره نخواهد کرد.
-                </p>
-              </div>
-            )}
-          </div>
+            {/* Log Export Format Settings */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <button
+                onClick={() => toggleSection('exportSettings')}
+                className="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Save className="h-5 w-5 text-green-600" />
+                  <span className="font-semibold text-gray-900">فرمت ذخیره‌سازی لاگ‌ها</span>
+                </div>
+                {expandedSections.includes('exportSettings') ? 
+                  <ChevronUp className="h-5 w-5 text-gray-400" /> : 
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                }
+              </button>
+              
+              {expandedSections.includes('exportSettings') && (
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                      { id: 'xlsx', name: 'Excel (XLSX)', icon: FileSpreadsheet, desc: 'فرمت استاندارد اکسل' },
+                      { id: 'txt', name: 'Text (TXT)', icon: FileText, desc: 'فایل متنی ساده' },
+                      { id: 'log', name: 'Log (Standard)', icon: FileCode, desc: 'فرمت استاندارد لاگ دنیا' }
+                    ].map((format) => (
+                      <label
+                        key={format.id}
+                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                          logPathConfig.exportFormat === format.id
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="exportFormat"
+                          value={format.id}
+                          checked={logPathConfig.exportFormat === format.id}
+                          onChange={() => updatePathConfig({ exportFormat: format.id as any })}
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-3 mb-2">
+                          <format.icon className={`h-6 w-6 ${logPathConfig.exportFormat === format.id ? 'text-green-600' : 'text-gray-400'}`} />
+                          <div className="font-medium text-gray-900">{format.name}</div>
+                        </div>
+                        <p className="text-xs text-gray-500">{format.desc}</p>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
 
           {/* Active Categories Settings */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -2226,32 +2498,39 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 )}
               </button>
 
-              <div className="flex gap-2">
-                <div className="relative">
-                  <select
-                    value={settings.logging.exportFormat || 'json'}
-                    onChange={(e) => {
-                      const format = e.target.value as 'json' | 'csv' | 'xml' | 'txt';
-                      exportLogs(format);
-                    }}
-                    className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer appearance-none pr-10"
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportToExcel}
+                    className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
                   >
-                    <option value="json" className="bg-white text-gray-900">JSON</option>
-                    <option value="csv" className="bg-white text-gray-900">CSV</option>
-                    <option value="xml" className="bg-white text-gray-900">XML</option>
-                    <option value="txt" className="bg-white text-gray-900">متن</option>
-                  </select>
-                  <Download className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white pointer-events-none" />
+                    <FileSpreadsheet className="h-5 w-5" />
+                    خروجی به اکسل (XLSX)
+                  </button>
+
+                  <div className="relative group">
+                    <button
+                      className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      <Download className="h-5 w-5" />
+                      خروجی (سایر فرمت‌ها)
+                    </button>
+                    <div className="absolute left-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10 invisible group-hover:visible">
+                      <button onClick={() => exportLogs('json')} className="w-full px-4 py-2 text-right hover:bg-gray-100 text-sm">JSON</button>
+                      <button onClick={() => exportLogs('csv')} className="w-full px-4 py-2 text-right hover:bg-gray-100 text-sm">CSV (Excel)</button>
+                      <button onClick={() => exportLogs('xml')} className="w-full px-4 py-2 text-right hover:bg-gray-100 text-sm">XML</button>
+                      <button onClick={() => exportLogs('txt')} className="w-full px-4 py-2 text-right hover:bg-gray-100 text-sm">Text</button>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={clearAllLogs}
+                    className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    پاک کردن
+                  </button>
                 </div>
-                
-                <button
-                  onClick={clearAllLogs}
-                  className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <Trash2 className="h-5 w-5" />
-                  پاک کردن
-                </button>
-              </div>
+
             </div>
 
             {/* Advanced Filters */}

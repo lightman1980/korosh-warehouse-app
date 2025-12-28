@@ -1403,7 +1403,7 @@ export const InventoryAdjustmentManager: React.FC = () => {
       (window as any).logUserActivity(
         user?.id || 'admin',
         user?.name || 'مدیر سیستم',
-        'ثبت سند کسر انبار',
+        `ثبت سند کسر انبار - ${deductionForm.productType === 'owned' ? 'تملیکی' : 'امانی'}`,
         'adjustment',
         'success',
         'کسر و اضافه انبار',
@@ -1413,7 +1413,8 @@ export const InventoryAdjustmentManager: React.FC = () => {
           productId: deductionForm.productId,
           quantity: deductionQuantity,
           site: deductionForm.siteId,
-          tank: deductionForm.tankId
+          tank: deductionForm.tankId,
+          contract: deductionForm.contractId
         }
       );
     }
@@ -1484,7 +1485,7 @@ export const InventoryAdjustmentManager: React.FC = () => {
       (window as any).logUserActivity(
         user?.id || 'admin',
         user?.name || 'مدیر سیستم',
-        'ثبت سند اضافه انبار',
+        `ثبت سند اضافه انبار - ${additionForm.productType === 'owned' ? 'تملیکی' : 'امانی'}`,
         'adjustment',
         'success',
         'کسر و اضافه انبار',
@@ -1494,7 +1495,8 @@ export const InventoryAdjustmentManager: React.FC = () => {
           productId: additionForm.productId,
           quantity: additionQuantity,
           site: additionForm.siteId,
-          tank: additionForm.tankId
+          tank: additionForm.tankId,
+          contract: additionForm.contractId
         }
       );
     }
