@@ -526,34 +526,30 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   // - For web: Fallback to webkit directory picker (limited support)
   const handleSelectPath = async () => {
     try {
-      // Check if we're in an Electron environment
-      if ((window as any).electronAPI && (window as any).electronAPI.openDirectoryDialog) {
-        // Electron implementation
-        const result = await (window as any).electronAPI.openDirectoryDialog();
-        if (result && !result.canceled && result.filePaths.length > 0) {
-          const selectedPath = result.filePaths[0];
-          setTempPath(selectedPath);
-          setIsEditingPath(true);
-          validatePath(selectedPath);
-        }
-      } else if ((window as any).tauri && (window as any).tauri.dialog) {
-        // Tauri implementation
-        const selectedPath = await (window as any).tauri.dialog.open({
-          directory: true,
-          multiple: false
-        });
-        if (selectedPath && typeof selectedPath === 'string') {
-          setTempPath(selectedPath);
-          setIsEditingPath(true);
-          validatePath(selectedPath);
-        }
+      if ('showDirectoryPicker' in window) {
+        const dirHandle = await (window as any).showDirectoryPicker();
+        const selectedPath = dirHandle.name;
+        updateStoragePathConfig({ localPath: selectedPath });
+        setPathSuccess(true);
+        setTimeout(() => setPathSuccess(false), 3000);
       } else {
-        // Fallback for web environment - trigger webkit directory picker
-        openFolderPicker();
+        const path = prompt('لطفا مسیر کامل پوشه ذخیره‌سازی را وارد کنید:', storagePathConfig.localPath);
+        if (path) {
+          updateStoragePathConfig({ localPath: path });
+        }
       }
-    } catch (error) {
-      console.error('Error selecting directory:', error);
-      setPathValidationError('خطا در انتخاب پوشه. لطفاً از روش دستی استفاده کنید.');
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Error selecting directory:', error);
+        alert('خطا در انتخاب پوشه: ' + (error.message || 'خطای نامشخص'));
+      }
+    }
+  };
+
+  const selectServerPath = async () => {
+    const url = prompt('لطفا آدرس سایت یا هاست را وارد کنید:', storagePathConfig.serverUrl);
+    if (url) {
+      updateStoragePathConfig({ serverUrl: url });
     }
   };
 
@@ -951,22 +947,53 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
 
   const loadLogs = async () => {
     try {
-      // First try to load from file-based storage
+      // 1. Load from file-based storage (if any)
       const pathLogs = await loadLogsFromPath();
-      if (pathLogs.length > 0) {
-        setLogs(pathLogs);
-        return;
-      }
       
-      // Fall back to stored logs
+      // 2. Load from userActivities (This is where transaction logs should be)
+      const activityLogs = storage.loadData('userActivities') as any[] | null;
+      console.log('🔍 بارگذاری فعالیت‌های کاربر:', activityLogs?.length || 0);
+      
+      const formattedActivityLogs = (activityLogs || []).map(log => ({
+        id: log.id,
+        timestamp: log.timestamp,
+        level: log.status === 'failed' ? 'error' : log.status === 'warning' ? 'warn' : 'info',
+        category: log.category || 'فعالیت کاربر',
+        message: log.action,
+        userName: log.userName || 'ناشناس',
+        userId: log.userId,
+        ipAddress: log.ipAddress,
+        page: log.page || '-',
+        field: log.field || '-',
+        details: log.details ? (typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : log.details) : undefined,
+        status: log.status
+      }));
+
+      // 3. Load from systemLogs (fallback)
       const savedLogs = storage.loadData('systemLogs') as LogEntry[] | null;
-      if (savedLogs && Array.isArray(savedLogs)) {
-        setLogs(savedLogs);
-      } else {
-        // Generate sample logs if none exist
-        const sampleLogs: LogEntry[] = generateSampleLogs();
+      const formattedSavedLogs = (savedLogs || []).map(log => ({
+        ...log,
+        page: log.page || '-',
+        field: log.field || '-'
+      }));
+
+      // Combine all and sort by timestamp descending
+      const combinedLogs = [...pathLogs, ...formattedActivityLogs, ...formattedSavedLogs];
+      
+      // Remove duplicates by ID
+      const uniqueLogs = Array.from(new Map(combinedLogs.map(item => [item.id, item])).values());
+      
+      const sortedLogs = uniqueLogs.sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+
+      setLogs(sortedLogs);
+      
+      if (sortedLogs.length === 0 && !storage.loadData('hasInitialLogs')) {
+        const sampleLogs = generateSampleLogs();
         setLogs(sampleLogs);
         storage.saveData('systemLogs', sampleLogs);
+        storage.saveData('hasInitialLogs', 'true');
       }
     } catch (error) {
       console.error('Error loading logs:', error);
@@ -1072,9 +1099,13 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
 
     // Date filter
     if (filters.dateFrom) {
-      filtered = filtered.filter(log => new Date(log.timestamp) >= filters.dateFrom!);
+      // Set to start of day in local time
+      const fromDate = new Date(filters.dateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(log => new Date(log.timestamp) >= fromDate);
     }
     if (filters.dateTo) {
+      // Set to end of day in local time
       const toDate = new Date(filters.dateTo);
       toDate.setHours(23, 59, 59, 999);
       filtered = filtered.filter(log => new Date(log.timestamp) <= toDate);
@@ -1455,92 +1486,97 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         </div>
       </div>
 
-        {/* Path Configuration Tab */}
-        {activeTab === 'path' && (
-          <div className="space-y-6">
-            {/* Local Storage Card */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-              <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
-                <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                  <HardDrive className="h-6 w-6" />
-                  مسیر ذخیره‌سازی محلی
-                </h3>
-                <p className="text-blue-100 text-sm mt-1">
-                  تعیین محل ذخیره‌سازی لاگ‌ها روی سیستم لوکال
-                </p>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    آدرس فولدر ذخیره‌سازی
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={storagePathConfig.localPath}
-                      onChange={(e) => updateStoragePathConfig({ localPath: e.target.value })}
-                      placeholder="مثال: C:\Logs\Makhazen"
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <button
-                      onClick={handleSelectPath}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                      <FolderOpen className="h-4 w-4" />
-                      انتخاب فولدر
-                    </button>
-                  </div>
+          {/* Path Configuration Tab */}
+          {activeTab === 'path' && (
+            <div className="space-y-6">
+              {/* Local Storage Card */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                    <HardDrive className="h-6 w-6" />
+                    مسیر ذخیره‌سازی محلی
+                  </h3>
+                  <p className="text-blue-100 text-sm mt-1">
+                    تعیین محل ذخیره‌سازی لاگ‌ها روی سیستم لوکال
+                  </p>
                 </div>
-              </div>
-            </div>
 
-            {/* Server Storage Card */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-              <div className="px-6 py-5 bg-gradient-to-r from-green-600 to-green-700">
-                <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                  <Globe className="h-6 w-6" />
-                  آدرس هاست و سرور
-                </h3>
-                <p className="text-green-100 text-sm mt-1">
-                  تعیین آدرس سایت و هاست برای ذخیره‌سازی ابری لاگ‌ها
-                </p>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-6 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      آدرس سایت یا سرور
+                      آدرس فولدر ذخیره‌سازی
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        value={storagePathConfig.serverUrl}
-                        onChange={(e) => updateStoragePathConfig({ serverUrl: e.target.value })}
-                        placeholder="مثال: https://logs.mysite.com"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        value={storagePathConfig.localPath}
+                        onChange={(e) => updateStoragePathConfig({ localPath: e.target.value })}
+                        placeholder="مثال: C:\Logs\Makhazen"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
-                      <div className="px-4 py-2 bg-gray-100 text-gray-500 rounded-lg flex items-center gap-2 border border-gray-200">
-                        <Link className="h-4 w-4" />
-                      </div>
+                      <button
+                        onClick={handleSelectPath}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        انتخاب فولدر
+                      </button>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      آدرس هاست (IP/Domain)
-                    </label>
-                    <input
-                      type="text"
-                      value={storagePathConfig.serverHost}
-                      onChange={(e) => updateStoragePathConfig({ serverHost: e.target.value })}
-                      placeholder="مثال: 192.168.1.50 یا logs.server.local"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    />
                   </div>
                 </div>
               </div>
-            </div>
+
+              {/* Server Storage Card */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="px-6 py-5 bg-gradient-to-r from-green-600 to-green-700">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                    <Globe className="h-6 w-6" />
+                    آدرس هاست و سرور
+                  </h3>
+                  <p className="text-green-100 text-sm mt-1">
+                    تعیین آدرس سایت و هاست برای ذخیره‌سازی ابری لاگ‌ها
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        آدرس سایت یا سرور
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={storagePathConfig.serverUrl}
+                          onChange={(e) => updateStoragePathConfig({ serverUrl: e.target.value })}
+                          placeholder="مثال: https://logs.mysite.com"
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        />
+                        <button
+                          onClick={selectServerPath}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                        >
+                          <Server className="h-4 w-4" />
+                          انتخاب هاست
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        آدرس هاست (IP/Domain)
+                      </label>
+                      <input
+                        type="text"
+                        value={storagePathConfig.serverHost}
+                        onChange={(e) => updateStoragePathConfig({ serverHost: e.target.value })}
+                        placeholder="مثال: 192.168.1.50 یا logs.server.local"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
 
           {/* Advanced Path Settings */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

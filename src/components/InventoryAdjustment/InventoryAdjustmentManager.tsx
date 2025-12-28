@@ -1397,6 +1397,27 @@ export const InventoryAdjustmentManager: React.FC = () => {
       return;
     }
     
+    // Log activity before saving
+    if ((window as any).logUserActivity) {
+      const user = storage.loadData('currentUser') as any;
+      (window as any).logUserActivity(
+        user?.id || 'admin',
+        user?.name || 'مدیر سیستم',
+        'ثبت سند کسر انبار',
+        'adjustment',
+        'success',
+        'کسر و اضافه انبار',
+        'مقدار کسری',
+        { 
+          productType: deductionForm.productType, 
+          productId: deductionForm.productId,
+          quantity: deductionQuantity,
+          site: deductionForm.siteId,
+          tank: deductionForm.tankId
+        }
+      );
+    }
+    
     saveAdjustment('deduction');
   };
 
@@ -1455,6 +1476,27 @@ export const InventoryAdjustmentManager: React.FC = () => {
       } catch (e) {
         console.error('خطا در محاسبه ظرفیت مخزن برای اضافه انبار:', e);
       }
+    }
+
+    // Log activity before saving
+    if ((window as any).logUserActivity) {
+      const user = storage.loadData('currentUser') as any;
+      (window as any).logUserActivity(
+        user?.id || 'admin',
+        user?.name || 'مدیر سیستم',
+        'ثبت سند اضافه انبار',
+        'adjustment',
+        'success',
+        'کسر و اضافه انبار',
+        'مقدار اضافی',
+        { 
+          productType: additionForm.productType, 
+          productId: additionForm.productId,
+          quantity: additionQuantity,
+          site: additionForm.siteId,
+          tank: additionForm.tankId
+        }
+      );
     }
 
     saveAdjustment('addition');
