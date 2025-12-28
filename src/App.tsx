@@ -46,6 +46,7 @@ import { useAutoInvoiceChecker } from './hooks/useAutoInvoiceChecker';
 import { useVersionChecker } from './hooks/useVersionChecker';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { initTabManager, updateTabModule, cleanupTabManager } from './utils/tabManager';
+import { useModuleChangeLogger, logLoginAction, logLogoutAction } from './hooks/useActivityLogger';
 
 // Mapping نام منوها برای نمایش در title
 const moduleNames: Record<string, string> = {
@@ -119,6 +120,9 @@ const AppContent: React.FC = () => {
   const [isFloatingCalendarOpen, setIsFloatingCalendarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [appInitialized, setAppInitialized] = useState(false);
+  
+  // لاگ تغییرات منو
+  useModuleChangeLogger(activeModule, isLoggedIn);
   
   // ذخیره ماژول فعلی در localStorage هر زمان که تغییر کند
   useEffect(() => {
@@ -312,12 +316,14 @@ const AppContent: React.FC = () => {
         if (result.success && result.user) {
           setCurrentUser(result.user);
           setIsLoggedIn(true);
-          // AuthService already handles session storage
+          logLoginAction(username, true);
           return true;
         }
+        logLoginAction(username, false);
         return false;
       } catch (error) {
         console.error('Login error:', error);
+        logLoginAction(username, false);
         return false;
       }
     },
@@ -325,13 +331,14 @@ const AppContent: React.FC = () => {
   );
 
     const handleLogout = useCallback(() => {
+      const username = currentUser?.username || 'unknown';
+      logLogoutAction(username);
       authService.logout();
       setIsLoggedIn(false);
       setCurrentUser(null);
       setActiveModule('dashboard');
-      // پاک کردن ماژول ذخیره شده هنگام logout
       localStorage.removeItem('activeModule');
-    }, []);
+    }, [currentUser]);
 
     // Session timeout handler
     const getSessionTimeout = useCallback(() => {

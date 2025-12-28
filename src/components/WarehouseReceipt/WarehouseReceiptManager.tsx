@@ -2813,29 +2813,31 @@ export const WarehouseReceiptManager: React.FC = () => {
         return updatedReceipts;
       });
       
-      setEditingReceipt(null);
-      setIsAddingNew(false);
-      setNewReceipt({});
-      setErrors({});
-      setIsReceiptBasisManuallyEdited(false);
-      setContractRemainderWarning(null);
-      setTankCapacityWarning(null);
-      
+        const savedTransactionNumber = newReceipt.transactionNumber;
+        
+        setEditingReceipt(null);
+        setIsAddingNew(false);
+        setNewReceipt({});
+        setErrors({});
+        setIsReceiptBasisManuallyEdited(false);
+        setContractRemainderWarning(null);
+        setTankCapacityWarning(null);
+        
         console.log("? رسيد با موفقيت ذخيره شد");
 
         // ثبت لاگ فعالیت کاربر
         if (typeof (window as any).logUserActivity === 'function') {
-          const user = storage.loadData('currentUser') as any;
-          (window as any).logUserActivity(
-            user?.id || 'unknown',
-            user?.fullName || 'کاربر سیستم',
-            editingReceipt ? 'ویرایش رسید انبار' : 'ثبت رسید انبار جدید',
-            'receipt',
-            'success',
-            'رسید انبار',
-            editingReceipt ? 'دکمه ویرایش' : 'دکمه ثبت',
-            { transactionNumber: transactionNumber || newReceipt.transactionNumber }
-          );
+          (window as any).logUserActivity({
+            action: editingReceipt ? 'ویرایش رسید انبار' : 'ثبت رسید انبار جدید',
+            category: currentUserType === 'consignment' ? 'receipt' : 'receipt',
+            page: currentUserType === 'consignment' ? 'رسید انبار امانی' : 'رسید انبار تملیکی',
+            status: 'success',
+            field: editingReceipt ? 'دکمه ویرایش' : 'دکمه ثبت',
+            selection: savedTransactionNumber || '',
+            logType: 'user',
+            logNature: 'عملکردی',
+            details: { transactionNumber: savedTransactionNumber }
+          });
         }
       } catch (error) {
       console.error("? خطا در ذخيره‌سازي رسيد:", error);
