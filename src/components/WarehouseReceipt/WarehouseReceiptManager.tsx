@@ -2538,10 +2538,16 @@ export const WarehouseReceiptManager: React.FC = () => {
     const contract = contracts.find(c => c.id === contractId);
     if (!contract) return true;
     
-    const startDate = new Date(contract.startDate);
-    const endDate = new Date(contract.endDate);
+    // مقایسه فقط تاریخ بدون زمان برای اطمینان از شامل شدن روز آخر
+    const start = new Date(contract.startDate);
+    start.setHours(0, 0, 0, 0);
     
-    return transactionDate >= startDate && transactionDate <= endDate;
+    const end = new Date(contract.endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    const current = new Date(transactionDate);
+    
+    return current >= start && current <= end;
   };
   
   // تابع handleSave با کنترل فراخواني‌هاي تکراري
@@ -3940,204 +3946,139 @@ dispatchWastageTransactions({
     return dueDate <= today;
   };
   
-  // اصلاح تابع handleFieldChange براي اطمينان از به‌روزرساني صحيح فيلدها در حالت ويرايش
-  const handleFieldChange = (fieldName: string, value: any) => {
-    console.log(`?? تغيير فيلد: ${fieldName} = ${value}`);
-    
-    setNewReceipt(prev => {
-      const updated = { ...prev, [fieldName]: value };
+    // اصلاح تابع handleFieldChange براي اطمينان از به‌روزرساني صحيح فيلدها در حالت ويرايش
+    const handleFieldChange = (fieldName: string, value: any) => {
+      console.log(`?? تغيير فيلد: ${fieldName} = ${value}`);
+      
+      const updatedReceipt = { ...newReceipt, [fieldName]: value };
+      
+      setNewReceipt(prev => {
+        const updated = { ...prev, [fieldName]: value };
 
-      // هم‌زمان پیش‌فرض‌های اطلاعات تکمیلی را در صورت نیاز تنظیم کن
-      if (fieldName === 'receiptBasisAmount' && (!receiptExtraInfo.weight || receiptExtraInfo.weight === prev.receiptBasisAmount)) {
-        setReceiptExtraInfo(extra => ({ ...extra, weight: value || 0 }));
-      }
-      if ((fieldName === 'siteName' || fieldName === 'tankName' || fieldName === 'siteId' || fieldName === 'tankId') && !showReceiptExtraInfo) {
-        setReceiptExtraInfo(extra => ({
-          ...extra,
-          originAddress: updated.siteName && updated.tankName ? `${updated.siteName} - ${updated.tankName}` : extra.originAddress
-        }));
-      }
-      if (fieldName === 'receiptDate' && receiptExtraInfo.billDate && isValidDate(receiptExtraInfo.billDate)) {
-        const prevDate = prev.receiptDate;
-        if (prevDate && receiptExtraInfo.billDate && new Date(prevDate).toDateString() === new Date(receiptExtraInfo.billDate).toDateString()) {
-          setReceiptExtraInfo(extra => ({ ...extra, billDate: value }));
+        // هم‌زمان پیش‌فرض‌های اطلاعات تکمیلی را در صورت نیاز تنظیم کن
+        if (fieldName === 'receiptBasisAmount' && (!receiptExtraInfo.weight || receiptExtraInfo.weight === prev.receiptBasisAmount)) {
+          setReceiptExtraInfo(extra => ({ ...extra, weight: value || 0 }));
+        }
+        if ((fieldName === 'siteName' || fieldName === 'tankName' || fieldName === 'siteId' || fieldName === 'tankId') && !showReceiptExtraInfo) {
+          setReceiptExtraInfo(extra => ({
+            ...extra,
+            originAddress: updated.siteName && updated.tankName ? `${updated.siteName} - ${updated.tankName}` : extra.originAddress
+          }));
+        }
+        if (fieldName === 'receiptDate' && receiptExtraInfo.billDate && isValidDate(receiptExtraInfo.billDate)) {
+          const prevDate = prev.receiptDate;
+          if (prevDate && receiptExtraInfo.billDate && new Date(prevDate).toDateString() === new Date(receiptExtraInfo.billDate).toDateString()) {
+            setReceiptExtraInfo(extra => ({ ...extra, billDate: value }));
+          }
+        }
+
+        return updated;
+      });
+      
+      if (fieldName === 'deliveryType') {
+        const deliveryType = value as 'first_party' | 'second_party';
+        
+        if (deliveryType === 'first_party') {
+          setNewReceipt(prev => ({
+            ...prev,
+            customerCounterpartyId: '',
+            customerCounterpartyName: '',
+            customerCounterpartyLocationId: '',
+            customerCounterpartyLocationName: ''
+          }));
         }
       }
-
-      return updated;
-    });
-    
-    if (fieldName === 'deliveryType') {
-      const deliveryType = value as 'first_party' | 'second_party';
       
-      if (deliveryType === 'first_party') {
-        setNewReceipt(prev => ({
-          ...prev,
-          customerCounterpartyId: '',
-          customerCounterpartyName: '',
-          customerCounterpartyLocationId: '',
-          customerCounterpartyLocationName: ''
-        }));
-      }
-    }
-    
       if (fieldName === 'contractId') {
         handleContractChange(value);
       }
       
-      // Update receiptBasisAmount when weight fields change if they are the current basis
-      if (['shipBillOfLadingAmount', 'shipUnloadingAmount', 'tankShoreAmount', 'weightGross'].includes(fieldName)) {
-        const currentBasis = newReceipt.receiptBasis;
-        const shouldUpdate = 
-          (fieldName === 'shipBillOfLadingAmount' && currentBasis === 'bill-lading') ||
-          (fieldName === 'shipUnloadingAmount' && currentBasis === 'ullage') ||
-          (fieldName === 'tankShoreAmount' && currentBasis === 'shore-tank') ||
-          (fieldName === 'weightGross' && currentBasis === 'gross');
+      // به‌روزرساني مقدار مبناي رسيد بلافاصله پس از تغيير مبنا يا فيلدهاي وزني
+      if (fieldName === 'receiptBasis' || ['shipBillOfLadingAmount', 'shipUnloadingAmount', 'tankShoreAmount', 'weightGross'].includes(fieldName)) {
+        const basis = fieldName === 'receiptBasis' ? value : newReceipt.receiptBasis;
         
-        if (shouldUpdate) {
-          setTimeout(() => {
-            const numericValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
-            setNewReceipt(prev => ({
-              ...prev,
-              receiptBasisAmount: numericValue
-            }));
-            
-            calculateAmounts({
-              ...newReceipt,
-              [fieldName]: numericValue,
-              receiptBasisAmount: numericValue
-            });
-          }, 50);
-        }
-      }
-      
-      if (fieldName === 'receiptBasis') {
-
-      console.log(`?? تغيير مبناي رسيد به: ${value}`);
-      
-      setTimeout(() => {
+        // محاسبه مقدار جدید بر اساس مبنا
         const receiptBasisAmount = calculateReceiptBasisAmount({
-          ...newReceipt,
-          receiptBasis: value
+          ...updatedReceipt,
+          receiptBasis: basis
         });
         
-        setNewReceipt(prev => ({
-          ...prev,
+        console.log(`? به‌روزرساني فوري مقدار مبناي رسيد: ${receiptBasisAmount} (مبنا: ${basis})`);
+        
+        const finalUpdatedReceipt = {
+          ...updatedReceipt,
+          receiptBasis: basis,
           receiptBasisAmount
+        };
+        
+        setNewReceipt(finalUpdatedReceipt);
+        
+        // همزمان با به‌روزرسانی receiptBasisAmount، وزن (مبنا) در اطلاعات تکمیلی را نیز به‌روزرسانی کن
+        setReceiptExtraInfo(prevExtra => ({
+          ...prevExtra,
+          weight: receiptBasisAmount || 0
         }));
         
-        calculateAmounts({
-          ...newReceipt,
-          receiptBasis: value,
-          receiptBasisAmount
-        });
-      }, 100);
-    }
-    
-    if (fieldName === 'wastagePercentage') {
-      console.log(`?? تغيير درصد افت به: ${value}%`);
-      
-      setTimeout(() => {
-        calculateAmounts({
-          ...newReceipt,
-          wastagePercentage: value
-        });
-      }, 100);
-    }
-    
-    // Handle dropdown selections - اصلاح شده براي شامل فيلدهاي جديد
-    if (['shipName', 'cotageNumber', 'indexNumber', 'driverName', 'internalCompanyName'].includes(fieldName)) {
-      let selectedItem = null;
-      if (fieldName === 'shipName') {
-        selectedItem = baseData.shipNames?.find((item: any) => item.id === value);
-      } else if (fieldName === 'cotageNumber') {
-        selectedItem = baseData.cotageNumbers?.find((item: any) => item.id === value);
-      } else if (fieldName === 'indexNumber') {
-        selectedItem = baseData.indexNumbers?.find((item: any) => item.id === value);
-      } else if (fieldName === 'driverName') {
-        selectedItem = baseData.drivers?.find((item: any) => item.id === value);
-      } else if (fieldName === 'internalCompanyName') {
-        selectedItem = baseData.internalCompany?.find((item: any) => item.id === value);
+        calculateAmounts(finalUpdatedReceipt);
       }
       
-      if (selectedItem) {
-        setTimeout(() => {
+      if (fieldName === 'wastagePercentage') {
+        console.log(`?? تغيير درصد افت به: ${value}%`);
+        calculateAmounts(updatedReceipt);
+      }
+      
+      // Handle dropdown selections - اصلاح شده براي شامل فيلدهاي جديد
+      if (['shipName', 'cotageNumber', 'indexNumber', 'driverName', 'internalCompanyName'].includes(fieldName)) {
+        let selectedItem = null;
+        if (fieldName === 'shipName') {
+          selectedItem = baseData.shipNames?.find((item: any) => item.id === value);
+        } else if (fieldName === 'cotageNumber') {
+          selectedItem = baseData.cotageNumbers?.find((item: any) => item.id === value);
+        } else if (fieldName === 'indexNumber') {
+          selectedItem = baseData.indexNumbers?.find((item: any) => item.id === value);
+        } else if (fieldName === 'driverName') {
+          selectedItem = baseData.drivers?.find((item: any) => item.id === value);
+        } else if (fieldName === 'internalCompanyName') {
+          selectedItem = baseData.internalCompany?.find((item: any) => item.id === value);
+        }
+        
+        if (selectedItem) {
           setNewReceipt(prev => ({
             ...prev,
             [fieldName]: selectedItem.name
           }));
-        }, 50);
-      }
-    }
-    
-    // Note: For productId, siteId, and tankId, we handle them directly in the onChange handlers
-    // to ensure proper state updates and avoid conflicts
-    
-    // براي فيلدهاي مهم، محاسبات را مجدداً اجرا کن
-    if (['productId', 'siteId', 'tankId'].includes(fieldName)) {
-      setTimeout(() => {
-        calculateAmounts(newReceipt);
-      }, 100);
-    }
-    
-    // به‌روزرساني تراکنش‌هاي افت در صورت تغيير مقدار مبناي رسيد يا وزن افت - اصلاح شده
-    if (editingReceipt && (fieldName === 'receiptBasisAmount' || fieldName === 'wastagePercentage' || fieldName === 'receiptBasis')) {
-      setTimeout(() => {
-        // Get the updated receipt data
-        const updatedReceipt = {
-          ...newReceipt,
-          [fieldName]: value
-        };
-        
-        // Recalculate amounts
-        calculateAmounts(updatedReceipt);
-        
-        // Get the updated gainedWeight
-        const gainedWeight = updatedReceipt.gainedWeight || 0;
-        
-        // بررسي وجود تراکنش‌هاي افت براي اين رسيد
-        const existingTransactions = wastageTransactions.filter(t => t.referenceId === editingReceipt);
-        
-        if (existingTransactions.length > 0) {
-          console.log(`?? به‌روزرساني تراکنش‌هاي افت براي رسيد ${editingReceipt}`);
-          
-          // به‌روزرساني تراکنش کسر از اماني
-          const consignmentTransaction = existingTransactions.find(t => t.transactionType === 'consignment');
-          if (consignmentTransaction) {
-            dispatchWastageTransactions({
-              type: 'UPDATE_TRANSACTION',
-              payload: {
-                receiptId: editingReceipt,
-                transactionData: {
-                  ...updatedReceipt,
-                  gainedWeight: gainedWeight
-                },
-                transactionType: 'consignment'
-              }
-            });
-          }
-          
-          // به‌روزرسانی تراکنش افزودن به تملیکی
-          const ownedTransaction = existingTransactions.find(t => t.transactionType === 'owned');
-          if (ownedTransaction) {
-            dispatchWastageTransactions({
-              type: 'UPDATE_TRANSACTION',
-              payload: {
-                receiptId: editingReceipt,
-                transactionData: {
-                  ...updatedReceipt,
-                  gainedWeight: gainedWeight
-                },
-                transactionType: 'owned'
-              }
-            });
-          }
         }
-      }, 200);
-    }
-  };
-  
-  // اصلاح تابع generateAnalyticsData براي حذف نمودار "درصد پر شدن مخازن"
+      }
+      
+      // براي فيلدهاي مهم، محاسبات را مجدداً اجرا کن
+      if (['productId', 'siteId', 'tankId'].includes(fieldName)) {
+        calculateAmounts(updatedReceipt);
+      }
+      
+      // به‌روزرساني تراکنش‌هاي افت در صورت تغيير مقدار مبناي رسيد يا وزن افت - اصلاح شده
+      if (editingReceipt && (fieldName === 'receiptBasisAmount' || fieldName === 'wastagePercentage' || fieldName === 'receiptBasis')) {
+        setTimeout(() => {
+          const finalReceipt = { ...newReceipt, [fieldName]: value };
+          const gainedWeight = finalReceipt.gainedWeight || 0;
+          const existingTransactions = wastageTransactions.filter(t => t.referenceId === editingReceipt);
+          
+          if (existingTransactions.length > 0) {
+            existingTransactions.forEach(transaction => {
+              dispatchWastageTransactions({
+                type: 'UPDATE_TRANSACTION',
+                payload: {
+                  receiptId: editingReceipt,
+                  transactionData: { ...finalReceipt, gainedWeight },
+                  transactionType: transaction.transactionType
+                }
+              });
+            });
+          }
+        }, 300);
+      }
+    };
+    
+    // اصلاح تابع generateAnalyticsData براي حذف نمودار "درصد پر شدن مخازن"
   const generateAnalyticsData = () => {
     const ownedReceipts = receipts.filter(r => r.userType === 'owned');
     const consignmentReceipts = receipts.filter(r => r.userType === 'consignment');

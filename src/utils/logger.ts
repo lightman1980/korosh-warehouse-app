@@ -242,13 +242,18 @@ export const logUserActivity = async (
 
   const currentUser = storage.loadData<any>('current_session')?.user || 
                     storage.loadData<any>('currentUser') || 
+                    JSON.parse(localStorage.getItem('currentUser') || 'null') ||
                     { username: 'Unknown', id: 'unknown', fullName: 'کاربر ناشناس' };
+
+  // اطمینان از وجود فیلدهای لازم در شی کاربر
+  const userId = currentUser.id || currentUser.username || 'unknown';
+  const userName = currentUser.fullName || currentUser.username || 'کاربر ناشناس';
 
   const activity: UserActivityEntry = {
     id: Math.random().toString(36).substring(2, 11),
     timestamp: new Date().toISOString(),
-    userId: currentUser.id || currentUser.username,
-    userName: currentUser.fullName || currentUser.username,
+    userId: userId,
+    userName: userName,
     action: finalAction,
     category: finalCategory,
     page: finalPage,
@@ -268,8 +273,8 @@ export const logUserActivity = async (
     level: finalStatus === 'failed' ? 'error' : finalStatus === 'warning' ? 'warn' : 'info',
     category: finalCategory,
     message: finalAction,
-    userName: activity.userName,
-    userId: activity.userId,
+    userName: userName,
+    userId: userId,
     page: finalPage,
     field: finalField,
     selection: finalSelection,
