@@ -176,7 +176,7 @@ const AppContent: React.FC = () => {
   });
 
   // اضافه کردن state برای تنظیمات
-  const [settings, setSettings] = useState<any>({});
+  const [settings, setSettings] = useState<any>(null);
 
   const storage = DataStorage.getInstance();
 

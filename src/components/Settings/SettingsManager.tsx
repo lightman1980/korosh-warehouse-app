@@ -617,13 +617,18 @@ const loadSettings = async () => {
       } else {
         applySettings(finalSettings);
       }
-    } else if (externalSettings) {
+    } else if (externalSettings && Object.keys(externalSettings).length > 0) {
       // فقط اگر هیچ تنظیم ذخیره‌شده‌ای وجود نداشت، از props اولیه استفاده کن
-      setSettings(externalSettings);
+      const mergedExternal = {
+        ...initialSettings,
+        ...externalSettings,
+        logging: { ...initialSettings.logging, ...(externalSettings.logging || {}) }
+      };
+      setSettings(mergedExternal);
       if (externalApplySettings) {
-        externalApplySettings(externalSettings);
+        externalApplySettings(mergedExternal);
       } else {
-        applySettings(externalSettings);
+        applySettings(mergedExternal);
       }
     }
   } catch (error) {
