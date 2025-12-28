@@ -260,11 +260,13 @@ export const logUserActivity = async (
 
     // اطمینان از وجود فیلدهای لازم در شی کاربر و عدم نمایش Unknown
     const userId = currentUser.userId || currentUser.id || currentUser.uid || currentUser.username || 'system';
-    let userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.displayName || currentUser.username || 'مدیر سیستم';
+    let userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.displayName || currentUser.username || currentUser.fullName_fa || 'مدیر سیستم';
     
-    if (userName.toLowerCase() === 'unknown' || userName === 'ناشناس') {
-      userName = 'مدیر سیستم';
+    if (!userName || userName.toLowerCase() === 'unknown' || userName === 'ناشناس' || userName === 'undefined') {
+      userName = currentUser.username || 'مدیر سیستم';
     }
+    
+    if (userName === 'admin') userName = 'مدیر سیستم';
 
     // تعیین نوع تراکنش بر اساس متن پیام اگر مستقیماً ارسال نشده باشد
     let detectedLogNature = finalLogNature;
