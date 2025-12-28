@@ -618,6 +618,173 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);
 
   // ============================================================================
+  // Helper Functions
+  // ============================================================================
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const validatePath = (path: string): boolean => {
+    if (!path || !path.trim()) {
+      setPathValidationError('مسیر نمی‌تواند خالی باشد');
+      return false;
+    }
+    // Basic validation for Windows or Unix paths
+    const winPathRegex = /^[a-zA-Z]:\\.*$/;
+    const unixPathRegex = /^\/.*$/;
+    if (!winPathRegex.test(path) && !unixPathRegex.test(path) && !path.startsWith('./') && !path.startsWith('../')) {
+      setPathValidationError('فرمت مسیر معتبر نیست');
+      return false;
+    }
+    setPathValidationError('');
+    return true;
+  };
+
+  const loadLogs = useCallback(async () => {
+    try {
+      const allFiles = await logger.getLogFiles();
+      let allEntries: LogEntry[] = [];
+      
+      for (const file of allFiles) {
+        const content = await logger.readLogFile(file.path);
+        const entries = await logger.parseLogEntries(content);
+        allEntries = [...allEntries, ...entries];
+      }
+      
+      // Also add in-memory logs from activity view
+      const activityLogs = userActivityLogs.map(al => ({
+        id: al.id,
+        timestamp: al.timestamp,
+        level: (al.status === 'failed' ? 'error' : al.status === 'warning' ? 'warn' : 'info') as LogEntry['level'],
+        category: al.category,
+        message: al.action,
+        userName: al.userName,
+        ipAddress: al.ipAddress,
+        page: al.page,
+        field: al.field,
+        selection: al.selection,
+        logType: al.logType || 'user',
+        logNature: al.logNature || al.status
+      }));
+      
+      const combined = [...allEntries, ...activityLogs].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+      
+      setLogs(combined);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+    }
+  }, [logger, userActivityLogs]);
+
+  const refreshLogFiles = useCallback(async () => {
+    try {
+      const files = await logger.getLogFiles();
+      setLogFiles(files);
+    } catch (error) {
+      console.error('Error refreshing log files:', error);
+    }
+  }, [logger]);
+
+  const updateLoggingSettings = (updates: any) => {
+    const newLogging = {
+      ...(settings.logging || {}),
+      ...updates
+    };
+    setSettings({
+      ...settings,
+      logging: newLogging
+    });
+    // Also update logger service if needed
+    if (updates.logLevel) {
+      // Logic to update logger service level
+    }
+  };
+
+  const updateStoragePathConfig = (updates: Partial<StoragePathConfig>) => {
+    const newConfig = { ...storagePathConfig, ...updates };
+    setStoragePathConfig(newConfig);
+    storage.saveData('storagePathConfig', newConfig);
+    logger.setStorageConfig(newConfig);
+  };
+
+  const updatePathConfig = (updates: Partial<LogPathConfig>) => {
+    const newConfig = { ...logPathConfig, ...updates };
+    setLogPathConfig(newConfig);
+    storage.saveData('logPathConfig', newConfig);
+    logger.setConfig(newConfig);
+  };
+
+  const saveLogPath = () => {
+    if (validatePath(tempPath)) {
+      updateStoragePathConfig({ localPath: tempPath });
+      updatePathConfig({ path: tempPath });
+      setPathSuccess(true);
+      setIsEditingPath(false);
+      setTimeout(() => setPathSuccess(false), 3000);
+    }
+  };
+
+  const clearAllLogs = async () => {
+    if (confirm('آیا از حذف تمام لاگ‌ها اطمینان دارید؟ این عمل غیرقابل بازگشت است.')) {
+      try {
+        const allFiles = await logger.getLogFiles();
+        for (const file of allFiles) {
+          const key = `logfile_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const metaKey = key.replace('logfile_', 'logmeta_');
+          localStorage.removeItem(key);
+          localStorage.removeItem(metaKey);
+        }
+        // Also clear activities if needed
+        storage.saveData('userActivities', []);
+        loadLogs();
+        refreshLogFiles();
+        alert('تمامی لاگ‌ها با موفقیت حذف شدند');
+      } catch (error) {
+        console.error('Error clearing logs:', error);
+        alert('خطا در حذف لاگ‌ها');
+      }
+    }
+  };
+
+  const downloadLogFile = async (file: LogFileInfo) => {
+    try {
+      const content = await logger.readLogFile(file.path);
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.path.split('/').pop() || 'log.txt';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      alert('خطا در دانلود فایل');
+    }
+  };
+
+  const deleteLogFile = async (filePath: string) => {
+    if (confirm(`آیا از حذف فایل ${filePath} اطمینان دارید؟`)) {
+      try {
+        const key = `logfile_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const metaKey = key.replace('logfile_', 'logmeta_');
+        localStorage.removeItem(key);
+        localStorage.removeItem(metaKey);
+        refreshLogFiles();
+        alert('فایل با موفقیت حذف شد');
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        alert('خطا در حذف فایل');
+      }
+    }
+  };
+
+  // ============================================================================
   // Folder Selection Functions
   // ============================================================================
 
@@ -735,10 +902,12 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     return filteredLogs;
   }, [userActivityLogs, activityViewSettings]);
 
-  // Load activity view settings on mount
-  useEffect(() => {
-    loadActivityViewSettings();
-  }, [loadActivityViewSettings]);
+    // Load activity view settings on mount
+    useEffect(() => {
+      loadActivityViewSettings();
+      loadLogs();
+      refreshLogFiles();
+    }, [loadActivityViewSettings, loadLogs, refreshLogFiles]);
 
   // Update available users based on activity logs
   useEffect(() => {
@@ -799,7 +968,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     URL.revokeObjectURL(link.href);
   };
 
-  const exportActivitiesToExcel = () => {
+  const handleExportActivitiesToExcel = () => {
     const activities = storage.loadData('userActivities') as any[] | null;
     if (activities && activities.length > 0) {
       const sortedActivities = [...activities].sort((a, b) => 

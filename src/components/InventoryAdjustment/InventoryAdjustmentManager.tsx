@@ -8,6 +8,7 @@ import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
 import { usePermissions } from '../../hooks/usePermissions';
+import { logUserActivity } from '../../utils/logger';
 
 interface InventoryAdjustment {
   id: string;
