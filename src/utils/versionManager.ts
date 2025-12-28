@@ -34,12 +34,10 @@ export function getCurrentVersion(): string {
     }
   }
   
-  // در development، از timestamp استفاده می‌کنیم
-  // در production، از build time استفاده می‌کنیم
-  // برای تشخیص تغییرات در development، از تغییرات در فایل‌های اصلی استفاده می‌کنیم
+  // در development، از یک مقدار ثابت استفاده می‌کنیم تا جلوی لوپ رفرش گرفته شود
   const versionHash = import.meta.env.DEV 
-    ? `${buildTime}-dev`
-    : `${buildTime}-prod`;
+    ? `dev-stable`
+    : `${buildTime || new Date().getTime()}-prod`;
   
   // در development، می‌توانیم از hash فایل main استفاده کنیم
   // اما برای سادگی، از buildTime استفاده می‌کنیم که در هر dev server restart تغییر می‌کند
