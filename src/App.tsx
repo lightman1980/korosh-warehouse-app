@@ -35,6 +35,7 @@ import { useVersionChecker } from './hooks/useVersionChecker';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { useModuleChangeLogger, logLoginAction, logLogoutAction } from './hooks/useActivityLogger';
 
+
 const moduleNames: Record<string, string> = {
   'dashboard': 'داشبورد',
   'base-data': 'اطلاعات پایه',
