@@ -2274,20 +2274,25 @@ const ConsignmentDeliverySlip: React.FC<Props> = ({
 
         console.log('✅ حواله با موفقیت صادر شد:', updatedSlipInfo);
 
-        // ثبت لاگ فعالیت کاربر
-        if (typeof (window as any).logUserActivity === 'function') {
-          const user = storage.loadData('currentUser') as any;
-          (window as any).logUserActivity(
-            user?.id || 'unknown',
-            user?.fullName || 'کاربر سیستم',
-            'صدور حواله امانی',
-            'release',
-            'success',
-            'حواله امانی',
-            'دکمه صدور',
-            { transactionNumber: updatedSlipInfo.transactionNumber }
-          );
-        }
+          // ثبت لاگ فعالیت کاربر
+          if (typeof (window as any).logUserActivity === 'function') {
+            (window as any).logUserActivity({
+              action: `صدور حواله امانی - شماره ${updatedSlipInfo.transactionNumber}`,
+              category: 'release',
+              page: 'حواله انبار امانی',
+              status: 'success',
+              amount: updatedSlipInfo.amount,
+              product: updatedSlipInfo.productName,
+              receiptDate: updatedSlipInfo.slipDate ? formatPersianDate(new Date(updatedSlipInfo.slipDate)) : '',
+              documentType: 'امانی (مجوزی)',
+              counterparty: updatedSlipInfo.deliveryCounterpartyName || updatedSlipInfo.counterpartyName || '',
+              logNature: 'امانی - صدور',
+              field: 'دکمه صدور',
+              selection: updatedSlipInfo.transactionNumber || '',
+              logType: 'user',
+              details: { transactionNumber: updatedSlipInfo.transactionNumber }
+            });
+          }
 
         alert('✅ حواله با موفقیت صادر شد!\n\nوضعیت حواله به "صادر شده" تغییر کرد.');
       
@@ -2602,25 +2607,30 @@ const handleSaveSlip = async () => {
     
       alert(successMessage);
 
-      // ثبت لاگ فعالیت کاربر
-      if (typeof (window as any).logUserActivity === 'function') {
-        const user = storage.loadData('currentUser') as any;
-        (window as any).logUserActivity(
-          user?.id || 'unknown',
-          user?.fullName || 'کاربر سیستم',
-          isEditMode ? 'ویرایش حواله امانی' : 'ثبت حواله امانی جدید',
-          'release',
-          'success',
-          'حواله امانی',
-          isEditMode ? 'دکمه ویرایش' : 'دکمه ثبت',
-          { 
-            transactionNumber: finalSlipInfo.transactionNumber,
+        // ثبت لاگ فعالیت کاربر
+        if (typeof (window as any).logUserActivity === 'function') {
+          (window as any).logUserActivity({
+            action: isEditMode ? `ویرایش حواله امانی - شماره ${finalSlipInfo.transactionNumber}` : `ثبت حواله امانی جدید - شماره ${finalSlipInfo.transactionNumber}`,
+            category: 'release',
+            page: 'حواله انبار امانی',
+            status: 'success',
             amount: finalSlipInfo.amount,
-            productName: finalSlipInfo.productName,
-            counterpartyName: finalSlipInfo.counterpartyName
-          }
-        );
-      }
+            product: finalSlipInfo.productName,
+            receiptDate: finalSlipInfo.slipDate ? formatPersianDate(new Date(finalSlipInfo.slipDate)) : '',
+            documentType: 'امانی (مجوزی)',
+            counterparty: finalSlipInfo.deliveryCounterpartyName || finalSlipInfo.counterpartyName || '',
+            logNature: isEditMode ? 'امانی - ویرایش' : 'امانی - ایجاد',
+            field: isEditMode ? 'دکمه ویرایش' : 'دکمه ثبت',
+            selection: finalSlipInfo.transactionNumber || '',
+            logType: 'user',
+            details: { 
+              transactionNumber: finalSlipInfo.transactionNumber,
+              amount: finalSlipInfo.amount,
+              productName: finalSlipInfo.productName,
+              counterpartyName: finalSlipInfo.counterpartyName
+            }
+          });
+        }
       
       // 🔄 راه حل قطعی: بعد از ذخیره، بازگشت به لیست
       setIsSaving(false);
