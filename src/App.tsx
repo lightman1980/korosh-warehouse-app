@@ -41,6 +41,7 @@ import { SettingsProvider } from './components/Contracts/SettingsContext';
 import { ServerSettings } from './components/Settings/ServerSettings';
 
 import { DataStorage } from './utils/dataStorage';
+import './utils/logger';
 import { useAutoInvoiceChecker } from './hooks/useAutoInvoiceChecker';
 import { useVersionChecker } from './hooks/useVersionChecker';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
