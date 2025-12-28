@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Save, X, AlertCircle, Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { formatPersianDate, formatPersianDateTime } from '../../utils/persian';
+import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
 import { DataStorage } from '../../utils/dataStorage';
 
 interface User {
@@ -257,8 +258,15 @@ export const UserManagementManager: React.FC = () => {
       updatedUsersArray = users;
     }
     
-    setUsers(updatedUsersArray);
-    saveUsers(updatedUsersArray);
+      setUsers(updatedUsersArray);
+      saveUsers(updatedUsersArray);
+      
+      if (editingUser) {
+        logSaveAction('کاربران', newUser.username || '', { action: 'edit' });
+      } else {
+        logCreateAction('کاربران', newUser.username || '');
+      }
+
 
     setEditingUser(null);
     setIsAddingNew(false);
@@ -273,19 +281,23 @@ export const UserManagementManager: React.FC = () => {
     setErrors({});
   };
 
-  const handleDelete = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    if (user?.role === 'admin') {
-      alert('نمی توان کاربر مدیر را حذف کرد');
-      return;
-    }
+    const handleDelete = (userId: string) => {
+      const user = users.find(u => u.id === userId);
+      if (user?.role === 'admin') {
+        alert('نمی توان کاربر مدیر را حذف کرد');
+        return;
+      }
+  
+      if (confirm('آیا از حذف این کاربر اطمینان دارید؟')) {
+        const updatedUsers = users.filter(user => user.id !== userId);
+        setUsers(updatedUsers);
+        saveUsers(updatedUsers);
+        if (user) {
+          logDeleteAction('کاربران', user.username || '');
+        }
+      }
+    };
 
-    if (confirm('آیا از حذف این کاربر اطمینان دارید؟')) {
-      const updatedUsers = users.filter(user => user.id !== userId);
-      setUsers(updatedUsers);
-      saveUsers(updatedUsers);
-    }
-  };
 
   const handleToggleActive = (userId: string) => {
     const user = users.find(u => u.id === userId);

@@ -1,18 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Search, Download, RefreshCw, Edit2, Trash2, AlertCircle, Printer, CheckSquare, Calendar, Building2, Clock, Truck, Minimize2, Maximize2 } from 'lucide-react';
-import { WarehouseDelivery } from '../../types/WarehouseDeliveryTypes';
-import { formatPersianNumber, formatPersianDate } from "../../utils/persian";
-import { DataStorage } from '../../utils/dataStorage';
-import { usePermissions } from '../../hooks/usePermissions';
-// Removed unused imports: DeliveryTypeSelector, CompanySelector, ContractSelector, PermitSelector, DeliveryForm, DeliveriesTable
-import DeliverySlipTypeSelector from './DeliverySlipTypeSelector';
-import ConsignmentDeliverySlip from './ConsignmentDeliverySlip';
-import OwnershipDeliverySlip from './OwnershipDeliverySlip';
-import ModernOwnershipDeliverySlip from './ModernOwnershipDeliverySlip';
-import NewOwnershipDeliverySlip from './NewOwnershipDeliverySlip';
-import PersianDatePicker from '../Common/PersianDatePicker';
+import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
 
 interface WarehouseDeliveryManagerProps {
+
   sharedData: {
     baseData: any;
     contracts: any[];
@@ -2479,10 +2470,12 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
       // به‌روزرسانی inventoryRefreshKey برای refresh محاسبات موجودی
       setInventoryRefreshKey(prev => prev + 1);
       
-      // 5. به‌روزرسانی deliveries state برای محاسبه مجدد مانده مجوز
-      const reloadedDeliveries = (storage.loadData('deliveries') || []) as WarehouseDelivery[];
-      setDeliveries(reloadedDeliveries);
-      alert('تراکنش با موفقيت حذف شد و مانده مجوز به‌روزرساني شد.');
+        // 5. به‌روزرسانی deliveries state برای محاسبه مجدد مانده مجوز
+        const reloadedDeliveries = (storage.loadData('deliveries') || []) as WarehouseDelivery[];
+        setDeliveries(reloadedDeliveries);
+        logDeleteAction('حواله انبار', transactionToDelete.transactionNumber || transactionToDelete.id);
+        alert('تراکنش با موفقيت حذف شد و مانده مجوز به‌روزرساني شد.');
+
     }
   }, [deliveries, saveDeliveries, storage]);
 
@@ -2579,29 +2572,37 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
     alert('درخواست اصلاحيه با موفقيت ثبت شد.');
   }, [issuedPermits, deliveries, existingSlips, updatePermitEvent]);
 
-  // Handle status change - کاملاً اصلاح شده برای toggle کردن صحیح
-  const handleChangeStatus = useCallback((id: string) => {
-    // Find transaction (by id or transactionNumber for robustness)
-    const transaction = existingSlips.find(s => s.id === id) || existingSlips.find(s => s.transactionNumber === id);
-    if (!transaction) {
-      alert('خطا: تراکنش مورد نظر يافت نشد.');
-      return;
-    }
+    // Handle status change - کاملاً اصلاح شده برای toggle کردن صحیح
+    const handleChangeStatus = useCallback((id: string) => {
+      // Find transaction (by id or transactionNumber for robustness)
+      const transaction = existingSlips.find(s => s.id === id) || existingSlips.find(s => s.transactionNumber === id);
+      if (!transaction) {
+        alert('خطا: تراکنش مورد نظر يافت نشد.');
+        return;
+      }
 
-    // تعیین وضعیت جدید: اگر فعلاً "پیش نویس" است، به "صادر شده" تغییر کند و بالعکس
-    const currentStatus = transaction.status || 'draft';
-    const newStatus = currentStatus === 'draft' || currentStatus === 'پیش‌نویس' || currentStatus === 'پيش‌نويس' ? 'issued' : 'draft';
-    const newPersianStatus = newStatus === 'issued' ? 'صادر شده' : 'پیش‌نویس';
+      // تعیین وضعیت جدید: اگر فعلاً "پیش نویس" است، به "صادر شده" تغییر کند و بالعکس
+      const currentStatus = transaction.status || 'draft';
+      const newStatus = currentStatus === 'draft' || currentStatus === 'پیش‌نویس' || currentStatus === 'پيش‌نويس' ? 'issued' : 'draft';
+      const newPersianStatus = newStatus === 'issued' ? 'صادر شده' : 'پیش‌نویس';
 
-    console.log('تغییر وضعیت تراکنش:', {
-      transactionId: id,
-      currentStatus,
-      newStatus,
-      newPersianStatus,
-      transactionNumber: transaction.transactionNumber
-    });
+      console.log('تغییر وضعیت تراکنش:', {
+        transactionId: id,
+        currentStatus,
+        newStatus,
+        newPersianStatus,
+        transactionNumber: transaction.transactionNumber
+      });
 
-    // Update delivery status in main deliveries list (match by id OR transactionNumber)
+      // لاگ تغییر وضعیت
+      logSaveAction('حواله انبار', transaction.transactionNumber || id, { 
+        oldStatus: currentStatus, 
+        newStatus: newStatus,
+        type: transaction.type || transaction.userType 
+      });
+
+      // Update delivery status in main deliveries list (match by id OR transactionNumber)
+
     const updatedDeliveries = deliveries.map((d: any) => {
       const sameById = d.id === id || d.id === transaction.id;
       const sameByNumber = d.transactionNumber && (d.transactionNumber === transaction.transactionNumber || d.transactionNumber === id);

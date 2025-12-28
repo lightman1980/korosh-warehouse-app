@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Search, Edit2, Trash2, Save, X, AlertCircle, FileText, Calendar, Building, Package, Download, Filter, ChevronUp, ChevronDown, BarChart3, PieChart, TrendingUp, Droplets, Layers, Percent, Users, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber, generateTransactionNumber } from '../../utils/persian';
+import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
 import moment from 'moment-jalaali';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
@@ -2274,11 +2275,14 @@ export const ContractManager: React.FC = () => {
       updatedAt: new Date()
     } as Contract;
     
-      if (editingContract) {
-        setContracts(prev => prev.map(c => c.id === editingContract ? contractData : c));
-      } else {
-        setContracts(prev => [...prev, contractData]);
-      }
+        if (editingContract) {
+          setContracts(prev => prev.map(c => c.id === editingContract ? contractData : c));
+          logSaveAction('قرارداد', contractData.contractNumber, { action: 'edit' });
+        } else {
+          setContracts(prev => [...prev, contractData]);
+          logCreateAction('قرارداد', contractData.contractNumber);
+        }
+
 
       // ثبت لاگ فعالیت کاربر
       if (typeof (window as any).logUserActivity === 'function') {
@@ -2415,17 +2419,22 @@ export const ContractManager: React.FC = () => {
     return false;
   }, [contracts, storage]);
 
-  const handleDelete = (contractId: string) => {
-    // بررسی اینکه آیا قرارداد تراکنش دارد یا نه
-    if (hasContractTransactions(contractId)) {
-      alert('این قرارداد را نمی‌توان حذف کرد زیرا در سایر بخش‌های برنامه تراکنش‌هایی برای آن ثبت شده است.');
-      return;
-    }
-    
-    if (confirm('آیا از حذف این قرارداد اطمینان دارید؟')) {
-      setContracts(prev => prev.filter(c => c.id !== contractId));
-    }
-  };
+    const handleDelete = (contractId: string) => {
+      // بررسی اینکه آیا قرارداد تراکنش دارد یا نه
+      if (hasContractTransactions(contractId)) {
+        alert('این قرارداد را نمی‌توان حذف کرد زیرا در سایر بخش‌های برنامه تراکنش‌هایی برای آن ثبت شده است.');
+        return;
+      }
+      
+      if (confirm('آیا از حذف این قرارداد اطمینان دارید؟')) {
+        const contractToDelete = contracts.find(c => c.id === contractId);
+        setContracts(prev => prev.filter(c => c.id !== contractId));
+        if (contractToDelete) {
+          logDeleteAction('قرارداد', contractToDelete.contractNumber);
+        }
+      }
+    };
+
   
   const handleToggleActive = (contractId: string) => {
     setContracts(prev => prev.map(c => 

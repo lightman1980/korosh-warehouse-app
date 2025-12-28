@@ -121,10 +121,12 @@ const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [appInitialized, setAppInitialized] = useState(false);
   
-  // لاگ تغییرات منو
-  useModuleChangeLogger(activeModule, isLoggedIn);
-  
-  // ذخیره ماژول فعلی در localStorage هر زمان که تغییر کند
+    // لاگ تغییرات منو
+    const currentModuleName = moduleNames[activeModule] || activeModule;
+    useModuleChangeLogger(activeModule, currentModuleName);
+    
+    // ذخیره ماژول فعلی در localStorage هر زمان که تغییر کند
+
   useEffect(() => {
     if (isLoggedIn && appInitialized) {
       try {
