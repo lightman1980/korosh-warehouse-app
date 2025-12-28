@@ -8,7 +8,7 @@ import BaseDataManager from './components/BaseData/BaseDataManager';
 import ContractManager from './components/Contracts/ContractManager';
 import { WarehouseReceiptManager } from './components/WarehouseReceipt/WarehouseReceiptManager';
 // تغییر اصلی: وارد کردن ماژول جدید به صورت ماژولار
-import WarehouseDeliveryManager from './components/WarehouseDelivery/WarehouseDeliveryManager.tsx';
+import WarehouseDeliveryManager from './components/WarehouseDelivery/WarehouseDeliveryManager';
 import AccountingManager from './components/accounting/AccountingManager';
 import { ReportsManager } from './components/Reports/ReportsManager';
 import { InventoryLedgerManager } from './components/InventoryLedger/InventoryLedgerManager';
