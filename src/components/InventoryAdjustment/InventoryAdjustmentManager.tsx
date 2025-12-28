@@ -1607,23 +1607,26 @@ export const InventoryAdjustmentManager: React.FC = () => {
       storage.saveData('inventoryAdjustments', updatedAdjustments);
       setAdjustments(updatedAdjustments);
       
-        // ثبت در لاگ سیستم
-        logUserActivity({
-          action: `${isEdit ? 'ویرایش' : 'ثبت'} تراکنش ${type === 'deduction' ? 'کاهش' : 'افزایش'} انبار - شماره ${transactionNumber}`,
-          category: 'adjustment',
-          status: 'success',
-          page: 'مدیریت کسر و اضافه انبار',
-          amount: adjustment.quantity,
-          product: adjustment.productName,
-          logNature: `${isEdit ? 'ویرایش' : 'ایجاد'} - ${adjustment.productType === 'owned' ? 'تملیکی' : 'امانی'}`,
-          details: {
-            transactionNumber,
-            productName: adjustment.productName,
-            quantity: adjustment.quantity,
-            site: adjustment.siteName,
-            tank: adjustment.tankName
-          }
-        });
+          // ثبت در لاگ سیستم
+          logUserActivity({
+            action: `${isEdit ? 'ویرایش' : 'ثبت'} تراکنش ${type === 'deduction' ? 'کاهش' : 'افزایش'} انبار - شماره ${transactionNumber}`,
+            category: 'adjustment',
+            status: 'success',
+            page: 'مدیریت کسر و اضافه انبار',
+            amount: adjustment.quantity,
+            product: adjustment.productName,
+            receiptDate: formatPersianDate(adjustment.documentDate),
+            documentType: adjustment.contractId ? 'سیستمی (قراردادی)' : 'دستی',
+            counterparty: adjustment.customerCompanyName || adjustment.companyName || '',
+            logNature: `${isEdit ? 'ویرایش' : 'ایجاد'} - ${adjustment.productType === 'owned' ? 'تملیکی' : 'امانی'}`,
+            details: {
+              transactionNumber,
+              productName: adjustment.productName,
+              quantity: adjustment.quantity,
+              site: adjustment.siteName,
+              tank: adjustment.tankName
+            }
+          });
       
       // به‌روزرسانی موجودی
       if (!isEdit || adjustment.status === 'finalized') {

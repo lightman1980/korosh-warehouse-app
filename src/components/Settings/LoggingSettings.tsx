@@ -1981,84 +1981,84 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
-                      {paginatedLogs.map(log => (
-                        <div
-                          key={log.id}
-                          onClick={() => setSelectedLog(log)}
-                          className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-start gap-3 flex-1">
-                                <div className={`p-2 rounded-lg ${getLevelColor(log.level)}`}>
-                                  {getLevelIcon(log.level)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
-                                          {log.level.toUpperCase()}
-                                        </span>
-                                        <span className="text-xs text-gray-500 font-mono">
-                                          {new Date(log.timestamp).toLocaleTimeString('fa-IR')}
-                                        </span>
-                                      </div>
-                                      
-                                      <div className="text-sm font-bold text-gray-900 truncate" title={log.userName}>
-                                        {log.userName || 'سیستم'}
-                                      </div>
-
-                                      <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded truncate" title={log.page}>
-                                        {log.page || 'نامشخص'}
-                                      </div>
-
-                                      <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded truncate" title={log.logNature}>
-                                        {log.logNature || 'عملیات'}
-                                      </div>
-
-                                      <div className="text-xs text-gray-600 font-mono">
-                                        {log.receiptDate || '-'}
-                                      </div>
-
-                                      <div className="text-sm font-bold text-green-600">
-                                        {log.amount ? formatPersianNumber(log.amount) : '-'}
-                                      </div>
-
-                                      <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded truncate">
-                                        {log.documentType || '-'}
-                                      </div>
-
-                                      <div className="text-xs text-gray-700 truncate" title={log.counterparty}>
-                                        {log.counterparty || '-'}
-                                      </div>
-                                    </div>
-                                    <div className="text-sm text-gray-600 mt-1 line-clamp-1">
-                                      {log.message}
-                                    </div>
-                                    
-                                    {log.product && (
-                                      <div className="mt-2 flex items-center gap-2 text-xs text-indigo-600 font-medium">
-                                        <Archive className="h-3.5 w-3.5" />
-                                        <span>کالا: {log.product}</span>
-                                      </div>
-                                    )}
-
-                                    {log.ipAddress && (
-                                      <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
-                                        <MapPin className="h-2.5 w-2.5" />
-                                        <span>{log.ipAddress}</span>
-                                      </div>
-                                    )}
-                                </div>
+                  {paginatedLogs.map(log => (
+                    <div
+                      key={log.id}
+                      onClick={() => setSelectedLog(log)}
+                      className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className={`p-2 rounded-lg ${getLevelColor(log.level)}`}>
+                            {getLevelIcon(log.level)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
+                                  {log.level.toUpperCase()}
+                                </span>
+                                <span className="text-xs text-gray-500 font-mono">
+                                  {new Date(log.timestamp).toLocaleTimeString('fa-IR')}
+                                </span>
                               </div>
-                              <div className="flex flex-col items-end gap-2">
-                                <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                                <div className="text-[10px] text-gray-400">
-                                  {formatPersianDate(new Date(log.timestamp))}
-                                </div>
+                              
+                              <div className="text-sm font-bold text-gray-900 truncate" title={log.userName}>
+                                {log.userName || 'سیستم'}
+                              </div>
+
+                              <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded truncate" title={log.page}>
+                                {log.page || 'نامشخص'}
+                              </div>
+
+                              <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded truncate" title={log.logNature}>
+                                {log.logNature || 'عملیات'}
+                              </div>
+
+                              <div className="text-xs text-gray-600 font-mono">
+                                {log.receiptDate || '-'}
+                              </div>
+
+                              <div className="text-sm font-bold text-green-600">
+                                {log.amount ? formatPersianNumber(log.amount) : '-'}
+                              </div>
+
+                              <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded truncate">
+                                {log.documentType || '-'}
+                              </div>
+
+                              <div className="text-xs text-gray-700 truncate" title={log.counterparty}>
+                                {log.counterparty || '-'}
                               </div>
                             </div>
+                            <div className="text-sm text-gray-600 mt-1 line-clamp-1">
+                              {log.message}
+                            </div>
+                            
+                            {log.product && (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-indigo-600 font-medium">
+                                <Archive className="h-3.5 w-3.5" />
+                                <span>کالا: {log.product}</span>
+                              </div>
+                            )}
+
+                            {log.ipAddress && (
+                              <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
+                                <MapPin className="h-2.5 w-2.5" />
+                                <span>{log.ipAddress}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ))}
+                        <div className="flex flex-col items-end gap-2">
+                          <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                          <div className="text-[10px] text-gray-400">
+                            {formatPersianDate(new Date(log.timestamp))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
