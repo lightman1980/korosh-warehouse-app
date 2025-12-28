@@ -551,12 +551,21 @@ const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'er
 const [logs, setLogs] = useState<LogEntry[]>([]);
 const [userActivityLogs, setUserActivityLogs] = useState<UserActivityLog[]>([]);
 const [showLogViewer, setShowLogViewer] = useState<boolean>(false);
-// Load settings on component mount
-useEffect(() => {
-loadSettings();
-loadLogs();
-loadUserActivityLogs();
-}, []);
+  // Load settings on component mount
+  useEffect(() => {
+    loadSettings();
+    loadLogs();
+    loadUserActivityLogs();
+
+    // Listen for new user activity logs
+    const handleNewActivity = (event: any) => {
+      const newActivity = event.detail;
+      setUserActivityLogs(prev => [newActivity, ...prev].slice(0, 1000));
+    };
+
+    window.addEventListener('user-activity-logged', handleNewActivity);
+    return () => window.removeEventListener('user-activity-logged', handleNewActivity);
+  }, []);
 const loadSettings = async () => {
   try {
     // ۱) تلاش برای بارگذاری از سرور (SQLite API) در صورت در دسترس بودن

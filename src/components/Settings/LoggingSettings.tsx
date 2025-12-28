@@ -542,12 +542,16 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     return filteredLogs;
   }, [userActivityLogs, activityViewSettings]);
 
-    // Load activity view settings on mount
-    useEffect(() => {
-      loadActivityViewSettings();
-      loadLogs();
-      refreshLogFiles();
-    }, [loadActivityViewSettings, loadLogs, refreshLogFiles]);
+  // Update logs when userActivityLogs prop changes
+  useEffect(() => {
+    loadLogs();
+  }, [userActivityLogs, loadLogs]);
+
+  // Load activity view settings on mount
+  useEffect(() => {
+    loadActivityViewSettings();
+    refreshLogFiles();
+  }, [loadActivityViewSettings, refreshLogFiles]);
 
   // Update available users based on activity logs
   useEffect(() => {
