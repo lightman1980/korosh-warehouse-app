@@ -590,7 +590,7 @@ const loadSettings = async () => {
 
     // ۲) اگر از سرور چیزی نبود، از localStorage (DataStorage) استفاده می‌کنیم
       const storage = DataStorage.getInstance();
-      const savedSettings = storage.loadData('settings') as AppSettings | null;
+      const savedSettings = storage.loadData('appSettings') as AppSettings | null;
       if (savedSettings) {
         // Ensure all top-level properties from initialSettings are present
         // and do a shallow merge for second-level objects to prevent undefined errors
@@ -745,16 +745,16 @@ const tabs = [
 
 // Debug: بررسی تعداد تب‌ها
 console.log('🔍 تعداد تب‌ها:', tabs.length, 'تب‌ها:', tabs.map(t => t.name));
-const handleSave = async () => {
-setIsLoading(true);
-setSaveStatus('saving');
-try {
-const storage = DataStorage.getInstance();
-await storage.saveData('settings', settings);
-// ذخیره موازی در سرور تنظیمات (در صورت در دسترس بودن)
-saveAppSettingsToServer(settings).catch((err) => {
-  console.warn('ذخیره تنظیمات در سرور با خطا مواجه شد (اما در localStorage ذخیره شد):', err);
-});
+  const handleSave = async () => {
+  setIsLoading(true);
+  setSaveStatus('saving');
+  try {
+  const storage = DataStorage.getInstance();
+  await storage.saveData('appSettings', settings);
+  // ذخیره موازی در سرور تنظیمات (در صورت در دسترس بودن)
+  saveAppSettingsToServer(settings).catch((err) => {
+    console.warn('ذخیره تنظیمات در سرور با خطا مواجه شد (اما در localStorage ذخیره شد):', err);
+  });
 // Apply settings immediately
 applySettings(settings);
 // Save theme to localStorage with key 'app-theme' for ThemeProvider

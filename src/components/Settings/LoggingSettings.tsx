@@ -353,6 +353,22 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     });
   };
 
+  useEffect(() => {
+    if (settings && !settings.logging) {
+      setSettings({
+        ...settings,
+        logging: {
+          logLevel: 'info',
+          logToFile: true,
+          logToDatabase: true,
+          maxLogSize: 100,
+          logRetention: 90,
+          logCategories: ['system', 'security', 'inventory', 'user']
+        }
+      });
+    }
+  }, [settings, setSettings]);
+
   if (!settings || !settings.logging) {
     return (
       <div className="p-8 text-center bg-white rounded-xl border border-gray-200 shadow-sm">
