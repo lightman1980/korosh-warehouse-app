@@ -208,7 +208,17 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   
   // Activity view settings state
   const [activityViewSettings, setActivityViewSettings] = useState<ActivityViewSettings>(DEFAULT_ACTIVITY_VIEW_SETTINGS);
-  
+
+  const updateLoggingSettings = (updates: any) => {
+    setSettings({
+      ...settings,
+      logging: {
+        ...settings.logging,
+        ...updates
+      }
+    });
+  };
+
   // Available users for individual view mode
   const [availableUsers, setAvailableUsers] = useState<{id: string, name: string}[]>([]);
   
@@ -534,46 +544,10 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         </div>
       </div>
 
-          {/* Path Configuration Tab */}
-          {activeTab === 'path' && (
-            <div className="space-y-6">
-              {/* Local Storage Card */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                    <HardDrive className="h-6 w-6" />
-                    مسیر ذخیره‌سازی محلی
-                  </h3>
-                  <p className="text-blue-100 text-sm mt-1">
-                    تعیین محل ذخیره‌سازی لاگ‌ها روی سیستم لوکال
-                  </p>
-                </div>
+      {/* Path Configuration Tab */}
 
-                <div className="p-6 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      آدرس فولدر ذخیره‌سازی
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={storagePathConfig.localPath}
-                        onChange={(e) => updateStoragePathConfig({ localPath: e.target.value })}
-                        placeholder="مثال: C:\Logs\Makhazen"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        onClick={handleSelectPath}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                        انتخاب فولدر
-            </button>
-          </div>
-        </div>
-
-        {/* Path Configuration Tab */}
         {activeTab === 'path' && (
+
           <div className="space-y-6">
             {/* Local Storage Card */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
