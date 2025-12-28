@@ -52,7 +52,7 @@ const initialCategories: BaseDataCategory[] = [
       { id: "9", code: "9", name: "روغن ذرت-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
       { id: "10", code: "10", name: "روغن کنجد-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
       { id: "11", code: "11", name: "دانه-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
-      { id: "12", code: "12", name: "لرد", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
+      { id: "12", code: "12", name: "لرد-تملیکی", isActive: true, canDelete: false, createdAt: new Date(), updatedAt: new Date() },
     ],
   },
   {
