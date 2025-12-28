@@ -2613,28 +2613,25 @@ const handleSaveSlip = async () => {
           'success',
           'حواله امانی',
           isEditMode ? 'دکمه ویرایش' : 'دکمه ثبت',
-          { transactionNumber: finalSlipInfo.transactionNumber }
+          { 
+            transactionNumber: finalSlipInfo.transactionNumber,
+            amount: finalSlipInfo.amount,
+            productName: finalSlipInfo.productName,
+            counterpartyName: finalSlipInfo.counterpartyName
+          }
         );
       }
       
-      // 🔄 راه حل قطعی: بعد از ذخیره، بازگشت به لیست و اجبار به refresh
-    // این باعث می‌شود کامپوننت والد داده‌های جدید را از storage بخواند
-    setIsSaving(false);
-    
-    // استفاده از onBack برای بازگشت به لیست (کامپوننت والد خودش refresh می‌کند)
-    if (onBack) {
-      onBack();
-    }
-    
-    // ⭐ در آخر، اطمینان از reload کامل صفحه
-    // از setTimeout استفاده می‌کنیم تا alert بسته شود و onBack اجرا شود
-    // سپس صفحه reload می‌شود تا تمام state‌ها پاک شوند
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
-    
-    // خروج سریع از function تا جلوی اجرای کدهای بعدی را بگیریم
-    return;
+      // 🔄 راه حل قطعی: بعد از ذخیره، بازگشت به لیست
+      setIsSaving(false);
+      
+      // استفاده از onBack برای بازگشت به لیست
+      if (onBack) {
+        onBack();
+      }
+      
+      return;
+
     
   } catch (error) {
     console.error('❌ خطا در ذخیره‌سازی حواله:', error);

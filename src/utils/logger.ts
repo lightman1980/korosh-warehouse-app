@@ -240,7 +240,8 @@ export const logUserActivity = async (
     finalNewValue = action.newValue || newValue;
   }
 
-  const currentUser = storage.loadData<any>('current_session')?.user || 
+  const session = storage.loadData<any>('current_session');
+  const currentUser = session || 
                     storage.loadData<any>('currentUser') || 
                     storage.loadData<any>('user') ||
                     JSON.parse(localStorage.getItem('currentUser') || 'null') ||
@@ -248,7 +249,7 @@ export const logUserActivity = async (
                     { username: 'Unknown', id: 'unknown', fullName: 'کاربر ناشناس' };
 
   // اطمینان از وجود فیلدهای لازم در شی کاربر
-  const userId = currentUser.id || currentUser.username || 'unknown';
+  const userId = currentUser.userId || currentUser.id || currentUser.username || 'unknown';
   const userName = currentUser.fullName || currentUser.fullNamePersian || currentUser.username || 'کاربر ناشناس';
 
   const activity: UserActivityEntry = {
