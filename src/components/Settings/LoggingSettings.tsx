@@ -2051,13 +2051,12 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                                       <span>{log.ipAddress}</span>
                                     </div>
                                   )}
-                                </div>
+                                  </div>
+                              </div>
+                              <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />
                             </div>
                           </div>
-                          <Eye className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                 </div>
               )}
             </div>
@@ -2311,112 +2310,8 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </div>
               </div>
             )}
-                  {selectedLog.product && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">کالا</label>
-                      <p className="mt-1 text-gray-900 font-bold text-green-600">{selectedLog.product}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedLog.page && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">صفحه عملکرد</label>
-                      <p className="mt-1 text-gray-900">{selectedLog.page}</p>
-                    </div>
-                  )}
-                  {selectedLog.field && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">منو / فیلد</label>
-                      <p className="mt-1 text-gray-900">{selectedLog.field}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedLog.logType && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">نوع تراکنش</label>
-                      <p className="mt-1 text-gray-900">
-                        {selectedLog.logType === 'user' ? 'تراکنش کاربر' : 'تراکنش سیستم'}
-                      </p>
-                    </div>
-                  )}
-                  {selectedLog.selection && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">گزینه انتخاب شده</label>
-                      <p className="mt-1 text-gray-900">{selectedLog.selection}</p>
-                    </div>
-                  )}
-                </div>
-
-              
-                {selectedLog.details && (
-                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <label className="text-sm font-medium text-gray-600 mb-1 block">جزئیات فنی</label>
-                    <div className="text-xs text-gray-700 font-mono overflow-x-auto whitespace-pre-wrap">
-                      {typeof selectedLog.details === 'object' 
-                        ? JSON.stringify(selectedLog.details, null, 2) 
-                        : selectedLog.details}
-                    </div>
-                  </div>
-                )}
-
-                {(selectedLog as any).oldValue && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600 block">تغییرات (مقدار قبلی)</label>
-                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-xs text-red-800 font-mono overflow-x-auto whitespace-pre-wrap max-h-40">
-                      {JSON.stringify((selectedLog as any).oldValue, null, 2)}
-                    </div>
-                  </div>
-                )}
-
-                {(selectedLog as any).newValue && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600 block">
-                      {(selectedLog as any).oldValue ? 'تغییرات (مقدار جدید)' : 'مقدار ثبت شده'}
-                    </label>
-                    <div className="bg-green-50 p-3 rounded-lg border border-green-100 text-xs text-green-800 font-mono overflow-x-auto whitespace-pre-wrap max-h-40">
-                      {JSON.stringify((selectedLog as any).newValue, null, 2)}
-                    </div>
-                  </div>
-                )}
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">زمان</label>
-                  <p className="mt-1 text-gray-900">
-                    {formatPersianDate(new Date(selectedLog.timestamp))} {new Date(selectedLog.timestamp).toLocaleTimeString('fa-IR')}
-                  </p>
-                </div>
-                {selectedLog.userName && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">کاربر</label>
-                    <p className="mt-1 text-gray-900">{selectedLog.userName}</p>
-                  </div>
-                )}
-              </div>
-              
-              {selectedLog.ipAddress && (
-                <div>
-                  <label className="text-sm font-medium text-gray-600">آدرس IP</label>
-                  <p className="mt-1 text-gray-900">{selectedLog.ipAddress}</p>
-                </div>
-              )}
-              
-              {selectedLog.userAgent && (
-                <div>
-                  <label className="text-sm font-medium text-gray-600">User Agent</label>
-                  <p className="mt-1 text-gray-900 text-sm">{selectedLog.userAgent}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+      </div>
+    );
+  };
 
 export default LoggingSettings;
