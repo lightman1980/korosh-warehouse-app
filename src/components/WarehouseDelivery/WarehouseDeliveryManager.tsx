@@ -2292,9 +2292,24 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
       // در حالت ایجاد: اضافه کردن رکورد جدید
       updatedSlips = [...slips, newDelivery];
     }
-    saveDataWithNotification(slipType, updatedSlips);
+      saveDataWithNotification(slipType, updatedSlips);
 
-    // 3. به‌روزرساني موجودي مجوز (فقط براي مجوزهاي اماني) - بهبود یافته
+      // ثبت در لاگ سیستم
+      logUserActivity({
+        action: `${isEditMode ? 'ویرایش' : 'ثبت'} حواله انبار - شماره ${newDelivery.transactionNumber}`,
+        category: 'release',
+        status: 'success',
+        page: 'مدیریت حواله انبار',
+        details: {
+          transactionNumber: newDelivery.transactionNumber,
+          productName: newDelivery.productName,
+          amount: newDelivery.amount,
+          site: newDelivery.siteName,
+          tank: newDelivery.tankName
+        }
+      });
+
+      // 3. به‌روزرساني موجودي مجوز (فقط براي مجوزهاي اماني) - بهبود یافته
     if (newDelivery.permitId) {
       const permits = (storage.loadData('delivery-permits') || []) as any[];
       const permitIndex = permits.findIndex((p: any) => p.id === newDelivery.permitId);
