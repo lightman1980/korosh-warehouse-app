@@ -3,6 +3,16 @@ import { Plus, Search, Download, RefreshCw, Edit2, Trash2, AlertCircle, Printer,
 import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
 import { usePermissions } from "../../hooks/usePermissions";
 import { DataStorage } from "../../utils/dataStorage";
+import { WarehouseDelivery } from "../../types/WarehouseDeliveryTypes";
+import { formatPersianDate, formatPersianNumber } from "../../utils/persian";
+import { logUserActivity } from "../../utils/logger";
+
+// Import Sub-components
+import ConsignmentDeliverySlip from "./ConsignmentDeliverySlip";
+import OwnershipDeliverySlip from "./OwnershipDeliverySlip";
+import ModernOwnershipDeliverySlip from "./ModernOwnershipDeliverySlip";
+import NewOwnershipDeliverySlip from "./NewOwnershipDeliverySlip";
+import DeliverySlipTypeSelector from "./DeliverySlipTypeSelector";
 
 interface WarehouseDeliveryManagerProps {
 
