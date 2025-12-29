@@ -8,7 +8,7 @@ import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
 import { usePermissions } from '../../hooks/usePermissions';
-import { logUserActivity } from '../../utils/logger';
+import { logSaveAction, logCreateAction } from '../../hooks/useActivityLogger';
 import jalaali from 'jalaali-js';
 
 interface ProductConversion {
@@ -936,37 +936,29 @@ export const ProductConversionManager: React.FC = () => {
       storage.saveData('productConversions', updatedConversions);
       setConversions(updatedConversions);
       
-            // ثبت در لاگ سیستم
-            logUserActivity({
-              action: `${editingId ? 'ویرایش' : 'ثبت'} تراکنش تبدیل کالا - شماره ${conversion.transactionNumber}`,
-              category: 'product-conversion',
-              status: 'success',
-              page: 'تبدیل کالا',
-              amount: conversion.producedQuantity,
-              product: `${conversion.consumedProductName} ⬅️ ${conversion.producedProductName}`,
-              receiptDate: formatPersianDate(conversion.documentDate),
-              documentType: 'تبدیل کالا',
-              counterparty: conversion.siteName || '',
-              logNature: `${editingId ? 'ویرایش' : 'ایجاد'}`,
-              details: {
-                transactionNumber: conversion.transactionNumber,
-                consumedProduct: conversion.consumedProductName,
-                consumedQuantity: conversion.consumedQuantity,
-                consumedUnit: conversion.consumedUnit,
-                consumedProductType: conversion.consumedProductType === 'owned' ? 'تملیکی' : 'امانی',
-                producedProduct: conversion.producedProductName,
-                producedQuantity: conversion.producedQuantity,
-                producedUnit: conversion.producedUnit,
-                producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
-                site: conversion.siteName,
-                tank: conversion.tankName,
-                contractNumber: conversion.contractNumber || '---',
-                emptyTankCapacity: conversion.emptyTankCapacity,
-                unit: conversion.producedUnit,
-                status: conversion.status,
-                fullSummary: `تبدیل ${formatPersianNumber(conversion.consumedQuantity)} ${conversion.consumedUnit} ${conversion.consumedProductName} به ${formatPersianNumber(conversion.producedQuantity)} ${conversion.producedUnit} ${conversion.producedProductName} در سایت ${conversion.siteName}، مخزن ${conversion.tankName}`
-              }
-            });
+      const details = {
+        transactionNumber: conversion.transactionNumber,
+        consumedProduct: conversion.consumedProductName,
+        consumedQuantity: conversion.consumedQuantity,
+        consumedUnit: conversion.consumedUnit,
+        consumedProductType: conversion.consumedProductType === 'owned' ? 'تملیکی' : 'امانی',
+        producedProduct: conversion.producedProductName,
+        producedQuantity: conversion.producedQuantity,
+        producedUnit: conversion.producedUnit,
+        producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
+        site: conversion.siteName,
+        tank: conversion.tankName,
+        contractNumber: conversion.contractNumber || '---',
+        emptyTankCapacity: conversion.emptyTankCapacity,
+        status: conversion.status,
+        fullSummary: `تبدیل ${formatPersianNumber(conversion.consumedQuantity)} ${conversion.consumedUnit} ${conversion.consumedProductName} به ${formatPersianNumber(conversion.producedQuantity)} ${conversion.producedUnit} ${conversion.producedProductName} در سایت ${conversion.siteName}، مخزن ${conversion.tankName}`
+      };
+
+      if (editingId) {
+        logSaveAction('تبدیل کالا', `شماره ${conversion.transactionNumber}`, details);
+      } else {
+        logCreateAction('تبدیل کالا', `شماره ${conversion.transactionNumber}`, details);
+      }
 
       // ارسال رویداد برای به‌روزرسانی موجودی
       window.dispatchEvent(new CustomEvent('productConversionsUpdated', { 

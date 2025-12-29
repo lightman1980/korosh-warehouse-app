@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
-import { logUserActivity } from '../../utils/logger';
+import { logSaveAction, logCreateAction } from '../../hooks/useActivityLogger';
 import PersianDatePicker from '../Common/PersianDatePicker';
 
 // تابع کمکی برای تبدیل ایمن مقادیر به عدد - اصلاح شده
@@ -2549,24 +2549,13 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
 
       console.log('📝 Prepared new delivery:', newDelivery);
 
-      // ذخیره در localStorage
-      const existingDeliveries = (storage.loadData('ownership-delivery-slips') || []) as OwnershipDelivery[];
-        const updatedDeliveries = [...existingDeliveries, newDelivery];
-        storage.saveData('ownership-delivery-slips', updatedDeliveries);
+        // ذخیره در localStorage
+        const existingDeliveries = (storage.loadData('ownership-delivery-slips') || []) as OwnershipDelivery[];
+          const updatedDeliveries = [...existingDeliveries, newDelivery];
+          storage.saveData('ownership-delivery-slips', updatedDeliveries);
 
-                // ثبت در لاگ سیستم
-                logUserActivity({
-                  action: `ثبت حواله تملیکی جدید - شماره ${newDelivery.transactionNumber}`,
-                  category: 'delivery',
-                  status: 'success',
-                  page: 'حواله تملیکی',
-                  amount: newDelivery.amount,
-                  product: newDelivery.productName,
-                  receiptDate: formatPersianDate(newDelivery.deliveryDate),
-                  documentType: 'حواله تملیکی',
-                  counterparty: newDelivery.driverName || '',
-                  logNature: 'ایجاد',
-                  details: {
+                  // ثبت در لاگ سیستم
+                  logCreateAction('حواله تملیکی', `شماره ${newDelivery.transactionNumber}`, {
                     transactionNumber: newDelivery.transactionNumber,
                     productName: newDelivery.productName,
                     amount: newDelivery.amount,
@@ -2586,10 +2575,9 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
                     status: newDelivery.status,
                     destinationAddress: newDelivery.additionalInfo?.destinationAddress || '---',
                     fullSummary: `حواله ${formatPersianNumber(newDelivery.amount)} ${newDelivery.unit} ${newDelivery.productName} (رسید: ${newDelivery.receiptNumber}) توسط راننده ${newDelivery.driverName || 'نامشخص'} با کشتی ${newDelivery.shipName || 'نامشخص'} در سایت ${newDelivery.siteName}`
-                  }
-                });
+                  });
 
-        // به‌روزرسانی state
+          // به‌روزرسانی state
       setOwnershipDeliveries(prev => [...prev, newDelivery]);
       setIsAddingNew(false);
       setEditingDelivery(null);
@@ -2680,22 +2668,11 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
         d.id === editingDelivery.id ? updatedDelivery : d
       );
       
-        storage.saveData('ownership-delivery-slips', updatedDeliveries);
-        setOwnershipDeliveries(updatedDeliveries);
-        
-                // ثبت در لاگ سیستم
-                logUserActivity({
-                  action: `ویرایش حواله تملیکی - شماره ${updatedDelivery.transactionNumber}`,
-                  category: 'delivery',
-                  status: 'success',
-                  page: 'حواله تملیکی',
-                  amount: updatedDelivery.amount,
-                  product: updatedDelivery.productName,
-                  receiptDate: formatPersianDate(updatedDelivery.deliveryDate),
-                  documentType: 'حواله تملیکی',
-                  counterparty: updatedDelivery.driverName || '',
-                  logNature: 'ویرایش',
-                  details: {
+          storage.saveData('ownership-delivery-slips', updatedDeliveries);
+          setOwnershipDeliveries(updatedDeliveries);
+          
+                  // ثبت در لاگ سیستم
+                  logSaveAction('حواله تملیکی', `شماره ${updatedDelivery.transactionNumber}`, {
                     transactionNumber: updatedDelivery.transactionNumber,
                     productName: updatedDelivery.productName,
                     amount: updatedDelivery.amount,
@@ -2715,10 +2692,9 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
                     status: updatedDelivery.status,
                     destinationAddress: updatedDelivery.additionalInfo?.destinationAddress || '---',
                     fullSummary: `ویرایش حواله ${formatPersianNumber(updatedDelivery.amount)} ${updatedDelivery.unit} ${updatedDelivery.productName} (رسید: ${updatedDelivery.receiptNumber}) توسط راننده ${updatedDelivery.driverName || 'نامشخص'} با کشتی ${updatedDelivery.shipName || 'نامشخص'} در سایت ${updatedDelivery.siteName}`
-                  }
-                });
+                  });
 
-        // ریست کردن state ها
+          // ریست کردن state ها
       setEditingDelivery(null);
       setIsAddingNew(false);
       setSelectedReceipt(null);
