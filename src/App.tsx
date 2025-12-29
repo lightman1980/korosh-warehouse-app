@@ -33,7 +33,7 @@ import './utils/logger';
 import { useAutoInvoiceChecker } from './hooks/useAutoInvoiceChecker';
 import { useVersionChecker } from './hooks/useVersionChecker';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
-import { useModuleChangeLogger, logLoginAction, logLogoutAction } from "./hooks/useActivityLogger";
+import { useModuleChangeLogger, logLoginAction, logLogoutAction } from './hooks/useActivityLogger';
 // Force reload
 
 
