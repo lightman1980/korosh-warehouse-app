@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
-import { logSaveAction, logCreateAction } from "../../hooks/useActivityLogger";
 import PersianDatePicker from '../Common/PersianDatePicker';
 
 // تابع کمکی برای تبدیل ایمن مقادیر به عدد - اصلاح شده
@@ -2549,35 +2548,12 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
 
       console.log('📝 Prepared new delivery:', newDelivery);
 
-        // ذخیره در localStorage
-        const existingDeliveries = (storage.loadData('ownership-delivery-slips') || []) as OwnershipDelivery[];
-          const updatedDeliveries = [...existingDeliveries, newDelivery];
-          storage.saveData('ownership-delivery-slips', updatedDeliveries);
+      // ذخیره در localStorage
+      const existingDeliveries = (storage.loadData('ownership-delivery-slips') || []) as OwnershipDelivery[];
+      const updatedDeliveries = [...existingDeliveries, newDelivery];
+      storage.saveData('ownership-delivery-slips', updatedDeliveries);
 
-                  // ثبت در لاگ سیستم
-                  logCreateAction('حواله تملیکی', `شماره ${newDelivery.transactionNumber}`, {
-                    transactionNumber: newDelivery.transactionNumber,
-                    productName: newDelivery.productName,
-                    amount: newDelivery.amount,
-                    unit: newDelivery.unit,
-                    site: newDelivery.siteName,
-                    tank: newDelivery.tankName,
-                    receiptNumber: newDelivery.receiptNumber,
-                    shipName: newDelivery.shipName || '---',
-                    driverName: newDelivery.driverName || '---',
-                    cotageNumber: newDelivery.cotageNumber || '---',
-                    indexNumber: newDelivery.indexNumber || '---',
-                    contractNumber: newDelivery.contractNumber || '---',
-                    shipBillOfLadingAmount: newDelivery.shipBillOfLadingAmount,
-                    shipUnloadingAmount: newDelivery.shipUnloadingAmount,
-                    tankShoreAmount: newDelivery.tankShoreAmount,
-                    weightGross: newDelivery.weightGross,
-                    status: newDelivery.status,
-                    destinationAddress: newDelivery.additionalInfo?.destinationAddress || '---',
-                    fullSummary: `حواله ${formatPersianNumber(newDelivery.amount)} ${newDelivery.unit} ${newDelivery.productName} (رسید: ${newDelivery.receiptNumber}) توسط راننده ${newDelivery.driverName || 'نامشخص'} با کشتی ${newDelivery.shipName || 'نامشخص'} در سایت ${newDelivery.siteName}`
-                  });
-
-          // به‌روزرسانی state
+      // به‌روزرسانی state
       setOwnershipDeliveries(prev => [...prev, newDelivery]);
       setIsAddingNew(false);
       setEditingDelivery(null);
@@ -2668,33 +2644,10 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
         d.id === editingDelivery.id ? updatedDelivery : d
       );
       
-          storage.saveData('ownership-delivery-slips', updatedDeliveries);
-          setOwnershipDeliveries(updatedDeliveries);
-          
-                  // ثبت در لاگ سیستم
-                  logSaveAction('حواله تملیکی', `شماره ${updatedDelivery.transactionNumber}`, {
-                    transactionNumber: updatedDelivery.transactionNumber,
-                    productName: updatedDelivery.productName,
-                    amount: updatedDelivery.amount,
-                    unit: updatedDelivery.unit,
-                    site: updatedDelivery.siteName,
-                    tank: updatedDelivery.tankName,
-                    receiptNumber: updatedDelivery.receiptNumber,
-                    shipName: updatedDelivery.shipName || '---',
-                    driverName: updatedDelivery.driverName || '---',
-                    cotageNumber: updatedDelivery.cotageNumber || '---',
-                    indexNumber: updatedDelivery.indexNumber || '---',
-                    contractNumber: updatedDelivery.contractNumber || '---',
-                    shipBillOfLadingAmount: updatedDelivery.shipBillOfLadingAmount,
-                    shipUnloadingAmount: updatedDelivery.shipUnloadingAmount,
-                    tankShoreAmount: updatedDelivery.tankShoreAmount,
-                    weightGross: updatedDelivery.weightGross,
-                    status: updatedDelivery.status,
-                    destinationAddress: updatedDelivery.additionalInfo?.destinationAddress || '---',
-                    fullSummary: `ویرایش حواله ${formatPersianNumber(updatedDelivery.amount)} ${updatedDelivery.unit} ${updatedDelivery.productName} (رسید: ${updatedDelivery.receiptNumber}) توسط راننده ${updatedDelivery.driverName || 'نامشخص'} با کشتی ${updatedDelivery.shipName || 'نامشخص'} در سایت ${updatedDelivery.siteName}`
-                  });
-
-          // ریست کردن state ها
+      storage.saveData('ownership-delivery-slips', updatedDeliveries);
+      setOwnershipDeliveries(updatedDeliveries);
+      
+      // ریست کردن state ها
       setEditingDelivery(null);
       setIsAddingNew(false);
       setSelectedReceipt(null);
