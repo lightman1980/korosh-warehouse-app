@@ -936,32 +936,34 @@ export const ProductConversionManager: React.FC = () => {
       storage.saveData('productConversions', updatedConversions);
       setConversions(updatedConversions);
       
-        // ثبت در لاگ سیستم
-        logUserActivity({
-          action: `${editingId ? 'ویرایش' : 'ثبت'} تبدیل کالا: ${conversion.consumedProductName} (مقدار: ${formatPersianNumber(conversion.consumedQuantity)}) به ${conversion.producedProductName} (مقدار: ${formatPersianNumber(conversion.producedQuantity)})`,
-          category: 'product-conversion',
-          status: 'success',
-          page: 'تبدیل کالا',
-          amount: conversion.producedQuantity,
-          product: `${conversion.consumedProductName} ⬅️ ${conversion.producedProductName}`,
-          receiptDate: formatPersianDate(conversion.documentDate),
-          documentType: 'تبدیل کالا',
-          counterparty: conversion.siteName || '',
-          logNature: `${editingId ? 'ویرایش' : 'ایجاد'}`,
-          details: {
-            transactionNumber: conversion.transactionNumber,
-            consumedProduct: conversion.consumedProductName,
-            consumedQuantity: conversion.consumedQuantity,
-            consumedProductType: conversion.consumedProductType === 'owned' ? 'تملیکی' : 'امانی',
-            producedProduct: conversion.producedProductName,
-            producedQuantity: conversion.producedQuantity,
-            producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
-            site: conversion.siteName,
-            tank: conversion.tankName,
-            contractNumber: conversion.contractNumber,
-            emptyTankCapacity: conversion.emptyTankCapacity
-          }
-        });
+          // ثبت در لاگ سیستم
+          logUserActivity({
+            action: `${editingId ? 'ویرایش' : 'ثبت'} تراکنش تبدیل کالا - شماره ${conversion.transactionNumber}`,
+            category: 'product-conversion',
+            status: 'success',
+            page: 'تبدیل کالا',
+            amount: conversion.producedQuantity,
+            product: `${conversion.consumedProductName} ⬅️ ${conversion.producedProductName}`,
+            receiptDate: formatPersianDate(conversion.documentDate),
+            documentType: 'تبدیل کالا',
+            counterparty: conversion.siteName || '',
+            logNature: `${editingId ? 'ویرایش' : 'ایجاد'}`,
+            details: {
+              transactionNumber: conversion.transactionNumber,
+              consumedProduct: conversion.consumedProductName,
+              consumedQuantity: conversion.consumedQuantity,
+              consumedProductType: conversion.consumedProductType === 'owned' ? 'تملیکی' : 'امانی',
+              producedProduct: conversion.producedProductName,
+              producedQuantity: conversion.producedQuantity,
+              producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
+              site: conversion.siteName,
+              tank: conversion.tankName,
+              contractNumber: conversion.contractNumber,
+              emptyTankCapacity: conversion.emptyTankCapacity,
+              unit: conversion.producedUnit,
+              status: conversion.status
+            }
+          });
 
       // ارسال رویداد برای به‌روزرسانی موجودی
       window.dispatchEvent(new CustomEvent('productConversionsUpdated', { 
