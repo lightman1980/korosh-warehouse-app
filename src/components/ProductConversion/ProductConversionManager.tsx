@@ -8,6 +8,7 @@ import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
 import { usePermissions } from '../../hooks/usePermissions';
+import { logUserActivity } from '../../utils/logger';
 import jalaali from 'jalaali-js';
 
 interface ProductConversion {
@@ -935,6 +936,29 @@ export const ProductConversionManager: React.FC = () => {
       storage.saveData('productConversions', updatedConversions);
       setConversions(updatedConversions);
       
+      // ثبت در لاگ سیستم
+      logUserActivity({
+        action: `${editingId ? 'ویرایش' : 'ثبت'} تراکنش تبدیل کالا - شماره ${conversion.transactionNumber}`,
+        category: 'product-conversion',
+        status: 'success',
+        page: 'تبدیل کالا',
+        amount: conversion.producedQuantity,
+        product: `${conversion.consumedProductName} ⬅️ ${conversion.producedProductName}`,
+        receiptDate: formatPersianDate(conversion.documentDate),
+        documentType: conversion.contractNumber ? 'سیستمی (قراردادی)' : 'دستی',
+        counterparty: conversion.siteName || '',
+        logNature: `${editingId ? 'ویرایش' : 'ایجاد'}`,
+        details: {
+          transactionNumber: conversion.transactionNumber,
+          consumedProduct: conversion.consumedProductName,
+          consumedQuantity: conversion.consumedQuantity,
+          producedProduct: conversion.producedProductName,
+          producedQuantity: conversion.producedQuantity,
+          site: conversion.siteName,
+          tank: conversion.tankName
+        }
+      });
+
       // ارسال رویداد برای به‌روزرسانی موجودی
       window.dispatchEvent(new CustomEvent('productConversionsUpdated', { 
         detail: { conversion, type: editingId ? 'edit' : 'add' }
