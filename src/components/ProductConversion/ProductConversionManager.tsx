@@ -938,7 +938,7 @@ export const ProductConversionManager: React.FC = () => {
       
         // ثبت در لاگ سیستم
         logUserActivity({
-          action: `${editingId ? 'ویرایش' : 'ثبت'} تراکنش تبدیل کالا - شماره ${conversion.transactionNumber}`,
+          action: `${editingId ? 'ویرایش' : 'ثبت'} تبدیل کالا: ${conversion.consumedProductName} (مقدار: ${formatPersianNumber(conversion.consumedQuantity)}) به ${conversion.producedProductName} (مقدار: ${formatPersianNumber(conversion.producedQuantity)})`,
           category: 'product-conversion',
           status: 'success',
           page: 'تبدیل کالا',
@@ -958,7 +958,8 @@ export const ProductConversionManager: React.FC = () => {
             producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
             site: conversion.siteName,
             tank: conversion.tankName,
-            contractNumber: conversion.contractNumber
+            contractNumber: conversion.contractNumber,
+            emptyTankCapacity: conversion.emptyTankCapacity
           }
         });
 

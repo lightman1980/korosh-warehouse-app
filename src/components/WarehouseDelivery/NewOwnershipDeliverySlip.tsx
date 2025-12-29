@@ -2554,30 +2554,37 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
         const updatedDeliveries = [...existingDeliveries, newDelivery];
         storage.saveData('ownership-delivery-slips', updatedDeliveries);
 
-          // ثبت در لاگ سیستم
-          logUserActivity({
-            action: `ثبت حواله تملیکی جدید - شماره ${newDelivery.transactionNumber}`,
-            category: 'delivery',
-            status: 'success',
-            page: 'حواله تملیکی',
-            amount: newDelivery.amount,
-            product: newDelivery.productName,
-            receiptDate: formatPersianDate(newDelivery.deliveryDate),
-            documentType: 'حواله تملیکی',
-            counterparty: newDelivery.driverName || '',
-            logNature: 'ایجاد',
-            details: {
-              transactionNumber: newDelivery.transactionNumber,
-              productName: newDelivery.productName,
+            // ثبت در لاگ سیستم
+            logUserActivity({
+              action: `ثبت حواله تملیکی جدید - شماره ${newDelivery.transactionNumber}`,
+              category: 'delivery',
+              status: 'success',
+              page: 'حواله تملیکی',
               amount: newDelivery.amount,
-              site: newDelivery.siteName,
-              tank: newDelivery.tankName,
-              receiptNumber: newDelivery.receiptNumber,
-              shipName: newDelivery.shipName,
-              driverName: newDelivery.driverName,
-              cotageNumber: newDelivery.cotageNumber
-            }
-          });
+              product: newDelivery.productName,
+              receiptDate: formatPersianDate(newDelivery.deliveryDate),
+              documentType: 'حواله تملیکی',
+              counterparty: newDelivery.driverName || '',
+              logNature: 'ایجاد',
+              details: {
+                transactionNumber: newDelivery.transactionNumber,
+                productName: newDelivery.productName,
+                amount: newDelivery.amount,
+                site: newDelivery.siteName,
+                tank: newDelivery.tankName,
+                receiptNumber: newDelivery.receiptNumber,
+                shipName: newDelivery.shipName,
+                driverName: newDelivery.driverName,
+                cotageNumber: newDelivery.cotageNumber,
+                indexNumber: newDelivery.indexNumber,
+                contractNumber: newDelivery.contractNumber,
+                shipBillOfLadingAmount: newDelivery.shipBillOfLadingAmount,
+                shipUnloadingAmount: newDelivery.shipUnloadingAmount,
+                tankShoreAmount: newDelivery.tankShoreAmount,
+                weightGross: newDelivery.weightGross,
+                additionalInfo: newDelivery.additionalInfo
+              }
+            });
 
         // به‌روزرسانی state
       setOwnershipDeliveries(prev => [...prev, newDelivery]);
@@ -2673,30 +2680,37 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
         storage.saveData('ownership-delivery-slips', updatedDeliveries);
         setOwnershipDeliveries(updatedDeliveries);
         
-          // ثبت در لاگ سیستم
-          logUserActivity({
-            action: `ویرایش حواله تملیکی - شماره ${updatedDelivery.transactionNumber}`,
-            category: 'delivery',
-            status: 'success',
-            page: 'حواله تملیکی',
-            amount: updatedDelivery.amount,
-            product: updatedDelivery.productName,
-            receiptDate: formatPersianDate(updatedDelivery.deliveryDate),
-            documentType: 'حواله تملیکی',
-            counterparty: updatedDelivery.driverName || '',
-            logNature: 'ویرایش',
-            details: {
-              transactionNumber: updatedDelivery.transactionNumber,
-              productName: updatedDelivery.productName,
+            // ثبت در لاگ سیستم
+            logUserActivity({
+              action: `ویرایش حواله تملیکی - شماره ${updatedDelivery.transactionNumber}`,
+              category: 'delivery',
+              status: 'success',
+              page: 'حواله تملیکی',
               amount: updatedDelivery.amount,
-              site: updatedDelivery.siteName,
-              tank: updatedDelivery.tankName,
-              receiptNumber: updatedDelivery.receiptNumber,
-              shipName: updatedDelivery.shipName,
-              driverName: updatedDelivery.driverName,
-              cotageNumber: updatedDelivery.cotageNumber
-            }
-          });
+              product: updatedDelivery.productName,
+              receiptDate: formatPersianDate(updatedDelivery.deliveryDate),
+              documentType: 'حواله تملیکی',
+              counterparty: updatedDelivery.driverName || '',
+              logNature: 'ویرایش',
+              details: {
+                transactionNumber: updatedDelivery.transactionNumber,
+                productName: updatedDelivery.productName,
+                amount: updatedDelivery.amount,
+                site: updatedDelivery.siteName,
+                tank: updatedDelivery.tankName,
+                receiptNumber: updatedDelivery.receiptNumber,
+                shipName: updatedDelivery.shipName,
+                driverName: updatedDelivery.driverName,
+                cotageNumber: updatedDelivery.cotageNumber,
+                indexNumber: updatedDelivery.indexNumber,
+                contractNumber: updatedDelivery.contractNumber,
+                shipBillOfLadingAmount: updatedDelivery.shipBillOfLadingAmount,
+                shipUnloadingAmount: updatedDelivery.shipUnloadingAmount,
+                tankShoreAmount: updatedDelivery.tankShoreAmount,
+                weightGross: updatedDelivery.weightGross,
+                additionalInfo: updatedDelivery.additionalInfo
+              }
+            });
 
         // ریست کردن state ها
       setEditingDelivery(null);
