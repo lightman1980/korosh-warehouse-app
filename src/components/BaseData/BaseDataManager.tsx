@@ -3,7 +3,7 @@ import { Plus, Search, CreditCard as Edit2, Trash2, Save, X, CircleAlert as Aler
 import { DataStorage } from "../../utils/dataStorage";
 import { formatPersianDate, safeParseDate } from "../../utils/persian";
 import { canCreate, canEdit, canDelete } from "../../utils/permissionHelpers";
-import { logSaveAction, logDeleteAction } from "../../hooks/useActivityLogger";
+import { logSaveAction, logDeleteAction } from "../../hooks/useActivityLogger.ts";
 
 interface BaseDataItem {
   id: string;

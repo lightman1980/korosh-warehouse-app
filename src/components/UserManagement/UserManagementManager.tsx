@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Save, X, AlertCircle, Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { formatPersianDate, formatPersianDateTime } from '../../utils/persian';
-import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
+import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger.ts";
 import { DataStorage } from '../../utils/dataStorage';
 
 interface User {

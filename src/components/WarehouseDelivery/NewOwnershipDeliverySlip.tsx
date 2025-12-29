@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
-import { logSaveAction, logCreateAction } from '../../hooks/useActivityLogger';
+import { logSaveAction, logCreateAction } from "../../hooks/useActivityLogger.ts";
 import PersianDatePicker from '../Common/PersianDatePicker';
 
 // تابع کمکی برای تبدیل ایمن مقادیر به عدد - اصلاح شده
