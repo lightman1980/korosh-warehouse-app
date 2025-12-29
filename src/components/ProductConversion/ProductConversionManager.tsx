@@ -8,7 +8,7 @@ import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
 import { usePermissions } from '../../hooks/usePermissions';
-import { logSaveAction, logCreateAction } from "../../hooks/useActivityLogger.ts";
+import { logSaveAction, logCreateAction } from "../../hooks/useActivityLogger";
 import jalaali from 'jalaali-js';
 
 interface ProductConversion {

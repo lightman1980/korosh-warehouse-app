@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Search, Edit2, Trash2, Save, X, AlertCircle, FileText, Calendar, Building, Package, Download, Filter, ChevronUp, ChevronDown, BarChart3, PieChart, TrendingUp, Droplets, Layers, Percent, Users, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { formatPersianDate, formatPersianNumber, generateTransactionNumber } from '../../utils/persian';
-import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger.ts";
+import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
 import moment from 'moment-jalaali';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
