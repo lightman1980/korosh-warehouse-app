@@ -936,34 +936,37 @@ export const ProductConversionManager: React.FC = () => {
       storage.saveData('productConversions', updatedConversions);
       setConversions(updatedConversions);
       
-          // ثبت در لاگ سیستم
-          logUserActivity({
-            action: `${editingId ? 'ویرایش' : 'ثبت'} تراکنش تبدیل کالا - شماره ${conversion.transactionNumber}`,
-            category: 'product-conversion',
-            status: 'success',
-            page: 'تبدیل کالا',
-            amount: conversion.producedQuantity,
-            product: `${conversion.consumedProductName} ⬅️ ${conversion.producedProductName}`,
-            receiptDate: formatPersianDate(conversion.documentDate),
-            documentType: 'تبدیل کالا',
-            counterparty: conversion.siteName || '',
-            logNature: `${editingId ? 'ویرایش' : 'ایجاد'}`,
-            details: {
-              transactionNumber: conversion.transactionNumber,
-              consumedProduct: conversion.consumedProductName,
-              consumedQuantity: conversion.consumedQuantity,
-              consumedProductType: conversion.consumedProductType === 'owned' ? 'تملیکی' : 'امانی',
-              producedProduct: conversion.producedProductName,
-              producedQuantity: conversion.producedQuantity,
-              producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
-              site: conversion.siteName,
-              tank: conversion.tankName,
-              contractNumber: conversion.contractNumber,
-              emptyTankCapacity: conversion.emptyTankCapacity,
-              unit: conversion.producedUnit,
-              status: conversion.status
-            }
-          });
+            // ثبت در لاگ سیستم
+            logUserActivity({
+              action: `${editingId ? 'ویرایش' : 'ثبت'} تراکنش تبدیل کالا - شماره ${conversion.transactionNumber}`,
+              category: 'product-conversion',
+              status: 'success',
+              page: 'تبدیل کالا',
+              amount: conversion.producedQuantity,
+              product: `${conversion.consumedProductName} ⬅️ ${conversion.producedProductName}`,
+              receiptDate: formatPersianDate(conversion.documentDate),
+              documentType: 'تبدیل کالا',
+              counterparty: conversion.siteName || '',
+              logNature: `${editingId ? 'ویرایش' : 'ایجاد'}`,
+              details: {
+                transactionNumber: conversion.transactionNumber,
+                consumedProduct: conversion.consumedProductName,
+                consumedQuantity: conversion.consumedQuantity,
+                consumedUnit: conversion.consumedUnit,
+                consumedProductType: conversion.consumedProductType === 'owned' ? 'تملیکی' : 'امانی',
+                producedProduct: conversion.producedProductName,
+                producedQuantity: conversion.producedQuantity,
+                producedUnit: conversion.producedUnit,
+                producedProductType: conversion.producedProductType === 'owned' ? 'تملیکی' : 'امانی',
+                site: conversion.siteName,
+                tank: conversion.tankName,
+                contractNumber: conversion.contractNumber || '---',
+                emptyTankCapacity: conversion.emptyTankCapacity,
+                unit: conversion.producedUnit,
+                status: conversion.status,
+                fullSummary: `تبدیل ${formatPersianNumber(conversion.consumedQuantity)} ${conversion.consumedUnit} ${conversion.consumedProductName} به ${formatPersianNumber(conversion.producedQuantity)} ${conversion.producedUnit} ${conversion.producedProductName} در سایت ${conversion.siteName}، مخزن ${conversion.tankName}`
+              }
+            });
 
       // ارسال رویداد برای به‌روزرسانی موجودی
       window.dispatchEvent(new CustomEvent('productConversionsUpdated', { 
