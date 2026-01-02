@@ -123,9 +123,12 @@ const DEFAULT_LOG_FIELD_CONFIG: LogFieldConfig = {
   page: true,
   field: true,
   selection: true,
+  oldValue: true,
+  newValue: true,
   logType: true,
   logNature: true,
-  ipAddress: true
+  ipAddress: true,
+  otherDetails: true
 };
 
 const DEFAULT_LOG_PATH_CONFIG: LogPathConfig = {
@@ -134,7 +137,10 @@ const DEFAULT_LOG_PATH_CONFIG: LogPathConfig = {
   maxFilesPerCategory: 10,
   compressOldLogs: true,
   backupCount: 5,
-  exportFormat: 'xlsx'
+  exportFormat: 'xlsx',
+  maxLogSizeMB: 100,
+  logRetentionDays: 90,
+  minLogLevel: 'all'
 };
 
 const DEFAULT_STORAGE_PATH_CONFIG: StoragePathConfig = {
@@ -171,7 +177,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([]);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
-  const [activeTab, setActiveTab] = useState<'settings' | 'viewer' | 'path'>(showLogViewer ? 'viewer' : 'settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'viewer' | 'path' | 'activities'>(showLogViewer ? 'viewer' : 'settings');
   const [realTimeMode, setRealTimeMode] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [logsPerPage, setLogsPerPage] = useState(50);
@@ -210,12 +216,51 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   // Online users count (simulated)
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);
 
+  // Activity filters and sort state
+  const [activityFilters, setActivityFilters] = useState<{
+    search: string;
+    dateFrom: Date | null;
+    dateTo: Date | null;
+    userId: string;
+    category: string[];
+    status: string[];
+  }>({
+    search: '',
+    dateFrom: null,
+    dateTo: null,
+    userId: '',
+    category: [],
+    status: []
+  });
+  const [activitySort, setActivitySort] = useState<{
+    field: string;
+    direction: 'asc' | 'desc';
+  }>({
+    field: 'timestamp',
+    direction: 'desc'
+  });
+  const [logSort, setLogSort] = useState<{
+    field: string;
+    direction: 'asc' | 'desc';
+  }>({
+    field: 'timestamp',
+    direction: 'desc'
+  });
+  const [showActivityFilters, setShowActivityFilters] = useState(false);
+
   // ============================================================================
   // Filtering Logic
   // ============================================================================
 
   useEffect(() => {
     let result = [...logs];
+
+    // Check if live view is enabled - if not, don't show logs in viewer
+    if (settings.logging?.enableLiveView === false) {
+      result = [];
+      setFilteredLogs(result);
+      return;
+    }
 
     // Search filter
     if (filters.search) {
@@ -255,7 +300,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
 
     setFilteredLogs(result);
     setCurrentPage(1); // Reset to first page when filters change
-  }, [logs, filters]);
+  }, [logs, filters, settings.logging?.enableLiveView]);
 
   // ============================================================================
   // Helper Functions
@@ -290,27 +335,75 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
       const allFiles = await logger.getLogFiles();
       let allEntries: LogEntry[] = [];
       
+      // Check if "All Transactions" is enabled
+      const logAllTransactions = settings.logging?.logAllTransactions === true;
+      
+      // Filter by selected categories (unless all transactions is enabled)
+      const selectedCategories = logAllTransactions ? [] : (settings.logging?.activeCategories || []);
+      
+      // Load from regular log files
       for (const file of allFiles) {
         const content = await logger.readLogFile(file.path);
         const entries = await logger.parseLogEntries(content);
-        allEntries = [...allEntries, ...entries];
+        // Filter by category if categories are selected and all transactions is not enabled
+        const filteredEntries = selectedCategories.length > 0 && !logAllTransactions
+          ? entries.filter(e => selectedCategories.includes(e.category))
+          : entries;
+        allEntries = [...allEntries, ...filteredEntries];
       }
       
+      // Also load from backup files
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (key.startsWith('backup_log_')) {
+          try {
+            const content = localStorage.getItem(key);
+            if (content) {
+              const entries = content.split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                  try {
+                    return JSON.parse(line);
+                  } catch (e) {
+                    return null;
+                  }
+                })
+                .filter(entry => entry !== null);
+              
+              const filteredEntries = selectedCategories.length > 0 && !logAllTransactions
+                ? entries.filter((e: LogEntry) => selectedCategories.includes(e.category))
+                : entries;
+              allEntries = [...allEntries, ...filteredEntries];
+            }
+          } catch (e) {}
+        }
+      });
+      
       // Also add in-memory logs from activity view
-      const activityLogs = userActivityLogs.map(al => ({
-        id: al.id,
-        timestamp: al.timestamp,
-        level: (al.status === 'failed' ? 'error' : al.status === 'warning' ? 'warn' : 'info') as LogEntry['level'],
-        category: al.category,
-        message: al.action,
-        userName: al.userName,
-        ipAddress: al.ipAddress,
-        page: al.page,
-        field: al.field,
-        selection: al.selection,
-        logType: al.logType || 'user',
-        logNature: al.logNature || al.status
-      }));
+      const activityLogs = (logAllTransactions ? userActivityLogs : userActivityLogs
+        .filter(al => selectedCategories.length === 0 || selectedCategories.includes(al.category)))
+        .map(al => ({
+          id: al.id,
+          timestamp: al.timestamp,
+          level: (al.status === 'failed' ? 'error' : al.status === 'warning' ? 'warn' : 'info') as LogEntry['level'],
+          category: al.category,
+          message: al.action,
+          userName: al.userName,
+          ipAddress: al.ipAddress,
+          page: al.page,
+          field: al.field,
+          selection: al.selection,
+          oldValue: al.oldValue !== undefined ? al.oldValue : null,
+          newValue: al.newValue !== undefined ? al.newValue : null,
+          logType: al.logType || 'user',
+          logNature: al.logNature || al.status,
+          details: al.details || null,
+          amount: al.amount,
+          product: al.product,
+          receiptDate: al.receiptDate,
+          documentType: al.documentType,
+          counterparty: al.counterparty
+        }));
       
       const combined = [...allEntries, ...activityLogs].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -320,12 +413,34 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     } catch (error) {
       console.error('Error loading logs:', error);
     }
-  }, [logger, userActivityLogs]);
+  }, [logger, userActivityLogs, settings.logging?.activeCategories, settings.logging?.logAllTransactions]);
 
   const refreshLogFiles = useCallback(async () => {
     try {
       const files = await logger.getLogFiles();
-      setLogFiles(files);
+      // Also get backup files
+      const allKeys = Object.keys(localStorage);
+      const backupFiles: LogFileInfo[] = [];
+      allKeys.forEach(key => {
+        if (key.startsWith('backup_log_')) {
+          try {
+            const content = localStorage.getItem(key);
+            if (content) {
+              const size = new Blob([content]).size;
+              const lines = content.split('\n').filter(l => l.trim()).length;
+              backupFiles.push({
+                path: key.replace('backup_log_', '').replace(/_/g, '.'),
+                size: size,
+                lastModified: new Date(),
+                entryCount: lines
+              });
+            }
+          } catch (e) {}
+        }
+      });
+      setLogFiles([...files, ...backupFiles].sort((a, b) => 
+        b.lastModified.getTime() - a.lastModified.getTime()
+      ));
     } catch (error) {
       console.error('Error refreshing log files:', error);
     }
@@ -423,6 +538,16 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     }
   };
 
+  const clearDisplayedLogs = () => {
+    if (confirm('آیا از حذف لاگ‌های نمایش داده شده اطمینان دارید؟ این عمل غیرقابل بازگشت است.')) {
+      // پاک کردن لاگ‌های نمایش داده شده از state
+      setLogs([]);
+      setFilteredLogs([]);
+      setCurrentPage(1);
+      alert('لاگ‌های نمایش داده شده با موفقیت حذف شدند');
+    }
+  };
+
   const clearAllLogs = async () => {
     if (confirm('آیا از حذف تمام لاگ‌ها اطمینان دارید؟ این عمل غیرقابل بازگشت است.')) {
       try {
@@ -435,6 +560,8 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         }
         // Also clear activities if needed
         storage.saveData('userActivities', []);
+        setLogs([]);
+        setFilteredLogs([]);
         loadLogs();
         refreshLogFiles();
         alert('تمامی لاگ‌ها با موفقیت حذف شدند');
@@ -442,6 +569,22 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         console.error('Error clearing logs:', error);
         alert('خطا در حذف لاگ‌ها');
       }
+    }
+  };
+
+  const clearDisplayedActivities = () => {
+    if (confirm('آیا از حذف فعالیت‌های نمایش داده شده اطمینان دارید؟ این عمل غیرقابل بازگشت است.')) {
+      // پاک کردن فعالیت‌های نمایش داده شده از userActivityLogs
+      const displayedIds = new Set(filteredActivities.map((a: any) => a.id));
+      const remainingActivities = userActivityLogs.filter((activity: any) => !displayedIds.has(activity.id));
+      storage.saveData('userActivities', remainingActivities);
+      
+      // Dispatch event برای به‌روزرسانی parent component
+      window.dispatchEvent(new CustomEvent('activities-cleared', { detail: { remainingActivities } }));
+      
+      // به‌روزرسانی state برای نمایش فوری - با استفاده از useEffect که userActivityLogs را watch می‌کند
+      // این کار باعث می‌شود که وقتی parent component userActivityLogs را به‌روزرسانی کند، اینجا هم به‌روزرسانی شود
+      alert('فعالیت‌های نمایش داده شده با موفقیت حذف شدند');
     }
   };
 
@@ -464,11 +607,18 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   const deleteLogFile = async (filePath: string) => {
     if (confirm(`آیا از حذف فایل ${filePath} اطمینان دارید؟`)) {
       try {
+        // Try regular log file
         const key = `logfile_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const metaKey = key.replace('logfile_', 'logmeta_');
         localStorage.removeItem(key);
         localStorage.removeItem(metaKey);
-        refreshLogFiles();
+        
+        // Try backup file
+        const backupKey = `backup_log_${filePath.replace(/\./g, '_')}`;
+        localStorage.removeItem(backupKey);
+        
+        await refreshLogFiles();
+        await loadLogs();
         alert('فایل با موفقیت حذف شد');
       } catch (error) {
         console.error('Error deleting file:', error);
@@ -600,11 +750,30 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     loadLogs();
   }, [userActivityLogs, loadLogs]);
 
+  // Sync realTimeMode with settings
+  useEffect(() => {
+    setRealTimeMode(settings.logging?.enableLiveView !== false);
+  }, [settings.logging?.enableLiveView]);
+
   // Load activity view settings on mount
   useEffect(() => {
     loadActivityViewSettings();
     refreshLogFiles();
-  }, [loadActivityViewSettings, refreshLogFiles]);
+    
+    // Load saved path config
+    const savedPathConfig = storage.loadData<LogPathConfig>('logPathConfig');
+    if (savedPathConfig) {
+      setLogPathConfig(savedPathConfig);
+      logger.setConfig(savedPathConfig);
+    }
+    
+    // Load saved storage config
+    const savedStorageConfig = storage.loadData<StoragePathConfig>('storagePathConfig');
+    if (savedStorageConfig) {
+      setStoragePathConfig(savedStorageConfig);
+      logger.setStorageConfig(savedStorageConfig);
+    }
+  }, [loadActivityViewSettings, refreshLogFiles, storage, logger]);
 
   // Update available users based on activity logs
   useEffect(() => {
@@ -698,18 +867,38 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
       }
 
       try {
-          // Prepare data for Excel export with the 7 required fields precisely
-          const worksheetData = filteredLogs.map(log => ({
-            'نام کاربر': log.userName || 'سیستم',
-            'نام صفحه': log.page || 'نامشخص',
-            'منو و فیلد': log.field || 'سایر',
-            'نوع تراکنش': log.logNature || 'عملیات',
-            'مقدار': log.amount ? formatPersianNumber(log.amount) : '0',
-            'کالا / محصول': log.product || '-',
-            'تاریخ تراکنش': formatPersianDate(new Date(log.timestamp)),
-            'زمان تراکنش': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
-            'شرح کامل': log.message
-          }));
+          // Prepare data for Excel export with comprehensive transaction information
+          const worksheetData = filteredLogs.map(log => {
+            const oldValueStr = log.oldValue ? (typeof log.oldValue === 'object' ? 
+              Object.keys(log.oldValue).map(k => `${k}: ${log.oldValue[k]}`).join(', ') : 
+              String(log.oldValue)) : '-';
+            const newValueStr = log.newValue ? (typeof log.newValue === 'object' ? 
+              Object.keys(log.newValue).map(k => `${k}: ${log.newValue[k]}`).join(', ') : 
+              String(log.newValue)) : '-';
+            
+            return {
+              'نام کاربر': log.userName || 'سیستم',
+              'نام صفحه': log.page || 'نامشخص',
+              'منو و فیلد': log.field || 'سایر',
+              'گزینه انتخاب شده': log.selection || '-',
+              'نوع تراکنش': log.logNature || 'عملیات',
+              'نوع لاگ': log.logType || 'user',
+              'سطح لاگ': log.level || 'info',
+              'دسته‌بندی': log.category || '-',
+              'مقدار': log.amount ? (typeof log.amount === 'string' ? log.amount : typeof log.amount === 'number' ? formatPersianNumber(log.amount) : String(log.amount)) : '0',
+              'کالا / محصول': log.product || '-',
+              'مقدار اولیه': oldValueStr,
+              'مقدار جدید (اصلاح شده)': newValueStr,
+              'تاریخ تراکنش': formatPersianDate(new Date(log.timestamp)),
+              'زمان تراکنش': new Date(log.timestamp).toLocaleTimeString('fa-IR'),
+              'آدرس IP': log.ipAddress || '-',
+              'شرح کامل': log.message,
+              'جزئیات': log.details ? JSON.stringify(log.details) : '-',
+              'شماره سند': log.details?.transactionNumber || log.details?.documentNumber || '-',
+              'شماره قرارداد': log.details?.contractNumber || log.counterparty || '-',
+              'طرف حساب': log.counterparty || log.details?.counterpartyName || '-'
+            };
+          });
 
         // Create worksheet from JSON data
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -836,23 +1025,179 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
     );
   };
 
+  // Filtered and sorted activities
+  const filteredActivities = useMemo(() => {
+    let result = [...userActivityLogs];
+    
+    // Apply max activity transactions limit
+    const maxTransactions = settings.logging?.maxActivityTransactions || 1000;
+    result = result.slice(0, maxTransactions);
+    
+    // Search filter
+    if (activityFilters.search) {
+      const searchLower = activityFilters.search.toLowerCase();
+      result = result.filter(activity => 
+        (activity.action && activity.action.toLowerCase().includes(searchLower)) ||
+        (activity.userName && activity.userName.toLowerCase().includes(searchLower)) ||
+        (activity.page && activity.page.toLowerCase().includes(searchLower)) ||
+        (activity.category && activity.category.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    // Date range filter
+    if (activityFilters.dateFrom) {
+      const fromTime = activityFilters.dateFrom.getTime();
+      result = result.filter(activity => new Date(activity.timestamp).getTime() >= fromTime);
+    }
+    if (activityFilters.dateTo) {
+      const toTime = activityFilters.dateTo.getTime() + (24 * 60 * 60 * 1000) - 1;
+      result = result.filter(activity => new Date(activity.timestamp).getTime() <= toTime);
+    }
+    
+    // User filter
+    if (activityFilters.userId) {
+      result = result.filter(activity => activity.userId === activityFilters.userId);
+    }
+    
+    // Category filter
+    if (activityFilters.category.length > 0) {
+      result = result.filter(activity => activityFilters.category.includes(activity.category));
+    }
+    
+    // Status filter
+    if (activityFilters.status.length > 0) {
+      result = result.filter(activity => activityFilters.status.includes(activity.status));
+    }
+    
+    // Sort
+    result.sort((a, b) => {
+      let aVal: any, bVal: any;
+      switch (activitySort.field) {
+        case 'timestamp':
+          aVal = new Date(a.timestamp).getTime();
+          bVal = new Date(b.timestamp).getTime();
+          break;
+        case 'userName':
+          aVal = (a.userName || '').toLowerCase();
+          bVal = (b.userName || '').toLowerCase();
+          break;
+        case 'page':
+          aVal = (a.page || '').toLowerCase();
+          bVal = (b.page || '').toLowerCase();
+          break;
+        case 'action':
+          aVal = (a.action || '').toLowerCase();
+          bVal = (b.action || '').toLowerCase();
+          break;
+        case 'category':
+          aVal = (a.category || '').toLowerCase();
+          bVal = (b.category || '').toLowerCase();
+          break;
+        case 'status':
+          aVal = (a.status || '').toLowerCase();
+          bVal = (b.status || '').toLowerCase();
+          break;
+        default:
+          aVal = new Date(a.timestamp).getTime();
+          bVal = new Date(b.timestamp).getTime();
+      }
+      
+      if (aVal < bVal) return activitySort.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return activitySort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return result;
+  }, [userActivityLogs, activityFilters, activitySort, settings.logging?.maxActivityTransactions]);
+
+  // Filtered and sorted logs
+  const sortedFilteredLogs = useMemo(() => {
+    let result = [...filteredLogs];
+    
+    // Sort
+    result.sort((a, b) => {
+      let aVal: any, bVal: any;
+      switch (logSort.field) {
+        case 'timestamp':
+          aVal = new Date(a.timestamp).getTime();
+          bVal = new Date(b.timestamp).getTime();
+          break;
+        case 'userName':
+          aVal = (a.userName || '').toLowerCase();
+          bVal = (b.userName || '').toLowerCase();
+          break;
+        case 'page':
+          aVal = (a.page || '').toLowerCase();
+          bVal = (b.page || '').toLowerCase();
+          break;
+        case 'message':
+          aVal = (a.message || '').toLowerCase();
+          bVal = (b.message || '').toLowerCase();
+          break;
+        case 'category':
+          aVal = (a.category || '').toLowerCase();
+          bVal = (b.category || '').toLowerCase();
+          break;
+        case 'level':
+          const levelOrder = { error: 0, warn: 1, info: 2, debug: 3 };
+          aVal = levelOrder[a.level] ?? 3;
+          bVal = levelOrder[b.level] ?? 3;
+          break;
+        default:
+          aVal = new Date(a.timestamp).getTime();
+          bVal = new Date(b.timestamp).getTime();
+      }
+      
+      if (aVal < bVal) return logSort.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return logSort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return result;
+  }, [filteredLogs, logSort]);
+
   // Pagination
-  const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+  const totalPages = Math.ceil(sortedFilteredLogs.length / logsPerPage);
   const paginatedLogs = useMemo(() => {
     const start = (currentPage - 1) * logsPerPage;
     const end = start + logsPerPage;
-    return filteredLogs.slice(start, end);
-  }, [filteredLogs, currentPage, logsPerPage]);
+    return sortedFilteredLogs.slice(start, end);
+  }, [sortedFilteredLogs, currentPage, logsPerPage]);
 
   // Get unique categories
   const categories = useMemo(() => {
     return Array.from(new Set(logs.map(log => log.category))).sort();
   }, [logs]);
 
-  // Get unique users
+  // Get unique users from logs and also from user management
   const users = useMemo(() => {
-    return Array.from(new Set(logs.filter(log => log.userName).map(log => ({ id: log.userId || '', name: log.userName || '' }))));
-  }, [logs]);
+    const logUsers = Array.from(new Set(logs.filter(log => log.userName).map(log => ({ id: log.userId || '', name: log.userName || '' }))));
+    
+    // Also get users and groups from user management
+    const allUsers = storage.loadData('users') || [];
+    const allGroups = storage.loadData('userGroups') || [];
+    
+    const userManagementUsers = allUsers.map((user: any) => ({
+      id: user.id || user.userId || '',
+      name: user.fullName || user.username || user.name || ''
+    })).filter((u: any) => u.id && u.name);
+    
+    const userManagementGroups = allGroups.map((group: any) => ({
+      id: `group_${group.id || group.groupId || ''}`,
+      name: `گروه: ${group.name || group.groupName || ''}`
+    })).filter((g: any) => g.id && g.name);
+    
+    // Combine and remove duplicates
+    const combined = [...logUsers, ...userManagementUsers, ...userManagementGroups];
+    const uniqueMap = new Map();
+    combined.forEach(item => {
+      if (item.id && item.name && !uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    
+    return Array.from(uniqueMap.values());
+  }, [logs, storage]);
 
   // Get selected categories from settings
   const selectedCategories = settings.logging?.activeCategories || [];
@@ -886,7 +1231,13 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
             
             {/* Toggle Real-time Mode */}
             <button
-              onClick={() => setRealTimeMode(!realTimeMode)}
+              onClick={() => {
+                const newMode = !realTimeMode;
+                setRealTimeMode(newMode);
+                // Also update the settings - this controls whether logs are displayed in viewer
+                updateLoggingSettings({ enableLiveView: newMode });
+                // Note: Logs are always saved to files regardless of this setting
+              }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 realTimeMode 
                   ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm' 
@@ -898,9 +1249,12 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
             </button>
             
             <button
-              onClick={() => {
-                loadLogs();
-                refreshLogFiles();
+              onClick={async () => {
+                await loadLogs();
+                await refreshLogFiles();
+                // Force re-render of logs
+                setCurrentPage(1);
+                alert('لاگ‌ها با موفقیت بروزرسانی شدند');
               }}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm hover:shadow-md"
             >
@@ -916,11 +1270,22 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
             <div className="w-2 h-2 bg-blue-500 rounded-full" />
             <span className="text-gray-600">لاگ‌ها:</span>
             <span className="font-semibold text-gray-900">{filteredLogs.length}</span>
+            {filteredLogs.length !== logs.length && (
+              <span className="text-xs text-gray-500">(از {logs.length} کل)</span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-sm">
             <div className="w-2 h-2 bg-green-500 rounded-full" />
             <span className="text-gray-600">فعالیت‌ها:</span>
-            <span className="font-semibold text-gray-900">{userActivityLogs.length}</span>
+            <span className="font-semibold text-gray-900">{filteredActivities.length}</span>
+            {filteredActivities.length !== userActivityLogs.length && (
+              <span className="text-xs text-gray-500">(از {userActivityLogs.length} کل)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-purple-500 rounded-full" />
+            <span className="text-gray-600">ریز فعالیت‌ها:</span>
+            <span className="font-semibold text-gray-900">{filteredActivities.length}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <FolderOpen className="h-4 w-4 text-gray-400" />
@@ -972,6 +1337,21 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
               مشاهده لاگ‌ها ({filteredLogs.length})
             </div>
           </button>
+          {settings.logging?.showActivities !== false && (
+            <button
+              onClick={() => setActiveTab('activities')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                activeTab === 'activities'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                ریز فعالیت‌ها ({userActivityLogs.length})
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1203,6 +1583,34 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                         
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
+                            onClick={() => {
+                              // Open folder in file explorer (simulated - in real app would use Electron/Tauri API)
+                              const path = storagePathConfig.localPath || logPathConfig.path;
+                              alert(`مسیر فولدر لاگ: ${path}\n\nدر محیط واقعی، این فولدر در File Explorer باز می‌شود.`);
+                            }}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="باز کردن فولدر"
+                          >
+                            <FolderOpen className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              // Open file (simulated)
+                              const content = localStorage.getItem(`logfile_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}`) || 
+                                            localStorage.getItem(`backup_log_${file.path.replace(/\./g, '_')}`);
+                              if (content) {
+                                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                                const url = URL.createObjectURL(blob);
+                                window.open(url, '_blank');
+                                setTimeout(() => URL.revokeObjectURL(url), 100);
+                              }
+                            }}
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="باز کردن فایل"
+                          >
+                            <FileText className="h-5 w-5" />
+                          </button>
+                          <button
                             onClick={() => downloadLogFile(file)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="دانلود فایل"
@@ -1300,7 +1708,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </div>
 
                 <p className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
-                  <strong>راهنما:</strong> با فعال کردن این گزینه، تمام لاگ‌های صفحات انتخاب شده در قسمت «دسته‌بندی‌های فعال» به صورت زنده در صفحه «مشاهده لاگ‌ها» نمایش داده می‌شوند. با غیرفعال کردن این گزینه، دیگر لاگ‌های سیستم در صفحه نمایش داده نخواهند شد.
+                  <strong>راهنما:</strong> با فعال کردن این گزینه، تمام لاگ‌های صفحات انتخاب شده در قسمت «دسته‌بندی‌های فعال» به صورت زنده در صفحه «مشاهده لاگ‌ها» نمایش داده می‌شوند. با غیرفعال کردن این گزینه، دیگر لاگ‌های سیستم در صفحه نمایش داده نخواهند شد، اما همچنان در فایل‌های لاگ در مسیر تعیین شده ذخیره می‌شوند.
                 </p>
               </div>
             )}
@@ -1330,7 +1738,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                       <div>
                         <div className="font-medium text-indigo-900">تعیین فیلدهای اطلاعاتی لاگ</div>
                         <div className="text-sm text-indigo-700">
-                          در این بخش مشخص کنید که کدامیک از ۷ مورد زیر در لاگ برنامه ثبت شوند
+                          در این بخش مشخص کنید که کدامیک از ۱۱ مورد زیر در لاگ برنامه ثبت شوند
                         </div>
                       </div>
                     </div>
@@ -1338,14 +1746,17 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { id: 'userName', name: 'نام کاربری', icon: User },
-                      { id: 'timestamp', name: 'تاریخ و ساعت عملکرد', icon: Clock },
-                      { id: 'page', name: 'صفحه عملکرد', icon: Monitor },
-                      { id: 'field', name: 'منو و یا فیلد انتخابی', icon: Edit3 },
+                      { id: 'userName', name: 'نام کاربر', icon: User },
+                      { id: 'timestamp', name: 'تاریخ و ساعت', icon: Clock },
+                      { id: 'page', name: 'نام صفحه برنامه', icon: Monitor },
+                      { id: 'field', name: 'نام منو یا فیلد انتخاب شده', icon: Edit3 },
                       { id: 'selection', name: 'گزینه انتخاب شده', icon: CheckCircle },
-                      { id: 'logType', name: 'نوع یا دسته‌بندی لاگ', icon: Folder },
-                      { id: 'logNature', name: 'جنس لاگ (هشدار/خطا/...)', icon: AlertCircle },
-                      { id: 'ipAddress', name: 'آدرس IP و سیستم', icon: Globe }
+                      { id: 'oldValue', name: 'مقدار اولیه تراکنش', icon: TrendingUp },
+                      { id: 'newValue', name: 'مقدار جدید (اصلاح شده)', icon: TrendingUp },
+                      { id: 'logNature', name: 'نوع تراکنش', icon: Zap },
+                      { id: 'logType', name: 'نوع لاگ', icon: Folder },
+                      { id: 'ipAddress', name: 'آی پی کاربر', icon: Globe },
+                      { id: 'otherDetails', name: 'سایر', icon: Info }
                     ].map((field) => {
                       const isEnabled = activityViewSettings.fieldConfig[field.id as keyof LogFieldConfig];
                       const Icon = field.icon;
@@ -1567,10 +1978,15 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                       </span>
                     </label>
                     <select
-                      value={settings.logging.logLevel}
-                      onChange={(e) => updateLoggingSettings({ logLevel: e.target.value as any })}
+                      value={settings.logging.logLevel || 'all'}
+                      onChange={(e) => {
+                        const level = e.target.value;
+                        updateLoggingSettings({ logLevel: level as any });
+                        updatePathConfig({ minLogLevel: level as any });
+                      }}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     >
+                      <option value="all">همه موارد</option>
                       <option value="error">خطا (Error)</option>
                       <option value="warn">هشدار (Warning)</option>
                       <option value="info">اطلاعات (Info)</option>
@@ -1587,8 +2003,12 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={settings.logging.maxLogSize}
-                      onChange={(e) => updateLoggingSettings({ maxLogSize: parseInt(e.target.value) || 100 })}
+                      value={settings.logging.maxLogSize || logPathConfig.maxLogSizeMB}
+                      onChange={(e) => {
+                        const size = parseInt(e.target.value) || 100;
+                        updateLoggingSettings({ maxLogSize: size });
+                        updatePathConfig({ maxLogSizeMB: size });
+                      }}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       min="10"
                       max="1000"
@@ -1605,11 +2025,70 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={settings.logging.logRetention}
-                      onChange={(e) => updateLoggingSettings({ logRetention: parseInt(e.target.value) || 90 })}
+                      value={settings.logging.logRetention || logPathConfig.logRetentionDays}
+                      onChange={(e) => {
+                        const days = parseInt(e.target.value) || 90;
+                        updateLoggingSettings({ logRetention: days });
+                        updatePathConfig({ logRetentionDays: days });
+                      }}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       min="1"
                       max="365"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={settings.logging?.logAllTransactions === true}
+                        onChange={(e) => updateLoggingSettings({ logAllTransactions: e.target.checked })}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div>
+                        <div className="font-medium text-gray-900">کلیه تراکنش‌ها</div>
+                        <div className="text-sm text-gray-500">
+                          در صورت فعال بودن، کلیه اقدامات کاربران شامل ورود به صفحه و خروج از صفحه کاربران به همراه کلیه اقدامات کاربران تحت پارامترهای انتخاب شده در جدول تعیین فیلدهای اطلاعاتی لاگ نمایش داده می‌شود
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={settings.logging?.showActivities !== false}
+                        onChange={(e) => updateLoggingSettings({ showActivities: e.target.checked })}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div>
+                        <div className="font-medium text-gray-900">نمایش فعالیت‌ها</div>
+                        <div className="text-sm text-gray-500">
+                          نمایش صفحه فعالیت‌ها در تب فعالیت‌ها
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      تعداد تراکنش فعالیت‌ها
+                      <span className="text-xs text-gray-500 block mt-1">
+                        حداکثر تعداد تراکنش‌های فعالیت که در حافظه برنامه نگهداری و نمایش داده می‌شوند
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.logging?.maxActivityTransactions || 1000}
+                      onChange={(e) => {
+                        const count = parseInt(e.target.value) || 1000;
+                        updateLoggingSettings({ maxActivityTransactions: count });
+                      }}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      min="100"
+                      max="10000"
+                      step="100"
                     />
                   </div>
                 </div>
@@ -1783,6 +2262,460 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
         </div>
       )}
 
+      {/* Activities Detail Tab */}
+      {activeTab === 'activities' && settings.logging?.showActivities !== false && (
+        <div className="space-y-4">
+          {/* Search and Filters */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="جستجو در فعالیت‌ها..."
+                  value={activityFilters.search}
+                  onChange={(e) => setActivityFilters({ ...activityFilters, search: e.target.value })}
+                  className="w-full pr-10 pl-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                />
+              </div>
+              
+              <button
+                onClick={() => setShowActivityFilters(!showActivityFilters)}
+                className="flex items-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <Sliders className="h-5 w-5" />
+                فیلترها
+                {Object.values(activityFilters).some(v => Array.isArray(v) ? v.length > 0 : v) && (
+                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                    {[
+                      activityFilters.search,
+                      activityFilters.dateFrom,
+                      activityFilters.dateTo,
+                      activityFilters.userId,
+                      activityFilters.category.length,
+                      activityFilters.status.length
+                    ].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={clearDisplayedActivities}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium shadow-sm hover:shadow-md"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  پاک کردن
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (filteredActivities.length === 0) {
+                      alert('هیچ فعالیتی برای خروجی وجود ندارد');
+                      return;
+                    }
+                    const activities = filteredActivities.map((activity: any) => ({
+                      'شناسه': activity.id,
+                      'تاریخ': formatPersianDate(new Date(activity.timestamp)),
+                      'ساعت': new Date(activity.timestamp).toLocaleTimeString('fa-IR'),
+                      'نام کاربر': activity.userName || '-',
+                      'اقدام': activity.action || '-',
+                      'دسته‌بندی': activity.category || '-',
+                      'صفحه': activity.page || '-',
+                      'وضعیت': activity.status === 'success' ? 'موفق' : activity.status === 'failed' ? 'ناموفق' : 'هشدار',
+                      'نوع تراکنش': activity.logNature || '-',
+                      'فیلد': activity.field || '-',
+                      'گزینه انتخاب شده': activity.selection || '-',
+                      'مقدار اولیه': activity.oldValue ? (typeof activity.oldValue === 'object' ? JSON.stringify(activity.oldValue, null, 2) : String(activity.oldValue)) : '-',
+                      'مقدار جدید (اصلاح شده)': activity.newValue ? (typeof activity.newValue === 'object' ? JSON.stringify(activity.newValue, null, 2) : String(activity.newValue)) : '-',
+                      'آدرس IP': activity.ipAddress || '-',
+                      'جزئیات': activity.details ? JSON.stringify(activity.details) : '-'
+                    }));
+                    
+                    const ws = XLSX.utils.json_to_sheet(activities);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'فعالیت‌ها');
+                    const dateStr = new Date().toISOString().split('T')[0];
+                    XLSX.writeFile(wb, `activities_${dateStr}.xlsx`);
+                    alert('فعالیت‌ها با موفقیت به اکسل export شدند');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-sm hover:shadow-md"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  خروجی به اکسل
+                </button>
+
+                <button
+                  onClick={async () => {
+                    await loadLogs();
+                    setCurrentPage(1);
+                    alert('فعالیت‌ها با موفقیت بروزرسانی شدند');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm hover:shadow-md"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  بروزرسانی
+                </button>
+              </div>
+            </div>
+
+            {/* Advanced Filters */}
+            {showActivityFilters && (
+              <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-500" />
+                      از تاریخ
+                    </label>
+                    <PersianDatePicker
+                      value={activityFilters.dateFrom}
+                      onChange={(date) => setActivityFilters({ ...activityFilters, dateFrom: date })}
+                      placeholder="تاریخ شروع"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-500" />
+                      تا تاریخ
+                    </label>
+                    <PersianDatePicker
+                      value={activityFilters.dateTo}
+                      onChange={(date) => setActivityFilters({ ...activityFilters, dateTo: date })}
+                      placeholder="تاریخ پایان"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">کاربر</label>
+                  <select
+                    value={activityFilters.userId}
+                    onChange={(e) => setActivityFilters({ ...activityFilters, userId: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">همه کاربران</option>
+                    {availableUsers.map(user => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">وضعیت</label>
+                  <div className="space-y-2">
+                    {['success', 'failed', 'warning'].map(status => (
+                      <label key={status} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={activityFilters.status.includes(status)}
+                          onChange={(e) => {
+                            const newStatuses = e.target.checked
+                              ? [...activityFilters.status, status]
+                              : activityFilters.status.filter(s => s !== status);
+                            setActivityFilters({ ...activityFilters, status: newStatuses });
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {status === 'success' ? 'موفق' : status === 'failed' ? 'ناموفق' : 'هشدار'}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Activities List */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-600">
+                  نمایش {filteredActivities.length} فعالیت
+                </span>
+              </div>
+            </div>
+            
+            <div className="max-h-[600px] overflow-y-auto">
+              {filteredActivities.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Activity className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p>هیچ فعالیتی یافت نشد</p>
+                </div>
+              ) : (
+                <div className="space-y-3 p-4">
+                  {/* Sortable Table Header - فقط فیلدهای فعال */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-2 bg-gray-50 rounded-lg mb-2 font-medium text-sm text-gray-700">
+                    {activityViewSettings.fieldConfig.timestamp && (
+                      <div 
+                        className="md:col-span-2 flex items-center gap-2 cursor-pointer hover:text-blue-600"
+                        onClick={() => setActivitySort({
+                          field: 'timestamp',
+                          direction: activitySort.field === 'timestamp' && activitySort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        تاریخ و ساعت
+                        {activitySort.field === 'timestamp' && (
+                          <span>{activitySort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.userName && (
+                      <div 
+                        className="md:col-span-2 flex items-center gap-2 cursor-pointer hover:text-blue-600"
+                        onClick={() => setActivitySort({
+                          field: 'userName',
+                          direction: activitySort.field === 'userName' && activitySort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        نام کاربر
+                        {activitySort.field === 'userName' && (
+                          <span>{activitySort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.page && (
+                      <div 
+                        className="md:col-span-2 flex items-center gap-2 cursor-pointer hover:text-blue-600"
+                        onClick={() => setActivitySort({
+                          field: 'page',
+                          direction: activitySort.field === 'page' && activitySort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        صفحه
+                        {activitySort.field === 'page' && (
+                          <span>{activitySort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.logNature && (
+                      <div 
+                        className="md:col-span-2 flex items-center gap-2 cursor-pointer hover:text-blue-600"
+                        onClick={() => setActivitySort({
+                          field: 'status',
+                          direction: activitySort.field === 'status' && activitySort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        نوع تراکنش
+                        {activitySort.field === 'status' && (
+                          <span>{activitySort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    <div 
+                      className="md:col-span-4 flex items-center gap-2 cursor-pointer hover:text-blue-600"
+                      onClick={() => setActivitySort({
+                        field: 'action',
+                        direction: activitySort.field === 'action' && activitySort.direction === 'desc' ? 'asc' : 'desc'
+                      })}
+                    >
+                      اقدام
+                      {activitySort.field === 'action' && (
+                        <span>{activitySort.direction === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {filteredActivities.map((activity: any) => (
+                    <div
+                      key={activity.id}
+                      className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                        {activityViewSettings.fieldConfig.timestamp && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs text-gray-500 mb-1">تاریخ و ساعت</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatPersianDate(new Date(activity.timestamp))}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {new Date(activity.timestamp).toLocaleTimeString('fa-IR')}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.userName && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs text-gray-500 mb-1">نام کاربر</div>
+                            <div className="text-sm font-bold text-gray-900">{activity.userName || 'سیستم'}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.page && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs text-gray-500 mb-1">صفحه</div>
+                            <div className="text-sm text-blue-600 font-medium">{activity.page || '-'}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.logNature && (
+                          <div className="md:col-span-2">
+                            <div className="text-xs text-gray-500 mb-1">نوع تراکنش</div>
+                            <div className="text-sm text-purple-600 font-medium">{activity.logNature || activity.status || '-'}</div>
+                          </div>
+                        )}
+                        
+                        <div className="md:col-span-4">
+                          <div className="text-xs text-gray-500 mb-1">اقدام</div>
+                          <div className="text-sm text-gray-900">{activity.action || activity.message || '-'}</div>
+                        </div>
+                        
+                        {activityViewSettings.fieldConfig.oldValue && activity.oldValue !== undefined && activity.oldValue !== null && (
+                          <div className="md:col-span-6">
+                            <div className="text-xs text-gray-500 mb-2 font-semibold">مقدار اولیه تراکنش</div>
+                            <div className="text-sm text-orange-800 bg-orange-50 p-3 rounded-lg border border-orange-200 space-y-1">
+                              {(() => {
+                                if (typeof activity.oldValue === 'object' && activity.oldValue !== null) {
+                                  const keys = Object.keys(activity.oldValue);
+                                  if (keys.length > 0) {
+                                    return keys.map(key => {
+                                      const value = activity.oldValue[key];
+                                      const displayValue = typeof value === 'number' 
+                                        ? formatPersianNumber(value) 
+                                        : typeof value === 'object' && value !== null
+                                          ? JSON.stringify(value)
+                                          : String(value);
+                                      return (
+                                        <div key={key} className="flex items-start gap-2 py-1 border-b border-orange-200 last:border-0">
+                                          <span className="font-semibold text-orange-900 min-w-[140px]">{key}:</span>
+                                          <span className="flex-1 text-orange-700">{displayValue}</span>
+                                        </div>
+                                      );
+                                    });
+                                  }
+                                  return <div className="text-orange-700">بدون مقدار</div>;
+                                }
+                                const displayValue = typeof activity.oldValue === 'number' 
+                                  ? formatPersianNumber(activity.oldValue) 
+                                  : String(activity.oldValue);
+                                return <div className="text-orange-700">{displayValue}</div>;
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.newValue && activity.newValue !== undefined && activity.newValue !== null && (
+                          <div className="md:col-span-6">
+                            <div className="text-xs text-gray-500 mb-2 font-semibold">مقدار جدید (اصلاح شده) تراکنش</div>
+                            <div className="text-sm text-green-800 bg-green-50 p-3 rounded-lg border border-green-200 space-y-1">
+                              {(() => {
+                                if (typeof activity.newValue === 'object' && activity.newValue !== null) {
+                                  const keys = Object.keys(activity.newValue);
+                                  if (keys.length > 0) {
+                                    return keys.map(key => {
+                                      const value = activity.newValue[key];
+                                      const displayValue = typeof value === 'number' 
+                                        ? formatPersianNumber(value) 
+                                        : typeof value === 'object' && value !== null
+                                          ? JSON.stringify(value)
+                                          : String(value);
+                                      return (
+                                        <div key={key} className="flex items-start gap-2 py-1 border-b border-green-200 last:border-0">
+                                          <span className="font-semibold text-green-900 min-w-[140px]">{key}:</span>
+                                          <span className="flex-1 text-green-700">{displayValue}</span>
+                                        </div>
+                                      );
+                                    });
+                                  }
+                                  return <div className="text-green-700">بدون مقدار</div>;
+                                }
+                                const displayValue = typeof activity.newValue === 'number' 
+                                  ? formatPersianNumber(activity.newValue) 
+                                  : String(activity.newValue);
+                                return <div className="text-green-700">{displayValue}</div>;
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.field && activity.field && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">فیلد</div>
+                            <div className="text-sm text-indigo-600">{activity.field}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.selection && activity.selection && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">گزینه انتخاب شده</div>
+                            <div className="text-sm text-purple-600">{activity.selection}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.ipAddress && activity.ipAddress && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">آی پی</div>
+                            <div className="text-sm text-gray-600 font-mono">{activity.ipAddress}</div>
+                          </div>
+                        )}
+                        
+                        {/* نمایش فیلدهای اضافی فقط وقتی "سایر" فعال است */}
+                        {activityViewSettings.fieldConfig.otherDetails && activity.product && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">کالا / محصول</div>
+                            <div className="text-sm text-indigo-600 font-medium">{activity.product}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.otherDetails && activity.amount && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">مقدار تراکنش</div>
+                            <div className="text-sm text-green-600 font-medium">
+                              {typeof activity.amount === 'number' ? formatPersianNumber(activity.amount) : String(activity.amount)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.otherDetails && activity.receiptDate && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">تاریخ رسید</div>
+                            <div className="text-sm text-blue-600 font-medium">
+                              {formatPersianDate(new Date(activity.receiptDate))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.otherDetails && activity.documentType && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">نوع سند</div>
+                            <div className="text-sm text-purple-600 font-medium">{activity.documentType}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.otherDetails && activity.counterparty && (
+                          <div className="md:col-span-4">
+                            <div className="text-xs text-gray-500 mb-1">طرف حساب</div>
+                            <div className="text-sm text-orange-600 font-medium">{activity.counterparty}</div>
+                          </div>
+                        )}
+                        
+                        {activityViewSettings.fieldConfig.otherDetails && activity.details && Object.keys(activity.details).length > 0 && (
+                          <div className="md:col-span-12">
+                            <div className="text-xs text-gray-500 mb-1 font-semibold">سایر اطلاعات تراکنش</div>
+                            <div className="bg-gray-100 p-3 rounded text-xs">
+                              {Object.entries(activity.details).map(([key, value]) => (
+                                <div key={key} className="mb-1">
+                                  <span className="font-medium text-gray-700">{key}:</span>{' '}
+                                  <span className="text-gray-600">
+                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Log Viewer Tab */}
       {activeTab === 'viewer' && (
         <div className="space-y-4">
@@ -1845,7 +2778,7 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                   </div>
                   
                   <button
-                    onClick={clearAllLogs}
+                    onClick={clearDisplayedLogs}
                     className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
                     <Trash2 className="h-5 w-5" />
@@ -1978,9 +2911,121 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                       گزینه «مشاهده زنده لاگ» غیرفعال است. برای نمایش لاگ‌ها، این گزینه را در تب تنظیمات فعال کنید.
                     </p>
                   )}
+                  {realTimeMode === false && (
+                    <p className="text-sm mt-2 text-blue-600">
+                      مشاهده زنده لاگ غیرفعال است. لاگ‌ها همچنان در فایل ذخیره می‌شوند.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
+                  {/* Sortable Header */}
+                  <div className="grid grid-cols-1 md:grid-cols-10 gap-2 items-center p-3 bg-gray-50 border-b border-gray-200 font-medium text-xs text-gray-700">
+                    {activityViewSettings.fieldConfig.timestamp && (
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:text-blue-600"
+                        onClick={() => setLogSort({
+                          field: 'timestamp',
+                          direction: logSort.field === 'timestamp' && logSort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        تاریخ/ساعت
+                        {logSort.field === 'timestamp' && (
+                          <span>{logSort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.userName && (
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:text-blue-600"
+                        onClick={() => setLogSort({
+                          field: 'userName',
+                          direction: logSort.field === 'userName' && logSort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        کاربر
+                        {logSort.field === 'userName' && (
+                          <span>{logSort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.page && (
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:text-blue-600"
+                        onClick={() => setLogSort({
+                          field: 'page',
+                          direction: logSort.field === 'page' && logSort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        صفحه
+                        {logSort.field === 'page' && (
+                          <span>{logSort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.field && (
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:text-blue-600"
+                        onClick={() => setLogSort({
+                          field: 'message',
+                          direction: logSort.field === 'message' && logSort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        فیلد
+                        {logSort.field === 'message' && (
+                          <span>{logSort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.selection && (
+                      <div className="flex items-center gap-1">
+                        انتخاب
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.oldValue && (
+                      <div className="flex items-center gap-1">
+                        مقدار اولیه
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.newValue && (
+                      <div className="flex items-center gap-1">
+                        مقدار جدید (اصلاح شده)
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.logNature && (
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:text-blue-600"
+                        onClick={() => setLogSort({
+                          field: 'category',
+                          direction: logSort.field === 'category' && logSort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        نوع
+                        {logSort.field === 'category' && (
+                          <span>{logSort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.logType && (
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:text-blue-600"
+                        onClick={() => setLogSort({
+                          field: 'level',
+                          direction: logSort.field === 'level' && logSort.direction === 'desc' ? 'asc' : 'desc'
+                        })}
+                      >
+                        سطح
+                        {logSort.field === 'level' && (
+                          <span>{logSort.direction === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    )}
+                    {activityViewSettings.fieldConfig.ipAddress && (
+                      <div className="flex items-center gap-1">
+                        IP
+                      </div>
+                    )}
+                  </div>
                   {paginatedLogs.map(log => (
                     <div
                       key={log.id}
@@ -1993,59 +3038,178 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                             {getLevelIcon(log.level)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="grid grid-cols-1 md:grid-cols-8 gap-4 items-center mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
-                                  {log.level.toUpperCase()}
-                                </span>
-                                <span className="text-xs text-gray-500 font-mono">
-                                  {new Date(log.timestamp).toLocaleTimeString('fa-IR')}
-                                </span>
-                              </div>
+                            <div className="grid grid-cols-1 md:grid-cols-10 gap-2 items-center mb-2">
+                              {activityViewSettings.fieldConfig.timestamp && (
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-1 text-xs font-medium rounded ${getLevelColor(log.level)}`}>
+                                    {log.level.toUpperCase()}
+                                  </span>
+                                  <span className="text-xs text-gray-500 font-mono">
+                                    {new Date(log.timestamp).toLocaleTimeString('fa-IR')}
+                                  </span>
+                                </div>
+                              )}
                               
-                              <div className="text-sm font-bold text-gray-900 truncate" title={log.userName}>
-                                {log.userName || 'سیستم'}
-                              </div>
+                              {activityViewSettings.fieldConfig.userName && (
+                                <div className="text-sm font-bold text-gray-900 truncate" title={log.userName}>
+                                  {log.userName || 'سیستم'}
+                                </div>
+                              )}
 
-                              <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded truncate" title={log.page}>
-                                {log.page || 'نامشخص'}
-                              </div>
+                              {activityViewSettings.fieldConfig.page && (
+                                <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded truncate" title={log.page}>
+                                  {log.page || 'نامشخص'}
+                                </div>
+                              )}
 
-                              <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded truncate" title={log.logNature}>
-                                {log.logNature || 'عملیات'}
-                              </div>
+                              {activityViewSettings.fieldConfig.field && (
+                                <div className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded truncate" title={log.field}>
+                                  {log.field || '-'}
+                                </div>
+                              )}
 
-                              <div className="text-xs text-gray-600 font-mono">
-                                {log.receiptDate || '-'}
-                              </div>
+                              {activityViewSettings.fieldConfig.selection && (
+                                <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded truncate" title={log.selection}>
+                                  {log.selection || '-'}
+                                </div>
+                              )}
 
-                              <div className="text-sm font-bold text-green-600">
-                                {log.amount ? formatPersianNumber(log.amount) : '-'}
-                              </div>
+                              {activityViewSettings.fieldConfig.oldValue && log.oldValue !== undefined && log.oldValue !== null && (
+                                <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded truncate" title={(() => {
+                                  if (typeof log.oldValue === 'object' && log.oldValue !== null) {
+                                    if (log.oldValue.toString && log.oldValue.toString() !== '[object Object]') {
+                                      return log.oldValue.toString();
+                                    }
+                                    const keys = Object.keys(log.oldValue);
+                                    if (keys.length > 0) {
+                                      return keys.map(key => `${key}: ${log.oldValue[key]}`).join(', ');
+                                    }
+                                    return JSON.stringify(log.oldValue);
+                                  }
+                                  return String(log.oldValue);
+                                })()}>
+                                  {(() => {
+                                    if (typeof log.oldValue === 'object' && log.oldValue !== null) {
+                                      if (log.oldValue.toString && log.oldValue.toString() !== '[object Object]') {
+                                        return String(log.oldValue).substring(0, 20);
+                                      }
+                                      const keys = Object.keys(log.oldValue);
+                                      if (keys.length > 0) {
+                                        const display = keys.map(key => `${key}: ${log.oldValue[key]}`).join(', ');
+                                        return display.length > 20 ? display.substring(0, 20) + '...' : display;
+                                      }
+                                      return JSON.stringify(log.oldValue).substring(0, 20) + '...';
+                                    }
+                                    return String(log.oldValue).substring(0, 20);
+                                  })()}
+                                </div>
+                              )}
 
-                              <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded truncate">
-                                {log.documentType || '-'}
-                              </div>
+                              {activityViewSettings.fieldConfig.newValue && log.newValue !== undefined && log.newValue !== null && (
+                                <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded truncate" title={(() => {
+                                  if (typeof log.newValue === 'object' && log.newValue !== null) {
+                                    if (log.newValue.toString && log.newValue.toString() !== '[object Object]') {
+                                      return log.newValue.toString();
+                                    }
+                                    const keys = Object.keys(log.newValue);
+                                    if (keys.length > 0) {
+                                      return keys.map(key => `${key}: ${log.newValue[key]}`).join(', ');
+                                    }
+                                    return JSON.stringify(log.newValue);
+                                  }
+                                  return String(log.newValue);
+                                })()}>
+                                  {(() => {
+                                    if (typeof log.newValue === 'object' && log.newValue !== null) {
+                                      if (log.newValue.toString && log.newValue.toString() !== '[object Object]') {
+                                        return String(log.newValue).substring(0, 20);
+                                      }
+                                      const keys = Object.keys(log.newValue);
+                                      if (keys.length > 0) {
+                                        const display = keys.map(key => `${key}: ${log.newValue[key]}`).join(', ');
+                                        return display.length > 20 ? display.substring(0, 20) + '...' : display;
+                                      }
+                                      return JSON.stringify(log.newValue).substring(0, 20) + '...';
+                                    }
+                                    return String(log.newValue).substring(0, 20);
+                                  })()}
+                                </div>
+                              )}
 
-                              <div className="text-xs text-gray-700 truncate" title={log.counterparty}>
-                                {log.counterparty || '-'}
-                              </div>
+                              {activityViewSettings.fieldConfig.logNature && (
+                                <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded truncate" title={log.logNature}>
+                                  {log.logNature || 'عملیات'}
+                                </div>
+                              )}
+
+                              {activityViewSettings.fieldConfig.logType && (
+                                <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded truncate" title={log.logType}>
+                                  {log.logType || '-'}
+                                </div>
+                              )}
+
+                              {activityViewSettings.fieldConfig.ipAddress && log.ipAddress && (
+                                <div className="text-xs text-gray-600 font-mono truncate" title={log.ipAddress}>
+                                  {log.ipAddress}
+                                </div>
+                              )}
+                              
+                              {activityViewSettings.fieldConfig.otherDetails && log.details && (
+                                <div className="text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded truncate" title={JSON.stringify(log.details)}>
+                                  سایر: {Object.keys(log.details).length} مورد
+                                </div>
+                              )}
                             </div>
                             <div className="text-sm text-gray-600 mt-1 line-clamp-1">
                               {log.message}
                             </div>
                             
-                            {log.product && (
+                            {/* نمایش فیلدهای اضافی فقط وقتی "سایر" فعال است */}
+                            {activityViewSettings.fieldConfig.otherDetails && log.product && (
                               <div className="mt-2 flex items-center gap-2 text-xs text-indigo-600 font-medium">
                                 <Archive className="h-3.5 w-3.5" />
                                 <span>کالا: {log.product}</span>
                               </div>
                             )}
-
-                            {log.ipAddress && (
-                              <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
-                                <MapPin className="h-2.5 w-2.5" />
-                                <span>{log.ipAddress}</span>
+                            
+                            {activityViewSettings.fieldConfig.otherDetails && log.amount && (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-green-600 font-medium">
+                                <TrendingUp className="h-3.5 w-3.5" />
+                                <span>مقدار: {typeof log.amount === 'number' ? formatPersianNumber(log.amount) : String(log.amount)}</span>
+                              </div>
+                            )}
+                            
+                            {activityViewSettings.fieldConfig.otherDetails && log.receiptDate && (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-blue-600 font-medium">
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>تاریخ رسید: {formatPersianDate(new Date(log.receiptDate))}</span>
+                              </div>
+                            )}
+                            
+                            {activityViewSettings.fieldConfig.otherDetails && log.documentType && (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-purple-600 font-medium">
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>نوع سند: {log.documentType}</span>
+                              </div>
+                            )}
+                            
+                            {activityViewSettings.fieldConfig.otherDetails && log.counterparty && (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-orange-600 font-medium">
+                                <User className="h-3.5 w-3.5" />
+                                <span>طرف حساب: {log.counterparty}</span>
+                              </div>
+                            )}
+                            
+                            {activityViewSettings.fieldConfig.otherDetails && log.details && Object.keys(log.details).length > 0 && (
+                              <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                                <div className="font-medium text-gray-700 mb-1">سایر اطلاعات:</div>
+                                <div className="text-gray-600 space-y-1">
+                                  {Object.entries(log.details).map(([key, value]) => (
+                                    <div key={key}>
+                                      <span className="font-medium">{key}:</span> {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2229,59 +3393,198 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
               {/* Main Info Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <span className="text-xs text-gray-500 block mb-1">نام کاربر</span>
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-blue-500" />
-                    <span className="font-bold text-gray-900">{selectedLog.userName || 'سیستم'}</span>
+                {activityViewSettings.fieldConfig.userName && (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <span className="text-xs text-gray-500 block mb-1">نام کاربر</span>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-500" />
+                      <span className="font-bold text-gray-900">{selectedLog.userName || 'سیستم'}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <span className="text-xs text-gray-500 block mb-1">تاریخ و زمان</span>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-blue-500" />
-                    <span className="font-bold text-gray-900">
-                      {formatPersianDate(new Date(selectedLog.timestamp))} - {new Date(selectedLog.timestamp).toLocaleTimeString('fa-IR')}
-                    </span>
+                )}
+                {activityViewSettings.fieldConfig.timestamp && (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <span className="text-xs text-gray-500 block mb-1">تاریخ و زمان</span>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-500" />
+                      <span className="font-bold text-gray-900">
+                        {formatPersianDate(new Date(selectedLog.timestamp))} - {new Date(selectedLog.timestamp).toLocaleTimeString('fa-IR')}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <span className="text-xs text-gray-500 block mb-1">صفحه / بخش</span>
-                  <div className="flex items-center gap-2">
-                    <Monitor className="h-4 w-4 text-purple-500" />
-                    <span className="font-bold text-gray-900">{selectedLog.page || 'نامشخص'}</span>
+                )}
+                {activityViewSettings.fieldConfig.page && (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <span className="text-xs text-gray-500 block mb-1">صفحه / بخش</span>
+                    <div className="flex items-center gap-2">
+                      <Monitor className="h-4 w-4 text-purple-500" />
+                      <span className="font-bold text-gray-900">{selectedLog.page || 'نامشخص'}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <span className="text-xs text-gray-500 block mb-1">منو / فیلد</span>
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="h-4 w-4 text-purple-500" />
-                    <span className="font-bold text-gray-900">{selectedLog.field || 'سایر'}</span>
+                )}
+                {activityViewSettings.fieldConfig.field && (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <span className="text-xs text-gray-500 block mb-1">منو / فیلد</span>
+                    <div className="flex items-center gap-2">
+                      <Edit3 className="h-4 w-4 text-purple-500" />
+                      <span className="font-bold text-gray-900">{selectedLog.field || 'سایر'}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                  <span className="text-xs text-orange-600 block mb-1">نوع تراکنش</span>
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-orange-500" />
-                    <span className="font-bold text-orange-900">{selectedLog.logNature || 'عملیات'}</span>
+                )}
+                {activityViewSettings.fieldConfig.selection && selectedLog.selection && (
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <span className="text-xs text-purple-600 block mb-1">گزینه انتخاب شده</span>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-purple-500" />
+                      <span className="font-bold text-purple-900">{selectedLog.selection}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                  <span className="text-xs text-indigo-600 block mb-1">کالا / محصول</span>
-                  <div className="flex items-center gap-2">
-                    <Folder className="h-4 w-4 text-indigo-500" />
-                    <span className="font-bold text-indigo-900">{selectedLog.product || '-'}</span>
+                )}
+                {activityViewSettings.fieldConfig.oldValue && selectedLog.oldValue !== undefined && selectedLog.oldValue !== null && (
+                  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <span className="text-xs text-orange-600 block mb-2 font-semibold">مقدار اولیه تراکنش</span>
+                    <div className="space-y-1">
+                      {(() => {
+                        if (typeof selectedLog.oldValue === 'object' && selectedLog.oldValue !== null) {
+                          const keys = Object.keys(selectedLog.oldValue);
+                          if (keys.length > 0) {
+                            return keys.map(key => {
+                              const value = selectedLog.oldValue[key];
+                              const displayValue = typeof value === 'number' 
+                                ? formatPersianNumber(value) 
+                                : typeof value === 'object' 
+                                  ? JSON.stringify(value) 
+                                  : String(value);
+                              return (
+                                <div key={key} className="text-sm text-orange-800 flex items-start gap-2">
+                                  <span className="font-semibold min-w-[120px]">{key}:</span>
+                                  <span className="flex-1">{displayValue}</span>
+                                </div>
+                              );
+                            });
+                          }
+                          return <div className="text-sm text-orange-800">بدون مقدار</div>;
+                        }
+                        const displayValue = typeof selectedLog.oldValue === 'number' 
+                          ? formatPersianNumber(selectedLog.oldValue) 
+                          : String(selectedLog.oldValue);
+                        return <div className="text-sm text-orange-800">{displayValue}</div>;
+                      })()}
+                    </div>
                   </div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-xl border border-green-100 col-span-2">
-                  <span className="text-xs text-green-600 block mb-1">مقدار تراکنش</span>
-                  <div className="flex items-center gap-2 text-lg">
-                    <TrendingUp className="h-5 w-5 text-green-500" />
-                    <span className="font-black text-green-900">
-                      {selectedLog.amount ? formatPersianNumber(selectedLog.amount) : '0'}
-                    </span>
+                )}
+                {activityViewSettings.fieldConfig.newValue && selectedLog.newValue !== undefined && selectedLog.newValue !== null && (
+                  <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                    <span className="text-xs text-green-600 block mb-2 font-semibold">مقدار جدید (اصلاح شده) تراکنش</span>
+                    <div className="space-y-1">
+                      {(() => {
+                        if (typeof selectedLog.newValue === 'object' && selectedLog.newValue !== null) {
+                          const keys = Object.keys(selectedLog.newValue);
+                          if (keys.length > 0) {
+                            return keys.map(key => {
+                              const value = selectedLog.newValue[key];
+                              const displayValue = typeof value === 'number' 
+                                ? formatPersianNumber(value) 
+                                : typeof value === 'object' 
+                                  ? JSON.stringify(value) 
+                                  : String(value);
+                              return (
+                                <div key={key} className="text-sm text-green-800 flex items-start gap-2">
+                                  <span className="font-semibold min-w-[120px]">{key}:</span>
+                                  <span className="flex-1">{displayValue}</span>
+                                </div>
+                              );
+                            });
+                          }
+                          return <div className="text-sm text-green-800">بدون مقدار</div>;
+                        }
+                        const displayValue = typeof selectedLog.newValue === 'number' 
+                          ? formatPersianNumber(selectedLog.newValue) 
+                          : String(selectedLog.newValue);
+                        return <div className="text-sm text-green-800">{displayValue}</div>;
+                      })()}
+                    </div>
                   </div>
-                </div>
+                )}
+                {activityViewSettings.fieldConfig.logNature && (
+                  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <span className="text-xs text-orange-600 block mb-1">نوع تراکنش</span>
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-orange-500" />
+                      <span className="font-bold text-orange-900">{selectedLog.logNature || 'عملیات'}</span>
+                    </div>
+                  </div>
+                )}
+                {activityViewSettings.fieldConfig.logType && (
+                  <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <span className="text-xs text-indigo-600 block mb-1">نوع لاگ</span>
+                    <div className="flex items-center gap-2">
+                      <Folder className="h-4 w-4 text-indigo-500" />
+                      <span className="font-bold text-indigo-900">{selectedLog.logType || '-'}</span>
+                    </div>
+                  </div>
+                )}
+                {activityViewSettings.fieldConfig.ipAddress && selectedLog.ipAddress && (
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <span className="text-xs text-blue-600 block mb-1">آی پی کاربر</span>
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-blue-500" />
+                      <span className="font-bold text-blue-900">{selectedLog.ipAddress}</span>
+                    </div>
+                  </div>
+                )}
+                {/* نمایش فیلدهای اضافی فقط وقتی "سایر" فعال است */}
+                {activityViewSettings.fieldConfig.otherDetails && selectedLog.product && (
+                  <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <span className="text-xs text-indigo-600 block mb-1">کالا / محصول</span>
+                    <div className="flex items-center gap-2">
+                      <Folder className="h-4 w-4 text-indigo-500" />
+                      <span className="font-bold text-indigo-900">{selectedLog.product}</span>
+                    </div>
+                  </div>
+                )}
+                {activityViewSettings.fieldConfig.otherDetails && selectedLog.amount && (
+                  <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                    <span className="text-xs text-green-600 block mb-1">مقدار تراکنش</span>
+                    <div className="flex items-center gap-2 text-lg">
+                      <TrendingUp className="h-5 w-5 text-green-500" />
+                      <span className="font-black text-green-900">
+                        {typeof selectedLog.amount === 'string' 
+                          ? selectedLog.amount 
+                          : typeof selectedLog.amount === 'number' 
+                            ? formatPersianNumber(selectedLog.amount) 
+                            : String(selectedLog.amount)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {activityViewSettings.fieldConfig.otherDetails && selectedLog.receiptDate && (
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <span className="text-xs text-blue-600 block mb-1">تاریخ رسید</span>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-500" />
+                      <span className="font-bold text-blue-900">{formatPersianDate(new Date(selectedLog.receiptDate))}</span>
+                    </div>
+                  </div>
+                )}
+                {activityViewSettings.fieldConfig.otherDetails && selectedLog.documentType && (
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <span className="text-xs text-purple-600 block mb-1">نوع سند</span>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-purple-500" />
+                      <span className="font-bold text-purple-900">{selectedLog.documentType}</span>
+                    </div>
+                  </div>
+                )}
+                {activityViewSettings.fieldConfig.otherDetails && selectedLog.counterparty && (
+                  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <span className="text-xs text-orange-600 block mb-1">طرف حساب</span>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-orange-500" />
+                      <span className="font-bold text-orange-900">{selectedLog.counterparty}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
@@ -2291,12 +3594,26 @@ export const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                 </p>
               </div>
 
-              {selectedLog.details && (
+              {activityViewSettings.fieldConfig.otherDetails && selectedLog.details && (
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <span className="text-xs text-gray-600 block mb-2 font-medium">سایر اطلاعات تراکنش</span>
+                  <div className="space-y-2">
+                    {Object.entries(selectedLog.details).map(([key, value]) => (
+                      <div key={key} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="font-medium text-gray-700 text-sm mb-1">{key}:</div>
+                        <div className="text-gray-600 text-sm">
+                          {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {selectedLog.details && !activityViewSettings.fieldConfig.otherDetails && (
                 <div className="bg-gray-900 p-4 rounded-xl border border-gray-700">
-                  <span className="text-xs text-gray-400 block mb-2 font-mono">EXTRA DATA (JSON)</span>
-                  <pre className="text-xs text-blue-300 overflow-x-auto font-mono ltr text-left">
-                    {JSON.stringify(selectedLog.details, null, 2)}
-                  </pre>
+                  <span className="text-xs text-gray-400 block mb-2 font-mono">EXTRA DATA (JSON) - غیرفعال</span>
+                  <p className="text-xs text-gray-500">برای نمایش این اطلاعات، گزینه "سایر" را در تنظیمات فعال کنید.</p>
                 </div>
               )}
             </div>

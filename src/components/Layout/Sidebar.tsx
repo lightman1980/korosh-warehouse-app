@@ -45,7 +45,6 @@ const menuItems = [
   { id: 'analytics', name: 'تحلیل و بررسی', icon: BarChart3, permissionModuleId: 'analytics' },
   { id: 'speech-to-text', name: 'امکانات ویژه', icon: Mic, permissionModuleId: 'speech-to-text' },
   { id: 'messaging', name: 'مکاتبات', icon: Users, permissionModuleId: 'correspondence' },
-  { id: 'users', name: 'مدیریت کاربران', icon: Users, permissionModuleId: 'user_management' },
   { id: 'settings', name: 'تنظیمات', icon: Settings, permissionModuleId: 'settings' },
 ];
 

@@ -4,6 +4,7 @@ import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
 import { Building2, Truck } from 'lucide-react';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // کامپوننت Tooltip برای راهنمایی فیلدهای محاسباتی
 const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
@@ -2011,7 +2012,11 @@ export const WarehouseReceiptManager: React.FC = () => {
     dispatchWastageTransactions({ type: 'SET_TRANSACTIONS', payload: savedWastageTransactions });
     
     // Load settings for automatic loss
-    const savedSettings = (storage.loadData('settings') || {}) as any;
+    // بارگذاری تنظیمات از appSettings (کلید اصلی) یا settings (برای سازگاری)
+    const appSettings = (storage.loadData('appSettings') || {}) as any;
+    const settingsBackup = (storage.loadData('settings') || {}) as any;
+    const savedSettings = appSettings || settingsBackup;
+    
     const automaticLoss = savedSettings.performance?.automaticLoss !== undefined 
       ? savedSettings.performance.automaticLoss 
       : (savedSettings.userManagement?.automaticLoss !== undefined 
@@ -2020,11 +2025,50 @@ export const WarehouseReceiptManager: React.FC = () => {
     setAutomaticLossEnabled(automaticLoss);
 
     const perfSettings = savedSettings.performance || {};
-    setEnforceReceiptExtraInfo({
-      consignment: perfSettings.enforceReceiptExtraInfo?.consignment || false,
-      owned: perfSettings.enforceReceiptExtraInfo?.owned || false
+    const enforceConsignment = perfSettings.requireReceiptExtraInfo?.consignment || false;
+    const enforceOwned = perfSettings.requireReceiptExtraInfo?.owned || false;
+    
+    console.log('🔍 تنظیمات بارگذاری شد:', {
+      enforceConsignment,
+      enforceOwned,
+      perfSettings: perfSettings.requireReceiptExtraInfo
     });
-  }, [loadBaseData, loadContracts, loadDeliveries]);
+    setEnforceReceiptExtraInfo({
+      consignment: enforceConsignment,
+      owned: enforceOwned
+    });
+    // اگر تنظیم غیرفعال است، چک‌باکس اطلاعات تکمیلی را غیرفعال و غیرچک کن
+    // اگر تنظیم فعال است، چک‌باکس را فعال و چک کن (اجباری)
+    if (currentUserType === 'consignment') {
+      if (!enforceConsignment) {
+        setShowReceiptExtraInfo(false);
+      } else {
+        setShowReceiptExtraInfo(true);
+      }
+    } else if (currentUserType === 'owned') {
+      if (!enforceOwned) {
+        setShowReceiptExtraInfo(false);
+      } else {
+        setShowReceiptExtraInfo(true);
+      }
+    }
+  }, [loadBaseData, loadContracts, loadDeliveries, currentUserType]);
+
+  // اضافه کردن Enter برای ذخیره و Esc برای انصراف
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (!isSaving && (isAddingNew || editingReceipt)) {
+        handleSave();
+      }
+    },
+    onEscape: () => {
+      // اگر در حالت ویرایش یا افزودن هستیم، فرم را ببند
+      if (isAddingNew || editingReceipt) {
+        handleCancel();
+      }
+    },
+    enabled: isAddingNew || !!editingReceipt
+  });
   
   useEffect(() => {
     if (receipts.length > 0) {
@@ -2572,6 +2616,25 @@ export const WarehouseReceiptManager: React.FC = () => {
     try {
       console.log("?? شروع ذخيره‌سازي رسيد...");
       
+      // بارگذاری مجدد تنظیمات برای اطمینان از به‌روز بودن
+      // استفاده از appSettings (کلید اصلی) یا settings (برای سازگاری)
+      const appSettings = (storage.loadData('appSettings') || {}) as any;
+      const settingsBackup = (storage.loadData('settings') || {}) as any;
+      const savedSettings = appSettings || settingsBackup;
+      const perfSettings = savedSettings.performance || {};
+      const enforceConsignment = perfSettings.requireReceiptExtraInfo?.consignment || false;
+      const enforceOwned = perfSettings.requireReceiptExtraInfo?.owned || false;
+      setEnforceReceiptExtraInfo({
+        consignment: enforceConsignment,
+        owned: enforceOwned
+      });
+      
+      console.log('🔍 تنظیمات در handleSave بارگذاری شد:', {
+        enforceConsignment,
+        enforceOwned,
+        perfSettings: perfSettings.requireReceiptExtraInfo
+      });
+      
       loadBaseData(false).catch(error => {
         console.error("? خطا در بارگذاري اطلاعات پايه:", error);
       });
@@ -2622,9 +2685,20 @@ export const WarehouseReceiptManager: React.FC = () => {
       }
 
     // اعتبارسنجی اطلاعات تکمیلی در صورت اجبار
-    const mustFillExtra = (currentUserType === 'consignment' && enforceReceiptExtraInfo.consignment) 
-      || (currentUserType === 'owned' && enforceReceiptExtraInfo.owned);
-    if (mustFillExtra || showReceiptExtraInfo) {
+    // استفاده از newReceipt.userType به جای currentUserType برای اطمینان از صحت
+    const userType = newReceipt.userType || currentUserType;
+    const mustFillExtra = (userType === 'consignment' && enforceReceiptExtraInfo.consignment) 
+      || (userType === 'owned' && enforceReceiptExtraInfo.owned);
+    
+    console.log('🔍 بررسی اعتبارسنجی اطلاعات تکمیلی:', {
+      userType,
+      enforceReceiptExtraInfo,
+      mustFillExtra,
+      receiptExtraInfo
+    });
+    
+    // اگر تنظیم اجباری فعال است، باید اطلاعات تکمیلی کامل باشد
+    if (mustFillExtra) {
       const requiredFields: (keyof ReceiptAdditionalInfo)[] = [
         'driverFirstName', 'driverLastName', 'driverNationalId', 'billOfLadingNumber',
         'plateNumber', 'weight', 'billAmount', 'origin', 'billDate', 'transportCompany',
@@ -2638,12 +2712,17 @@ export const WarehouseReceiptManager: React.FC = () => {
         }
       });
       setReceiptExtraInfoErrors(extraErrors);
-      if (mustFillExtra && Object.keys(extraErrors).length > 0) {
+      if (Object.keys(extraErrors).length > 0) {
+        console.log('❌ خطا: اطلاعات تکمیلی ناقص است:', extraErrors);
         alert('لطفاً اطلاعات تکمیلی رسید را کامل کنید');
         setIsSaving(false);
         return;
       }
+      console.log('✅ اطلاعات تکمیلی کامل است');
+    } else {
+      console.log('ℹ️ اطلاعات تکمیلی اجباری نیست');
     }
+    // اگر تنظیم اجباری غیرفعال است، امکان ذخیره بدون اطلاعات تکمیلی وجود دارد
       
       // بررسي تکميل بودن "مقدار مبناي رسيد"
       if (!newReceipt.receiptBasisAmount || newReceipt.receiptBasisAmount <= 0) {
@@ -5380,8 +5459,14 @@ dispatchWastageTransactions({
                       <input
                         type="checkbox"
                         className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                        checked={showReceiptExtraInfo || enforceReceiptExtraInfo[currentUserType === 'consignment' ? 'consignment' : 'owned']}
-                        onChange={(e) => setShowReceiptExtraInfo(e.target.checked)}
+                        checked={enforceReceiptExtraInfo[currentUserType === 'consignment' ? 'consignment' : 'owned'] ? true : showReceiptExtraInfo}
+                        onChange={(e) => {
+                          // فقط اگر تنظیم غیرفعال است، اجازه تغییر بده
+                          // اگر تنظیم فعال است، چک‌باکس اجباری است و نمی‌تواند تغییر کند
+                          if (!enforceReceiptExtraInfo[currentUserType === 'consignment' ? 'consignment' : 'owned']) {
+                            setShowReceiptExtraInfo(e.target.checked);
+                          }
+                        }}
                         disabled={enforceReceiptExtraInfo[currentUserType === 'consignment' ? 'consignment' : 'owned']}
                       />
                       <span>ثبت اطلاعات تکمیلی رسید انبار</span>
@@ -5391,7 +5476,7 @@ dispatchWastageTransactions({
                     </label>
                   </div>
 
-                  {(showReceiptExtraInfo || enforceReceiptExtraInfo[currentUserType === 'consignment' ? 'consignment' : 'owned']) && (
+                  {((showReceiptExtraInfo || enforceReceiptExtraInfo[currentUserType === 'consignment' ? 'consignment' : 'owned'])) && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">نام راننده</label>

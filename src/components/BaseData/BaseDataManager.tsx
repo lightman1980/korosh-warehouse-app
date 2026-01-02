@@ -4,6 +4,7 @@ import { DataStorage } from "../../utils/dataStorage";
 import { formatPersianDate, safeParseDate } from "../../utils/persian";
 import { canCreate, canEdit, canDelete } from "../../utils/permissionHelpers";
 import { logSaveAction, logDeleteAction } from "../../hooks/useActivityLogger";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 
 interface BaseDataItem {
   id: string;
@@ -336,6 +337,21 @@ const BaseDataManager = () => {
   const canCreateItem = canCreate('base_data');
   const canEditItem = canEdit('base_data');
   const canDeleteItem = canDelete('base_data');
+
+  // اضافه کردن Enter برای ذخیره و Esc برای انصراف
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (isAddingNew || editingItem) {
+        handleSave();
+      }
+    },
+    onEscape: () => {
+      if (isAddingNew || editingItem) {
+        handleCancel();
+      }
+    },
+    enabled: isAddingNew || !!editingItem
+  });
 
   // تابع برای بازنشانی داده‌ها به حالت اولیه
   const resetToInitialData = () => {

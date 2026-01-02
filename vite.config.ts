@@ -38,5 +38,9 @@ export default defineConfig({
     minify: 'esbuild',
     // اضافه کردن sourcemap برای debugging
     sourcemap: false,
+    // کپی کردن فایل‌های public به dist (شامل .htaccess)
+    copyPublicDir: true,
   },
+  // Vite به صورت خودکار فایل‌های public را کپی می‌کند
+  publicDir: 'public',
 });

@@ -3,6 +3,7 @@ import { Plus, Search, Edit2, Trash2, Save, X, AlertCircle, Users, Shield, Eye, 
 import { formatPersianDate, formatPersianDateTime } from '../../utils/persian';
 import { useModuleChangeLogger, logSaveAction, logDeleteAction, logCreateAction } from "../../hooks/useActivityLogger";
 import { DataStorage } from '../../utils/dataStorage';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 interface User {
   id: string;
@@ -342,6 +343,21 @@ export const UserManagementManager: React.FC = () => {
     }));
   };
 
+  // Add keyboard shortcuts: Enter to save, Esc to cancel
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (isAddingNew || editingUser) {
+        handleSave();
+      }
+    },
+    onEscape: () => {
+      if (isAddingNew || editingUser) {
+        handleCancel();
+      }
+    },
+    enabled: isAddingNew || editingUser !== null
+  });
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -605,101 +621,107 @@ export const UserManagementManager: React.FC = () => {
           )}
 
           {/* Users Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    کاربر
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    دپارتمان
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    نقش
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    آخرین ورود
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    وضعیت
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    عملیات
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user, index) => (
-                  <tr key={user.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                            <Users className="h-5 w-5 text-white" />
+          <div className="overflow-x-auto max-w-full w-full">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '200px', maxWidth: '250px' }}>
+                        کاربر
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px', maxWidth: '150px' }}>
+                        دپارتمان
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '80px', maxWidth: '100px' }}>
+                        نقش
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px', maxWidth: '180px' }}>
+                        آخرین ورود
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '80px', maxWidth: '100px' }}>
+                        وضعیت
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px', maxWidth: '200px' }}>
+                        عملیات
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredUsers.map((user, index) => (
+                      <tr key={user.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
+                                <Users className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
+                            <div className="mr-4 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate" style={{ maxWidth: '180px' }}>{user.fullName}</div>
+                              <div className="text-sm text-gray-500 truncate" style={{ maxWidth: '180px' }}>{user.username}</div>
+                              <div className="text-xs text-gray-400 truncate" style={{ maxWidth: '180px' }}>{user.email}</div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="mr-4">
-                          <div className="text-sm font-medium text-gray-900">{user.fullName}</div>
-                          <div className="text-sm text-gray-500">{user.username}</div>
-                          <div className="text-xs text-gray-400">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{user.departmentName}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {user.role === 'admin' ? 'مدیر' : 'کاربر'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {user.lastLogin ? formatPersianDateTime(user.lastLogin) : 'هرگز'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleToggleActive(user.id)}
-                        disabled={user.role === 'admin'}
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        } ${user.role === 'admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}`}
-                      >
-                        {user.isActive ? 'فعال' : 'غیرفعال'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(user.id)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        {user.role !== 'admin' && (
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-900 truncate block" style={{ maxWidth: '120px' }}>{user.departmentName}</span>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {user.role === 'admin' ? 'مدیر' : 'کاربر'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900 truncate" style={{ maxWidth: '150px' }}>
+                            {user.lastLogin ? formatPersianDateTime(user.lastLogin) : 'هرگز'}
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap">
                           <button
-                            onClick={() => handleDelete(user.id)}
-                            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                            onClick={() => handleToggleActive(user.id)}
+                            disabled={user.role === 'admin'}
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.isActive
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            } ${user.role === 'admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {user.isActive ? 'فعال' : 'غیرفعال'}
                           </button>
-                        )}
-                        <div className="text-gray-400" title="سطوح دسترسی">
-                          <Shield className="h-4 w-4" />
-                          <span className="text-xs ml-1">{user.permissions.length}</span>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center gap-2 justify-end">
+                            <button
+                              onClick={() => handleEdit(user.id)}
+                              className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors flex-shrink-0"
+                              title="ویرایش"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            {user.role !== 'admin' && (
+                              <button
+                                onClick={() => handleDelete(user.id)}
+                                className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors flex-shrink-0"
+                                title="حذف"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            <div className="text-gray-400 flex items-center gap-1 flex-shrink-0" title="سطوح دسترسی">
+                              <Shield className="h-4 w-4" />
+                              <span className="text-xs">{user.permissions.length}</span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           {filteredUsers.length === 0 && (

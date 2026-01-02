@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   Users, X, Layers, Plus, UserPlus, Save, Eye, EyeOff, 
   Edit2, Trash2, AlertTriangle, CheckCircle, Search, 
@@ -8,7 +8,7 @@ import {
   BarChart3, Mail, HardDrive, LogOut, LogIn,
   MoreHorizontal, ChevronDown, ChevronRight, ExternalLink, Upload,
   ArrowUpDown, AlertCircle, TrendingUp, TrendingDown, UserCheck, UserX,
-  Grid, FileCheck, Monitor
+  Grid, FileCheck, Monitor, Image, FileSpreadsheet
 } from 'lucide-react';
 import { DataStorage } from '../../utils/dataStorage';
 import jalaali from 'jalaali-js';
@@ -16,6 +16,30 @@ import { exportToExcel } from '../../utils/excelExport';
 import { formatPersianDate as utilsFormatPersianDate } from '../../utils/persian';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import '../style/theme-support.css';
+
+// Load XLSX library - use global window.XLSX after CDN script loads
+const loadXLSX = async (): Promise<any> => {
+  // Check if already loaded in window
+  if ((window as any).XLSX) {
+    return (window as any).XLSX;
+  }
+  
+  // Wait for the script to be loaded
+  return new Promise((resolve, reject) => {
+    const checkInterval = setInterval(() => {
+      if ((window as any).XLSX) {
+        clearInterval(checkInterval);
+        resolve((window as any).XLSX);
+      }
+    }, 100);
+    
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      reject(new Error('XLSX library failed to load'));
+    }, 10000);
+  });
+};
 
 type PermissionAction = 'create' | 'edit' | 'view' | 'delete';
 
@@ -68,12 +92,14 @@ interface UserProfile {
   username: string;
   password: string;
   fullName: string;
+  personnelNumber?: string;
   email: string;
   phone?: string;
   departmentId?: string;
   departmentName?: string;
   role: 'admin' | 'user' | 'manager' | 'operator';
   avatar?: string;
+  avatarFile?: File;
   isActive: boolean;
   isEmailVerified: boolean;
   lastLogin?: string;
@@ -304,17 +330,40 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     severity: 'all'
   });
 
+  // Load XLSX library from CDN
+  useEffect(() => {
+    const scriptId = 'xlsx-library-script';
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('XLSX library loaded from CDN');
+      };
+      script.onerror = () => {
+        console.error('Failed to load XLSX library from CDN');
+      };
+      document.head.appendChild(script);
+    } else {
+      console.log('XLSX library script already exists');
+    }
+  }, []);
+
   // User form state
   const [userForm, setUserForm] = useState<UserProfile>({
     id: '',
     username: '',
     password: '',
     fullName: '',
+    personnelNumber: '',
     email: '',
     phone: '',
     departmentId: '',
     departmentName: '',
     role: 'user',
+    avatar: '',
+    avatarFile: undefined,
     isActive: true,
     isEmailVerified: false,
     failedLoginAttempts: 0,
@@ -322,6 +371,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     updatedAt: '',
     permissions: []
   });
+
+  // Local state for avatar preview (only for current form)
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [avatarFile, setAvatarFile] = useState<File | undefined>(undefined);
 
   // Group form state
   const [groupForm, setGroupForm] = useState<UserGroup>({
@@ -338,6 +391,16 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
   // Form validation
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  
+  // Profile photo state - per user
+  // We'll store avatar data in userForm directly, not in global state
+  
+  // Template loading state
+  const [showTemplateUpload, setShowTemplateUpload] = useState(false);
+  const [templateType, setTemplateType] = useState<'users' | 'groups'>('users');
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const templateJustLoadedRef = useRef(false);
+  const initializationRanRef = useRef(false);
 
   // Load data
   const userManagement = settings?.userManagement || {};
@@ -351,6 +414,9 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
   // State برای force refresh لیست کاربران
   const [usersRefreshKey, setUsersRefreshKey] = useState(0);
   
+  // State برای force refresh لیست گروه‌ها
+  const [groupsRefreshKey, setGroupsRefreshKey] = useState(0);
+  
   const availableUsers = useMemo(() => {
     const users = storage.loadData<UserProfile[]>('users') || [];
     return Array.isArray(users) ? users : [];
@@ -363,7 +429,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       permissions: ensureModulePermissions(permissionCatalog, group.permissions),
       members: userManagement.userAccess?.filter((u: UserAccessEntry) => u.groups.includes(group.id)).length || 0
     }));
-  }, [userManagement.userGroups, userManagement.userAccess, permissionCatalog]);
+  }, [userManagement.userGroups, userManagement.userAccess, permissionCatalog, groupsRefreshKey]);
 
   const normalizedUserAccess: UserAccessEntry[] = useMemo(() => {
     const entries: UserAccessEntry[] = userManagement.userAccess || [];
@@ -412,6 +478,869 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       }
     }, [userManagement.logRetentionDays]);
 
+
+  // Initialize predefined users and groups
+  useEffect(() => {
+    // Check if we need to initialize
+    const expectedUserCount = 29; // 0-28
+    const expectedGroupCount = 13; // 13 predefined groups
+    const currentUserCount = availableUsers.length;
+    const currentGroupCount = (userManagement.userGroups || []).length;
+    
+    const needsUserInit = currentUserCount < expectedUserCount;
+    const needsGroupInit = currentGroupCount < expectedGroupCount;
+    const shouldInitialize = needsUserInit || needsGroupInit;
+    
+    if (!shouldInitialize) {
+      return;
+    }
+    
+    // Check if initialization is in progress to prevent multiple simultaneous initializations
+    const initInProgress = storage.loadData('usersInitInProgress');
+    if (initInProgress) {
+      console.log('⏳ User initialization already in progress, skipping...');
+      return;
+    }
+    
+    console.log('🔄 Initializing predefined users and groups...', {
+      currentUserCount,
+      expectedUserCount,
+      currentGroupCount,
+      expectedGroupCount
+    });
+    
+    // Mark initialization as in progress
+    storage.saveData('usersInitInProgress', true);
+    
+    const now = new Date().toISOString();
+    
+    // Define predefined users
+    const predefinedUsers: UserProfile[] = [
+      {
+        id: '0',
+        username: 'admin',
+        password: 'admin123',
+        fullName: 'مدیر سیستم',
+        personnelNumber: '0',
+        email: 'admin@system.local',
+        phone: '',
+        role: 'admin',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '1',
+        username: 'm.barhani',
+        password: 'user123',
+        fullName: 'آقای محمد برهانی',
+        personnelNumber: '1',
+        email: 'm.barhani@system.local',
+        phone: '',
+        role: 'manager',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '2',
+        username: 'r.khodadadi',
+        password: 'user123',
+        fullName: 'آقای رضا خدادادی',
+        personnelNumber: '2',
+        email: 'r.khodadadi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '3',
+        username: 'm.karimi',
+        password: 'user123',
+        fullName: 'آقای مشهدی کریمی',
+        personnelNumber: '3',
+        email: 'm.karimi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '4',
+        username: 'n.ghodsi',
+        password: 'user123',
+        fullName: 'آقای نوید قدسی',
+        personnelNumber: '4',
+        email: 'n.ghodsi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '5',
+        username: 'a.pezeshki',
+        password: 'user123',
+        fullName: 'آقای امیر حسین پزشکی',
+        personnelNumber: '5',
+        email: 'a.pezeshki@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '6',
+        username: 'a.aghili',
+        password: 'user123',
+        fullName: 'سرکار خانم عقیلی',
+        personnelNumber: '6',
+        email: 'a.aghili@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '7',
+        username: 'v.arjmand',
+        password: 'user123',
+        fullName: 'آقای وحید ارجمند',
+        personnelNumber: '7',
+        email: 'v.arjmand@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '8',
+        username: 'h.yari',
+        password: 'user123',
+        fullName: 'آقای حمید یاری',
+        personnelNumber: '8',
+        email: 'h.yari@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '9',
+        username: 'm.jafari',
+        password: 'user123',
+        fullName: 'آقای محمد جعفری',
+        personnelNumber: '9',
+        email: 'm.jafari@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '10',
+        username: 't.karami',
+        password: 'user123',
+        fullName: 'آقای طاهر کرمی',
+        personnelNumber: '10',
+        email: 't.karami@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '11',
+        username: 'a.mansouri',
+        password: 'user123',
+        fullName: 'آقای علیرضا منصوری',
+        personnelNumber: '11',
+        email: 'a.mansouri@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '12',
+        username: 'r.feshkhorani',
+        password: 'user123',
+        fullName: 'آقای روح الله فشخورانی',
+        personnelNumber: '12',
+        email: 'r.feshkhorani@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '13',
+        username: 's.habibi',
+        password: 'user123',
+        fullName: 'آقای سعید حبیبی',
+        personnelNumber: '13',
+        email: 's.habibi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '14',
+        username: 'z.mehnipour',
+        password: 'user123',
+        fullName: 'سرکار خانم زهرا مهنی پور',
+        personnelNumber: '14',
+        email: 'z.mehnipour@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '15',
+        username: 'm.safdel',
+        password: 'user123',
+        fullName: 'آقای مرتضی صاف دل',
+        personnelNumber: '15',
+        email: 'm.safdel@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '16',
+        username: 'm.masoudi',
+        password: 'user123',
+        fullName: 'آقای میثم مسعودی',
+        personnelNumber: '16',
+        email: 'm.masoudi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '17',
+        username: 'm.mousavi',
+        password: 'user123',
+        fullName: 'آقای محسن موسوی',
+        personnelNumber: '17',
+        email: 'm.mousavi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '18',
+        username: 'm.saeidifard',
+        password: 'user123',
+        fullName: 'آقای مرتضی سعیدی فرد',
+        personnelNumber: '18',
+        email: 'm.saeidifard@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '19',
+        username: 'm.javahirizadeh',
+        password: 'user123',
+        fullName: 'محمد جواهری زاده',
+        personnelNumber: '19',
+        email: 'm.javahirizadeh@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '20',
+        username: 'm.ghandi',
+        password: 'user123',
+        fullName: 'آقای محسن قندی',
+        personnelNumber: '20',
+        email: 'm.ghandi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '21',
+        username: 'a.solimanizadeh',
+        password: 'user123',
+        fullName: 'سرکار خانم آیدا سلیمان زاده',
+        personnelNumber: '21',
+        email: 'a.solimanizadeh@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '22',
+        username: 'sh.miralai',
+        password: 'user123',
+        fullName: 'سرکار خانم شهرزاد میرعلایی',
+        personnelNumber: '22',
+        email: 'sh.miralai@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '23',
+        username: 'h.ghiyourfar',
+        password: 'user123',
+        fullName: 'آقای حسین غیور فر',
+        personnelNumber: '23',
+        email: 'h.ghiyourfar@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '24',
+        username: 'o.salehi',
+        password: 'user123',
+        fullName: 'آقای امید صالحی',
+        personnelNumber: '24',
+        email: 'o.salehi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '25',
+        username: 'm.jalavand',
+        password: 'user123',
+        fullName: 'آقای محمد جلال وند',
+        personnelNumber: '25',
+        email: 'm.jalavand@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '26',
+        username: 'm.torabi',
+        password: 'user123',
+        fullName: 'سرکار خانم مهسا ترابی',
+        personnelNumber: '26',
+        email: 'm.torabi@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '27',
+        username: 'sh.jafari',
+        password: 'user123',
+        fullName: 'سرکار خانم شیدا جعفری',
+        personnelNumber: '27',
+        email: 'sh.jafari@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      },
+      {
+        id: '28',
+        username: 'support',
+        password: 'support123',
+        fullName: 'کاربر پشتیبان',
+        personnelNumber: '28',
+        email: 'support@system.local',
+        phone: '',
+        role: 'user',
+        isActive: true,
+        isEmailVerified: true,
+        failedLoginAttempts: 0,
+        createdAt: now,
+        updatedAt: now,
+        permissions: []
+      }
+    ];
+    
+    // Define predefined groups
+    const predefinedGroups: UserGroup[] = [
+      {
+        id: 'group-1',
+        name: 'گروه مدیر سیستم',
+        description: 'گروه مدیر سیستم',
+        color: GROUP_COLORS[0],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-2',
+        name: 'گروه مخازن انزلی',
+        description: 'گروه مخازن انزلی',
+        color: GROUP_COLORS[1],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-3',
+        name: 'گروه برنامه ریزی مخازن',
+        description: 'گروه برنامه ریزی مخازن',
+        color: GROUP_COLORS[2],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-4',
+        name: 'گروه برنامه ریزی/لجستیک',
+        description: 'گروه برنامه ریزی/لجستیک',
+        color: GROUP_COLORS[3],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-5',
+        name: 'گروه مالی',
+        description: 'گروه مالی',
+        color: GROUP_COLORS[4],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-6',
+        name: 'گروه مدیریت عامل',
+        description: 'گروه مدیریت عامل',
+        color: GROUP_COLORS[5],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-7',
+        name: 'گروه کنترل کیفیت',
+        description: 'گروه کنترل کیفیت',
+        color: GROUP_COLORS[6],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-8',
+        name: 'گروه کارخانه تاکستان',
+        description: 'گروه کارخانه تاکستان',
+        color: GROUP_COLORS[7],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-9',
+        name: 'گروه کارخانه اشتهارد',
+        description: 'گروه کارخانه اشتهارد',
+        color: GROUP_COLORS[0],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-10',
+        name: 'گروه ای آر پی',
+        description: 'گروه ای آر پی',
+        color: GROUP_COLORS[1],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-11',
+        name: 'گروه بی آی',
+        description: 'گروه بی آی',
+        color: GROUP_COLORS[2],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-12',
+        name: 'گروه بازرگانی',
+        description: 'گروه بازرگانی',
+        color: GROUP_COLORS[3],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      },
+      {
+        id: 'group-13',
+        name: 'گروه منابع انسانی',
+        description: 'گروه منابع انسانی',
+        color: GROUP_COLORS[4],
+        permissions: ensureModulePermissions(permissionCatalog),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        members: 0
+      }
+    ];
+    
+    // Define user access (mapping users to groups)
+    // Each user should appear only once with all their groups
+    const userGroupMap: Record<string, string[]> = {
+      '0': ['group-1', 'group-2', 'group-3', 'group-4', 'group-5', 'group-6', 'group-7', 'group-8', 'group-9', 'group-10', 'group-11', 'group-12', 'group-13'], // مدیر سیستم - عضو همه گروه‌ها
+      '1': ['group-6'], // محمد برهانی - گروه مدیریت عامل
+      '2': ['group-5'], // رضا خدادادی - گروه مالی
+      '3': ['group-5'], // مشهدی کریمی - گروه مالی
+      '4': ['group-2'], // نوید قدسی - گروه مخازن انزلی
+      '5': ['group-2'], // امیر حسین پزشکی - گروه مخازن انزلی
+      '6': ['group-5'], // سرکار خانم عقیلی - گروه مالی
+      '7': ['group-5'], // وحید ارجمند - گروه مالی
+      '8': ['group-3'], // حمید یاری - گروه برنامه ریزی مخازن
+      '9': ['group-4'], // محمد جعفری - گروه برنامه ریزی/لجستیک
+      '10': ['group-7'], // طاهر کرمی - گروه کنترل کیفیت
+      '11': ['group-8'], // علیرضا منصوری - گروه کارخانه تاکستان
+      '12': ['group-9'], // روح الله فشخورانی - گروه کارخانه اشتهارد
+      '13': ['group-8'], // سعید حبیبی - گروه کارخانه تاکستان
+      '14': ['group-9'], // زهرا مهنی پور - گروه کارخانه اشتهارد
+      '15': ['group-4'], // مرتضی صاف دل - گروه برنامه ریزی/لجستیک
+      '16': ['group-4'], // میثم مسعودی - گروه برنامه ریزی/لجستیک
+      '17': ['group-10'], // محسن موسوی - گروه ای آر پی
+      '18': ['group-10'], // مرتضی سعیدی فرد - گروه ای آر پی
+      '19': ['group-11'], // محمد جواهری زاده - گروه بی آی
+      '20': ['group-6'], // محسن قندی - گروه مدیریت عامل
+      '21': ['group-7'], // آیدا سلیمان زاده - گروه کنترل کیفیت
+      '22': ['group-4'], // شهرزاد میرعلایی - گروه برنامه ریزی/لجستیک
+      '23': ['group-12'], // حسین غیور فر - گروه بازرگانی
+      '24': ['group-9'], // امید صالحی - گروه کارخانه اشتهارد
+      '25': ['group-8'], // محمد جلال وند - گروه کارخانه تاکستان
+      '26': ['group-12'], // مهسا ترابی - گروه بازرگانی
+      '27': ['group-13'], // شیدا جعفری - گروه منابع انسانی
+      '28': ['group-1', 'group-2', 'group-3', 'group-4', 'group-5', 'group-6', 'group-7', 'group-8', 'group-9', 'group-10', 'group-11', 'group-12', 'group-13'] // کاربر پشتیبان - عضو همه گروه‌ها
+    };
+    
+    const predefinedUserAccess: UserAccessEntry[] = predefinedUsers.map(user => {
+      const userGroups = userGroupMap[user.id] || [];
+      return {
+        userId: user.id,
+        username: user.username,
+        displayName: user.fullName,
+        groups: userGroups,
+        overrides: ensureOverrides(permissionCatalog)
+      };
+    });
+    
+    // Merge existing users with predefined users (keep existing, add missing)
+    if (needsUserInit && !templateJustLoadedRef.current) {
+      const existingUserIds = new Set(availableUsers.map(u => u.id));
+      const missingUsers = predefinedUsers.filter(u => !existingUserIds.has(u.id));
+      
+      if (missingUsers.length > 0) {
+        const mergedUsers = [...availableUsers, ...missingUsers];
+        storage.saveData('users', mergedUsers);
+        console.log(`✅ Added ${missingUsers.length} missing users. Total: ${mergedUsers.length}`);
+        setUsersRefreshKey(prev => prev + 1);
+      }
+    }
+    
+    // Initialize or update groups and user access in settings
+    if (needsGroupInit && !templateJustLoadedRef.current) {
+      const existingGroups = userManagement.userGroups || [];
+      const existingGroupIds = new Set(existingGroups.map((g: UserGroup) => g.id));
+      const missingGroups = predefinedGroups.filter(g => !existingGroupIds.has(g.id));
+      
+      let finalGroups = existingGroups;
+      let finalUserAccess = userManagement.userAccess || [];
+      
+      if (missingGroups.length > 0) {
+        finalGroups = [...existingGroups, ...missingGroups];
+        console.log(`✅ Added ${missingGroups.length} missing groups. Total: ${finalGroups.length}`);
+      }
+      
+      // Update user access - merge existing with predefined
+      const existingAccessIds = new Set(finalUserAccess.map((a: UserAccessEntry) => a.userId));
+      const missingAccess = predefinedUserAccess.filter(a => !existingAccessIds.has(a.userId));
+      
+      if (missingAccess.length > 0) {
+        finalUserAccess = [...finalUserAccess, ...missingAccess];
+        console.log(`✅ Added ${missingAccess.length} missing user access entries. Total: ${finalUserAccess.length}`);
+      }
+      
+      // Update all user access entries to ensure they have correct groups
+      const updatedAccess = finalUserAccess.map((entry: UserAccessEntry) => {
+        const predefinedEntry = predefinedUserAccess.find(e => e.userId === entry.userId);
+        if (predefinedEntry) {
+          // Merge groups - keep existing groups, add predefined groups
+          const mergedGroups = Array.from(new Set([...entry.groups, ...predefinedEntry.groups]));
+          return {
+            ...entry,
+            groups: mergedGroups,
+            displayName: predefinedEntry.displayName || entry.displayName
+          };
+        }
+        return entry;
+      });
+      
+      updateUserManagement({
+        userGroups: finalGroups,
+        userAccess: updatedAccess
+      });
+      
+      console.log('✅ User management initialized successfully');
+      initializationRanRef.current = true;
+    }
+    
+    // Clear initialization flag only if initialization actually ran
+    // If template was loading, the flag was set before and should not be reset here
+    if (initializationRanRef.current) {
+      setTimeout(() => {
+        storage.saveData('usersInitInProgress', false);
+        initializationRanRef.current = false;
+      }, 1000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableUsers.length, userManagement.userGroups?.length]);
+
+  // Remove unwanted users and groups
+  useEffect(() => {
+    const unwantedUserNames = ['مدیر انبار', 'کاربر انبار', 'اپراتور سیستم', 'مدیر کل سیستم'];
+    const unwantedGroupNames = ['گروه انبار'];
+    
+    let usersChanged = false;
+    let groupsChanged = false;
+    
+    // Remove unwanted users
+    const filteredUsers = availableUsers.filter(user => {
+      const shouldRemove = unwantedUserNames.some(name => 
+        user.fullName.includes(name) || user.username.toLowerCase().includes(name.toLowerCase().replace(/\s/g, ''))
+      );
+      if (shouldRemove) {
+        usersChanged = true;
+        console.log(`🗑️ Removing user: ${user.fullName}`);
+      }
+      return !shouldRemove;
+    });
+    
+    if (usersChanged && filteredUsers.length !== availableUsers.length) {
+      storage.saveData('users', filteredUsers);
+      setUsersRefreshKey(prev => prev + 1);
+      console.log(`✅ Removed ${availableUsers.length - filteredUsers.length} unwanted users`);
+    }
+    
+    // Remove duplicate groups - keep groups that have members
+    const currentGroups = userManagement.userGroups || [];
+    const userAccess = userManagement.userAccess || [];
+    let groupToRemove: string[] = [];
+    
+    // Count users for each group
+    const getGroupMemberCount = (groupId: string): number => {
+      return userAccess.filter((entry: UserAccessEntry) => 
+        entry.groups.includes(groupId)
+      ).length;
+    };
+    
+    // Find duplicate financial groups and keep the one with members
+    const financialGroups = currentGroups.filter((g: UserGroup) => 
+      g.name === 'گروه مالی' && g.id !== 'group-5'
+    );
+    
+    // Remove duplicate financial groups (keep group-5 which is the main one)
+    financialGroups.forEach((group: UserGroup) => {
+      const memberCount = getGroupMemberCount(group.id);
+      if (memberCount === 0) {
+        groupToRemove.push(group.id);
+        groupsChanged = true;
+        console.log(`🗑️ Removing duplicate financial group: ${group.name} (Members: ${memberCount})`);
+      }
+    });
+    
+    // Remove groups by name (like "گروه انبار")
+    const filteredGroups = currentGroups.filter((g: UserGroup) => {
+      const shouldRemoveByName = unwantedGroupNames.some(name => g.name.includes(name));
+      if (shouldRemoveByName) {
+        groupsChanged = true;
+        groupToRemove.push(g.id);
+        console.log(`🗑️ Removing group: ${g.name}`);
+      }
+      return !shouldRemoveByName && !groupToRemove.includes(g.id);
+    });
+    
+    // Update user access to remove references to deleted groups
+    if (groupToRemove.length > 0) {
+      const updatedAccess = (userManagement.userAccess || []).map((entry: UserAccessEntry) => ({
+        ...entry,
+        groups: entry.groups.filter((groupId: string) => !groupToRemove.includes(groupId))
+      }));
+      
+      if (groupsChanged) {
+        updateUserManagement({
+          userGroups: filteredGroups,
+          userAccess: updatedAccess
+        });
+        console.log(`✅ Removed ${groupToRemove.length} unwanted groups`);
+      }
+    }
+    
+    // Update user access to remove references to deleted groups
+    if (groupToRemove.length > 0) {
+      const updatedAccess = (userManagement.userAccess || []).map((entry: UserAccessEntry) => ({
+        ...entry,
+        groups: entry.groups.filter((groupId: string) => !groupToRemove.includes(groupId))
+      }));
+      
+      if (groupsChanged) {
+        updateUserManagement({
+          userGroups: filteredGroups,
+          userAccess: updatedAccess
+        });
+        console.log(`✅ Removed unwanted groups`);
+      }
+    }
+  }, [availableUsers, userManagement.userGroups, userManagement.userAccess, storage]);
 
   // Sync availableUsers with normalizedUserAccess - ensure all users have access entries
   useEffect(() => {
@@ -470,6 +1399,570 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     setNotification({ type, message, visible: true });
     setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 4000);
   }
+
+  // Profile photo handling functions - per user
+  const handleAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        showNotification('error', 'فرمت عکس باید JPG، PNG، GIF یا WebP باشد');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification('error', 'حجم عکس نباید بیشتر از ۵ مگابایت باشد');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result as string;
+        setAvatarPreview(base64Data);
+        setAvatarFile(file);
+        setUserForm(prev => ({
+          ...prev,
+          avatarFile: file,
+          avatar: base64Data
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const removeAvatar = useCallback(() => {
+    setAvatarPreview('');
+    setAvatarFile(undefined);
+    setUserForm(prev => ({
+      ...prev,
+      avatar: '',
+      avatarFile: undefined
+    }));
+  }, []);
+
+  // Template functions
+  const createUserTemplate = () => {
+    try {
+      // Export ALL users to Excel
+      const userData = availableUsers.map(user => ({
+        username: user.username,
+        password: user.password,
+        fullName: user.fullName,
+        personnelNumber: user.personnelNumber || '',
+        email: user.email,
+        phone: user.phone || '',
+        departmentId: user.departmentId || '',
+        departmentName: user.departmentName || '',
+        role: user.role,
+        isActive: user.isActive
+      }));
+      
+      exportToExcel({
+        filename: `کاربران_${formatPersianDate(new Date())}`,
+        sheetName: 'کاربران',
+        title: 'لیست کاربران',
+        subtitle: `تاریخ: ${formatPersianDate(new Date())} - تعداد: ${userData.length}`,
+        columns: [
+          { key: 'username', header: 'نام کاربری', width: 20 },
+          { key: 'password', header: 'رمز عبور', width: 15 },
+          { key: 'fullName', header: 'نام کامل', width: 25 },
+          { key: 'personnelNumber', header: 'شماره پرسنلی', width: 15 },
+          { key: 'email', header: 'ایمیل', width: 25 },
+          { key: 'phone', header: 'شماره تماس', width: 15 },
+          { key: 'departmentId', header: 'شناسه دپارتمان', width: 15 },
+          { key: 'departmentName', header: 'نام دپارتمان', width: 20 },
+          { key: 'role', header: 'نقش', width: 15 },
+          { key: 'isActive', header: 'فعال', width: 10 }
+        ],
+        data: userData
+      });
+      
+      showNotification('success', `لیست ${userData.length} کاربر با موفقیت دانلود شد`);
+    } catch (error) {
+      console.error('Template creation error:', error);
+      showNotification('error', 'خطا در ایجاد فایل اکسل');
+    }
+  };
+
+  const createGroupTemplate = () => {
+    try {
+      // Export ALL groups to Excel
+      const groupData = normalizedGroups.map(group => ({
+        name: group.name,
+        description: group.description || '',
+        color: group.color || '',
+        members: group.members,
+        isActive: group.isActive
+      }));
+      
+      exportToExcel({
+        filename: `گروه‌ها_${formatPersianDate(new Date())}`,
+        sheetName: 'گروه‌ها',
+        title: 'لیست گروه‌ها',
+        subtitle: `تاریخ: ${formatPersianDate(new Date())} - تعداد: ${groupData.length}`,
+        columns: [
+          { key: 'name', header: 'نام گروه', width: 25 },
+          { key: 'description', header: 'توضیحات', width: 30 },
+          { key: 'color', header: 'رنگ', width: 40 },
+          { key: 'members', header: 'تعداد اعضا', width: 12 },
+          { key: 'isActive', header: 'فعال', width: 10 }
+        ],
+        data: groupData
+      });
+      
+      showNotification('success', `لیست ${groupData.length} گروه با موفقیت دانلود شد`);
+    } catch (error) {
+      console.error('Template creation error:', error);
+      showNotification('error', 'خطا در ایجاد فایل اکسل');
+    }
+  };
+
+  const loadUserTemplate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoadingTemplate(true);
+    
+    // Set initialization flag BEFORE loading to prevent predefined groups from being added
+    storage.saveData('usersInitInProgress', true);
+    templateJustLoadedRef.current = true;
+    
+    try {
+      // Load XLSX library with retry mechanism
+      let XLSXLib = null;
+      let retries = 0;
+      const maxRetries = 50; // Wait up to 5 seconds (50 * 100ms)
+      
+      while (!XLSXLib && retries < maxRetries) {
+        XLSXLib = (window as any).XLSX;
+        if (!XLSXLib) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retries++;
+        }
+      }
+      
+      if (!XLSXLib) {
+        showNotification('error', 'کتابخانه اکسل در دسترس نیست. لطفاً چند ثانیه صبر کنید و دوباره تلاش کنید');
+        setLoadingTemplate(false);
+        return;
+      }
+      
+      // Read and parse Excel file
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const data = event.target?.result;
+          const workbook = XLSXLib.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          
+          // Read the raw data to get headers from row 1 (which contains both subtitle and headers)
+          const rawData = XLSXLib.utils.sheet_to_json(firstSheet, { 
+            range: 0, 
+            header: 1, 
+            defval: '' 
+          });
+          
+          // Extract headers from the first data row (row 1, index 1)
+          // This row contains: [subtitle, username, password, fullName, ...]
+          const headerRow = rawData[1] || [];
+          console.log('Header row:', headerRow);
+          
+          // Column index mapping (0-based from Excel)
+          // Column A (0): contains subtitle AND username (merged cell)
+          // Column B (1): رمز عبور
+          // Column C (2): نام کامل
+          // Column D (3): شماره پرسنلی
+          // Column E (4): ایمیل
+          // Column F (5): شماره تماس
+          // Column G (6): شناسه دپارتمان
+          // Column H (7): نام دپارتمان
+          // Column I (8): نقش
+          // Column J (9): فعال
+          
+          // Read actual data rows (starting from row 2, index 2)
+          const jsonData = XLSXLib.utils.sheet_to_json(firstSheet, { 
+            range: 5,  // Start from row 6 (after title, headers, and extra rows)
+            defval: '' 
+          });
+          
+          if (jsonData.length === 0) {
+            showNotification('error', 'فایل خالی است یا داده‌ای ندارد');
+            setLoadingTemplate(false);
+            return;
+          }
+          
+          const now = new Date().toISOString();
+          const newUsers: UserProfile[] = [];
+          const errors: string[] = [];
+          
+          // Column index constants (0-based)
+          const COL_USERNAME = 0;  // Column A (username is in A2 due to merged cell)
+          const COL_PASSWORD = 1;  // Column B
+          const COL_FULLNAME = 2;  // Column C
+          const COL_PERSONNEL = 3; // Column D
+          const COL_EMAIL = 4;     // Column E
+          const COL_PHONE = 5;     // Column F
+          const COL_DEPT_ID = 6;   // Column G
+          const COL_DEPT_NAME = 7; // Column H
+          const COL_ROLE = 8;      // Column I
+          const COL_ACTIVE = 9;    // Column J
+          
+          // Re-read data as array of arrays for proper indexing
+          const dataRows = XLSXLib.utils.sheet_to_json(firstSheet, { 
+            range: 5,  // Skip title and header rows
+            header: 1, // Return arrays instead of objects
+            defval: '' 
+          });
+          
+          console.log('Data rows count:', dataRows.length);
+          console.log('First data row:', dataRows[0]);
+          
+          // Helper function to check if a row is empty
+          const isEmptyRow = (row: any[]): boolean => {
+            return row.every(cell => !cell || String(cell).trim() === '');
+          };
+          
+          // Helper to get value by column index from array
+          const getValueByIndex = (row: any[], index: number): string => {
+            if (row && row[index] !== undefined && row[index] !== null) {
+              return String(row[index]).trim();
+            }
+            return '';
+          };
+          
+          // List of header keywords to filter out
+          const headerKeywords = [
+            'نام کاربری', 'username', 'Username',
+            'نام کامل', 'fullname', 'FullName', 'نام و نام خانوادگی',
+            'ایمیل', 'email', 'Email',
+            'کلمه عبور', 'password', 'Password',
+            'شماره پرسنلی', 'personnel', 'Personnel',
+            'تلفن', 'phone', 'Phone',
+            'شناسه دپارتمان', 'department id', 'DepartmentId',
+            'نام دپارتمان', 'department name', 'DepartmentName',
+            'نقش', 'role', 'Role',
+            'فعال', 'is active', 'IsActive', 'status', 'Status'
+          ];
+          
+          // Check if a row contains header text
+          const isHeaderRow = (row: any[]): boolean => {
+            return row.some(cell => {
+              const cellStr = String(cell).trim().toLowerCase();
+              return headerKeywords.some(keyword => cellStr.includes(keyword.toLowerCase()));
+            });
+          };
+          
+          // Filter out empty rows at the beginning and find first valid row
+          let validDataRows: any[] = [];
+          let firstValidIndex = -1;
+          
+          for (let i = 0; i < dataRows.length; i++) {
+            const row = dataRows[i];
+            
+            // Skip header rows
+            if (isHeaderRow(row)) {
+              continue;
+            }
+            
+            const username = getValueByIndex(row, COL_USERNAME);
+            const fullName = getValueByIndex(row, COL_FULLNAME);
+            const email = getValueByIndex(row, COL_EMAIL);
+            
+            // Check if this row has actual user data
+            if (username || fullName || email) {
+              firstValidIndex = i;
+              validDataRows = dataRows.slice(i);
+              break;
+            }
+          }
+          
+          if (firstValidIndex === -1) {
+            showNotification('error', 'هیچ داده‌ای در فایل یافت نشد');
+            setLoadingTemplate(false);
+            return;
+          }
+          
+          console.log(`First valid row index: ${firstValidIndex}, remaining rows: ${validDataRows.length}`);
+          
+          validDataRows.forEach((row: any[], index: number) => {
+            // For column A (username), it might be merged with the subtitle cell
+            // If A is empty, check if headerRow[0] contains username
+            let username = getValueByIndex(row, COL_USERNAME);
+            if (!username && headerRow[COL_USERNAME]) {
+              // The username might be in the header row due to merged cells
+              username = String(headerRow[COL_USERNAME]).trim();
+            }
+            
+            const fullName = getValueByIndex(row, COL_FULLNAME);
+            const email = getValueByIndex(row, COL_EMAIL);
+            const password = getValueByIndex(row, COL_PASSWORD) || 'user123';
+            const personnelNumber = getValueByIndex(row, COL_PERSONNEL);
+            const phone = getValueByIndex(row, COL_PHONE);
+            const departmentId = getValueByIndex(row, COL_DEPT_ID);
+            const departmentName = getValueByIndex(row, COL_DEPT_NAME);
+            const role = getValueByIndex(row, COL_ROLE);
+            const isActiveStr = getValueByIndex(row, COL_ACTIVE);
+            const isActive = isActiveStr === '' || isActiveStr === 'TRUE' || isActiveStr === 'true' || isActiveStr === '1' || isActiveStr === 'فعال' || isActiveStr === 'بله';
+            
+            console.log(`Row ${firstValidIndex + index + 1}: username="${username}", fullName="${fullName}", email="${email}"`);
+            
+            if (!username || !fullName || !email) {
+              errors.push(`ردیف ${firstValidIndex + index + 1}: اطلاعات ناقص است`);
+              return;
+            }
+            
+            const newUser: UserProfile = {
+              id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              username: username,
+              password: password,
+              fullName: fullName,
+              personnelNumber: personnelNumber,
+              email: email,
+              phone: phone,
+              departmentId: departmentId,
+              departmentName: departmentName,
+              role: (['admin', 'manager', 'operator', 'user'].includes(role?.toLowerCase()) 
+                ? role.toLowerCase() 
+                : 'user') as 'admin' | 'manager' | 'operator' | 'user',
+              avatar: '',
+              isActive: isActive,
+              isEmailVerified: false,
+              failedLoginAttempts: 0,
+              createdAt: now,
+              updatedAt: now,
+              permissions: []
+            };
+            newUsers.push(newUser);
+          });
+          
+          if (newUsers.length > 0) {
+            // REPLACE all users with new ones
+            storage.saveData('users', newUsers);
+            setUsersRefreshKey(prev => prev + 1);
+            
+            // Replace user access entries
+            const newAccessEntries: UserAccessEntry[] = newUsers.map(user => ({
+              userId: user.id,
+              username: user.username,
+              displayName: user.fullName,
+              groups: [],
+              overrides: ensureOverrides(permissionCatalog)
+            }));
+            
+            updateUserManagement({
+              userAccess: newAccessEntries
+            });
+            
+            showNotification('success', `${newUsers.length} کاربر با موفقیت جایگزین شد`);
+          } else if (errors.length > 0) {
+            showNotification('error', `خطا در بارگذاری: ${errors.join('\n')}`);
+          }
+        } catch (parseError) {
+          console.error('Parse error:', parseError);
+          showNotification('error', 'خطا در خواندن فایل اکسل');
+        }
+        setLoadingTemplate(false);
+        // Reset initialization flags on completion
+        initializationRanRef.current = false;
+        storage.saveData('usersInitInProgress', false);
+        templateJustLoadedRef.current = false;
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Load template error:', error);
+      showNotification('error', 'خطا در بارگذاری قالب');
+      setLoadingTemplate(false);
+      // Reset initialization flags on error
+      initializationRanRef.current = false;
+      storage.saveData('usersInitInProgress', false);
+      templateJustLoadedRef.current = false;
+    }
+  };
+
+  const loadGroupTemplate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoadingTemplate(true);
+    
+    // Set initialization flag BEFORE loading to prevent predefined groups from being added
+    storage.saveData('usersInitInProgress', true);
+    templateJustLoadedRef.current = true;
+    
+    try {
+      // Load XLSX library with retry mechanism
+      let XLSXLib = null;
+      let retries = 0;
+      const maxRetries = 50; // Wait up to 5 seconds (50 * 100ms)
+      
+      while (!XLSXLib && retries < maxRetries) {
+        XLSXLib = (window as any).XLSX;
+        if (!XLSXLib) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retries++;
+        }
+      }
+      
+      if (!XLSXLib) {
+        showNotification('error', 'کتابخانه اکسل در دسترس نیست. لطفاً چند ثانیه صبر کنید و دوباره تلاش کنید');
+        setLoadingTemplate(false);
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const data = event.target?.result;
+          const workbook = XLSXLib.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          
+          // Read all rows as arrays to handle merged cells properly
+          const allRows = XLSXLib.utils.sheet_to_json(firstSheet, { 
+            range: 0, 
+            header: 1, 
+            defval: '' 
+          });
+          
+          // Row 0: Title (لیست گروه‌ها)
+          // Row 1: [subtitle, name, description, color, members, isActive]
+          // Row 2+: Data
+          
+          const headerRow = allRows[1] || [];
+          console.log('Group header row:', headerRow);
+          
+          // Read data rows (starting from row 2, index 2)
+          const dataRows = XLSXLib.utils.sheet_to_json(firstSheet, { 
+            range: 5,  // Skip title and header rows
+            header: 1, // Return arrays instead of objects
+            defval: '' 
+          });
+          
+          console.log('Group data rows count:', dataRows.length);
+          
+          if (dataRows.length === 0) {
+            showNotification('error', 'فایل خالی است یا داده‌ای ندارد');
+            setLoadingTemplate(false);
+            return;
+          }
+          
+          // Column index mapping (0-based)
+          const COL_NAME = 0;      // Column A
+          const COL_DESCRIPTION = 1; // Column B
+          const COL_COLOR = 2;      // Column C
+          const COL_MEMBERS = 3;    // Column D
+          const COL_ACTIVE = 4;     // Column E
+          
+          // Helper to get value by column index from array
+          const getValueByIndex = (row: any[], index: number): string => {
+            if (row && row[index] !== undefined && row[index] !== null) {
+              return String(row[index]).trim();
+            }
+            return '';
+          };
+          
+          // List of header keywords to filter out
+          const headerKeywords = [
+            'نام گروه', 'group name', 'GroupName',
+            'توضیحات', 'description', 'Description',
+            'رنگ', 'color', 'Color',
+            'اعضا', 'members', 'Members',
+            'فعال', 'is active', 'IsActive', 'status', 'Status'
+          ];
+          
+          // Check if a row contains header text
+          const isHeaderRow = (row: any[]): boolean => {
+            return row.some(cell => {
+              const cellStr = String(cell).trim().toLowerCase();
+              return headerKeywords.some(keyword => cellStr.includes(keyword.toLowerCase()));
+            });
+          };
+          
+          // Filter data rows to remove header rows and empty rows
+          const validDataRows = dataRows.filter((row: any[], index: number) => {
+            // Skip header rows
+            if (isHeaderRow(row)) {
+              return false;
+            }
+            
+            const name = getValueByIndex(row, COL_NAME);
+            
+            // Skip empty rows (rows where group name is empty)
+            if (!name) {
+              return false;
+            }
+            
+            return true;
+          });
+          
+          if (validDataRows.length === 0) {
+            showNotification('error', 'هیچ گروه معتبری در فایل یافت نشد');
+            setLoadingTemplate(false);
+            return;
+          }
+          
+          const now = new Date().toISOString();
+          const newGroups: UserGroup[] = [];
+          const errors: string[] = [];
+          
+          validDataRows.forEach((row: any[], index: number) => {
+            const name = getValueByIndex(row, COL_NAME);
+            const description = getValueByIndex(row, COL_DESCRIPTION);
+            const isActiveStr = getValueByIndex(row, COL_ACTIVE);
+            const isActive = isActiveStr === '' || isActiveStr === 'TRUE' || isActiveStr === 'true' || isActiveStr === '1' || isActiveStr === 'فعال' || isActiveStr === 'بله';
+            
+            if (!name.trim()) {
+              errors.push(`ردیف ${index + 1}: نام گروه الزامی است`);
+              return;
+            }
+            
+            const colorIndex = newGroups.length % GROUP_COLORS.length;
+            const newGroup: UserGroup = {
+              id: `imported-group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              name: name,
+              description: description,
+              color: GROUP_COLORS[colorIndex],
+              permissions: ensureModulePermissions(permissionCatalog),
+              isActive: isActive,
+              createdAt: now,
+              updatedAt: now,
+              members: 0
+            };
+            newGroups.push(newGroup);
+          });
+          
+          if (newGroups.length > 0) {
+            // REPLACE all groups with new ones
+            updateUserManagement({
+              userGroups: newGroups
+            });
+            
+            showNotification('success', `${newGroups.length} گروه با موفقیت جایگزین شد`);
+          } else if (errors.length > 0) {
+            showNotification('error', `خطا در بارگذاری: ${errors.join('\n')}`);
+          }
+        } catch (parseError) {
+          console.error('Parse error:', parseError);
+          showNotification('error', 'خطا در خواندن فایل اکسل');
+        }
+        setLoadingTemplate(false);
+        // Reset initialization flags on completion
+        initializationRanRef.current = false;
+        storage.saveData('usersInitInProgress', false);
+        templateJustLoadedRef.current = false;
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Load template error:', error);
+      showNotification('error', 'خطا در بارگذاری قالب');
+      setLoadingTemplate(false);
+      // Reset initialization flags on error
+      initializationRanRef.current = false;
+      storage.saveData('usersInitInProgress', false);
+      templateJustLoadedRef.current = false;
+    }
+  };
 
   function validateUserForm(): boolean {
     const errors: Record<string, string> = {};
@@ -580,7 +2073,8 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
   // Persian date formatting functions (matching InventoryAdjustmentManager exactly)
   const formatPersianDate = (date: string | Date): string => {
-    return utilsFormatPersianDate(date);
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return utilsFormatPersianDate(dateObj);
   };
 
   // Enhanced Persian date formatting with full details
@@ -1143,6 +2637,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
           departmentId: userForm.departmentId,
           departmentName: userForm.departmentName,
           role: userForm.role,
+          avatar: userForm.avatar,
           isActive: userForm.isActive,
           updatedAt: now
         };
@@ -1179,6 +2674,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
           departmentId: userForm.departmentId,
           departmentName: userForm.departmentName,
           role: userForm.role,
+          avatar: userForm.avatar,
           isActive: userForm.isActive,
           isEmailVerified: false,
           failedLoginAttempts: 0,
@@ -1353,12 +2849,8 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       
       updateUserManagement({ userGroups: updatedGroups });
       
-      // Force refresh - settings will update and normalizedGroups will refresh automatically
-      // But we also need to ensure the UI updates
-      setTimeout(() => {
-        // This will trigger a re-render
-        setSettings(prev => ({ ...prev }));
-      }, 100);
+      // Force refresh groups
+      setGroupsRefreshKey(prev => prev + 1);
       
       resetGroupForm();
       setShowGroupForm(false);
@@ -1378,21 +2870,69 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     
     if (confirm(`آیا از حذف گروه "${group.name}" مطمئن هستید؟`)) {
       try {
-        const updatedGroups = normalizedGroups.filter(g => g.id !== groupId);
-        updateUserManagement({ userGroups: updatedGroups });
+        // Use original userGroups data (not normalizedGroups which has computed members property)
+        const currentGroups: UserGroup[] = userManagement.userGroups || [];
+        const updatedGroups = currentGroups.filter((g: UserGroup) => g.id !== groupId);
         
         // Remove group from all users
-        const updatedAccess = normalizedUserAccess.map(access => ({
+        const currentAccess: UserAccessEntry[] = userManagement.userAccess || [];
+        const updatedAccess = currentAccess.map((access: UserAccessEntry) => ({
           ...access,
-          groups: access.groups.filter(gId => gId !== groupId)
+          groups: access.groups.filter((gId: string) => gId !== groupId)
         }));
-        updateUserManagement({ userAccess: updatedAccess });
+        
+        // Update both groups and access in one call
+        updateUserManagement({ 
+          userGroups: updatedGroups,
+          userAccess: updatedAccess
+        });
+        
+        // Force refresh groups
+        setGroupsRefreshKey(prev => prev + 1);
         
         showNotification('success', 'گروه با موفقیت حذف شد');
-        logActivity('حذف گروه', 'مدیریت گروه‌ها', 'warning', { groupId });
+        logActivity('حذف گروه', 'مدیریت گروه‌ها', 'warning', { groupId, groupName: group.name });
       } catch (error) {
         console.error('Error deleting group:', error);
         showNotification('error', 'خطا در حذف گروه');
+      }
+    }
+  }
+
+  function handleDeleteAllGroups() {
+    const currentGroups = userManagement.userGroups || [];
+    if (currentGroups.length === 0) {
+      showNotification('warning', 'هیچ گروهی برای حذف وجود ندارد');
+      return;
+    }
+    
+    const groupNames = currentGroups.map((g: UserGroup) => g.name).join(', ');
+    if (confirm(`آیا از حذف تمام ${currentGroups.length} گروه مطمئن هستید؟\n\nاین عملیات غیرقابل بازگشت است و تمام گروه‌ها از سیستم حذف خواهند شد.\nهمچنین تمام دسترسی‌های گروهی کاربران حذف خواهد شد.\n\nگروه‌ها: ${groupNames}`)) {
+      try {
+        // Clear group references from all user access entries
+        const currentAccess: UserAccessEntry[] = userManagement.userAccess || [];
+        const updatedAccess = currentAccess.map((access: UserAccessEntry) => ({
+          ...access,
+          groups: []
+        }));
+        
+        // Update both groups and access in one call
+        updateUserManagement({ 
+          userGroups: [],
+          userAccess: updatedAccess
+        });
+        
+        // Force refresh groups
+        setGroupsRefreshKey(prev => prev + 1);
+        
+        showNotification('success', `تمام ${currentGroups.length} گروه با موفقیت حذف شد`);
+        logActivity('حذف تمام گروه‌ها', 'مدیریت گروه‌ها', 'error', { 
+          deletedCount: currentGroups.length,
+          groupNames: currentGroups.map((g: UserGroup) => g.name)
+        });
+      } catch (error) {
+        console.error('Error deleting all groups:', error);
+        showNotification('error', 'خطا در حذف گروه‌ها');
       }
     }
   }
@@ -1567,44 +3107,43 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
   function renderPermissionMatrix() {
     const modules = permissionCatalog;
     const users = availableUsers;
+    const groups = normalizedGroups;
     
     return (
       <div className="w-full border border-gray-200 rounded-lg overflow-hidden max-w-full">
-        <div className="overflow-x-auto w-full max-w-full">
-          <table className="w-full min-w-max border-collapse max-w-full">
-          <thead className="bg-gray-50">
+        <div className="w-full" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '600px' }}>
+          <table className="w-full border-collapse" style={{ minWidth: `${150 + (users.length * 80)}px` }}>
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
-              <th className="p-3 text-right text-xs font-medium text-gray-500 uppercase border-b">ماژول</th>
-              {users.slice(0, 10).map(user => (
-                <th key={user.id} className="p-2 text-center text-xs font-medium text-gray-500 uppercase border-b border-l">
-                  <div className="transform -rotate-45 whitespace-nowrap">
-                    {user.fullName}
+              <th className="p-3 text-right text-xs font-medium text-gray-500 uppercase border-b bg-gray-50 sticky right-0 z-20" style={{ minWidth: '150px' }}>ماژول</th>
+              {users.map(user => (
+                <th key={user.id} className="p-2 text-center text-xs font-medium text-gray-500 uppercase border-b border-l bg-gray-50" style={{ minWidth: '80px' }}>
+                  <div className="transform -rotate-45 whitespace-nowrap origin-center" style={{ height: '60px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                    <span className="truncate max-w-[80px]" title={user.fullName}>
+                      {user.personnelNumber && `[${user.personnelNumber}] `}
+                      {user.fullName.length > 12 ? user.fullName.substring(0, 10) + '...' : user.fullName}
+                    </span>
                   </div>
                 </th>
               ))}
-              {users.length > 10 && (
-                <th className="p-2 text-center text-xs text-gray-400 border-b border-l">
-                  +{users.length - 10} نفر دیگر
-                </th>
-              )}
             </tr>
           </thead>
           <tbody>
             {modules.map(module => (
               <tr key={module.id} className="hover:bg-gray-50">
-                <td className="p-3 text-sm font-medium text-gray-900 border-b border-r">
+                <td className="p-3 text-sm font-medium text-gray-900 border-b border-r bg-white sticky right-0" style={{ minWidth: '150px' }}>
                   <div className="flex items-center gap-2">
-                    <span>{module.name}</span>
-                    <span className="text-xs text-gray-500">({module.category})</span>
+                    <span className="truncate">{module.name}</span>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">({module.category})</span>
                   </div>
                 </td>
-                {users.slice(0, 10).map(user => {
+                {users.map(user => {
                   const effectivePerms = getEffectivePermissions(user.id);
                   const modulePerms = effectivePerms[module.id] || { create: false, edit: false, view: false, delete: false };
                   const hasAnyPerm = modulePerms.create || modulePerms.edit || modulePerms.view || modulePerms.delete;
                   
                   return (
-                    <td key={user.id} className="p-2 text-center border-b border-l">
+                    <td key={user.id} className="p-2 text-center border-b border-l" style={{ minWidth: '80px' }}>
                       <div className="flex justify-center gap-1">
                         {modulePerms.view && <div className="w-2 h-2 bg-blue-500 rounded-full" title="مشاهده" />}
                         {modulePerms.create && <div className="w-2 h-2 bg-green-500 rounded-full" title="ایجاد" />}
@@ -1615,15 +3154,73 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                     </td>
                   );
                 })}
-                {users.length > 10 && (
-                  <td className="p-2 text-center text-xs text-gray-400 border-b border-l">
-                    ...
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>
           </table>
+        </div>
+        
+        {/* Groups Matrix */}
+        <div className="mt-6 border-t border-gray-200 pt-4">
+          <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Layers className="h-4 w-4 text-purple-500" />
+            ماتریس دسترسی گروه‌ها
+          </h4>
+          <div className="w-full" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '400px' }}>
+            <table className="w-full border-collapse" style={{ minWidth: `${150 + (groups.length * 100)}px` }}>
+              <thead className="bg-purple-50 sticky top-0 z-10">
+                <tr>
+                  <th className="p-3 text-right text-xs font-medium text-purple-700 uppercase border-b bg-purple-50 sticky right-0 z-20" style={{ minWidth: '150px' }}>ماژول</th>
+                  {groups.map(group => (
+                    <th key={group.id} className="p-2 text-center text-xs font-medium text-purple-700 uppercase border-b border-l bg-purple-50" style={{ minWidth: '100px' }}>
+                      <div className="whitespace-nowrap truncate" title={group.name}>
+                        {group.name.length > 15 ? group.name.substring(0, 12) + '...' : group.name}
+                        <div className="text-xs text-purple-500 font-normal">({group.members} عضو)</div>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {modules.map(module => (
+                  <tr key={module.id} className="hover:bg-purple-50/30">
+                    <td className="p-3 text-sm font-medium text-gray-900 border-b border-r bg-white sticky right-0" style={{ minWidth: '150px' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{module.name}</span>
+                      </div>
+                    </td>
+                    {groups.map(group => {
+                      const groupPerms = group.permissions.find(p => p.moduleId === module.id);
+                      const hasAnyPerm = groupPerms?.create || groupPerms?.edit || groupPerms?.view || groupPerms?.delete;
+                      
+                      return (
+                        <td key={group.id} className="p-2 text-center border-b border-l" style={{ minWidth: '100px' }}>
+                          <div className="flex justify-center gap-1">
+                            {groupPerms?.view && <div className="w-2 h-2 bg-blue-500 rounded-full" title="مشاهده" />}
+                            {groupPerms?.create && <div className="w-2 h-2 bg-green-500 rounded-full" title="ایجاد" />}
+                            {groupPerms?.edit && <div className="w-2 h-2 bg-yellow-500 rounded-full" title="ویرایش" />}
+                            {groupPerms?.delete && <div className="w-2 h-2 bg-red-500 rounded-full" title="حذف" />}
+                            {!hasAnyPerm && <div className="w-2 h-2 bg-gray-300 rounded-full" title="بدون دسترسی" />}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        {/* Legend */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex flex-wrap gap-4 items-center justify-center text-xs">
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div><span>مشاهده</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div><span>ایجاد</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500 rounded-full"></div><span>ویرایش</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded-full"></div><span>حذف</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-300 rounded-full"></div><span>بدون دسترسی</span></div>
+          </div>
         </div>
       </div>
     );
@@ -1711,7 +3308,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         new Date(log.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000)
       ).length,
       permissionChanges: activityLogs.filter(log => 
-        log.action.includes('دسترسی') && 
+        log.action && typeof log.action === 'string' && log.action.includes('دسترسی') && 
         new Date(log.timestamp) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       ).length,
       userCreations: activityLogs.filter(log => 
@@ -2195,11 +3792,14 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       username: '',
       password: '',
       fullName: '',
+      personnelNumber: '',
       email: '',
       phone: '',
       departmentId: '',
       departmentName: '',
       role: 'user',
+      avatar: '',
+      avatarFile: undefined,
       isActive: true,
       isEmailVerified: false,
       failedLoginAttempts: 0,
@@ -2207,6 +3807,9 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       updatedAt: '',
       permissions: []
     });
+    // Reset avatar preview and file for new user form
+    setAvatarPreview('');
+    setAvatarFile(undefined);
     setFormErrors({});
     setSelectedGroupsForUser([]);
     setTempUserId('');
@@ -2233,6 +3836,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
       ...user,
       password: '' // Don't show password for security
     });
+    
+    // Set avatar preview from user's stored avatar (per-user avatar)
+    setAvatarPreview(user.avatar || '');
+    setAvatarFile(undefined);
     
     // Set selected groups for this user
     const userAccess = normalizedUserAccess.find(u => u.userId === user.id);
@@ -2287,6 +3894,19 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
     if (!user) return {};
 
     const effective: Record<string, PermissionActionSet> = {};
+
+    // ADMIN OVERRIDE: Admin users have FULL access to everything
+    if (user.role === 'admin') {
+      permissionCatalog.forEach(module => {
+        effective[module.id] = {
+          create: true,
+          edit: true,
+          view: true,
+          delete: true
+        };
+      });
+      return effective;
+    }
 
     // Step 1: Start with default permissions (deny all)
     permissionCatalog.forEach(module => {
@@ -2433,7 +4053,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 mobile-layout overflow-x-hidden w-full">
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 mobile-layout overflow-auto w-full">
       {/* Notification - Fixed z-index to show above modal */}
       {notification.visible && (
         <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] px-4 py-3 rounded-lg shadow-xl border-2 max-w-md mx-4 transition-all duration-300 ${
@@ -2629,7 +4249,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         </div>
 
         {/* Content Area */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full max-w-full">
           {/* Enhanced Tabs with Permission Check */}
           <div className="w-full overflow-x-auto scrollbar-hide tab-navigation max-w-full overflow-hidden">
             <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 w-full max-w-full">
@@ -2729,8 +4349,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
           {/* Tab Content */}
             {activeTab === 'users' && (
-              <div className="custom-scrollbar-container p-1">
-                <div className="scroll-content-wrapper space-y-6 w-full">
+              <div className="space-y-6 w-full p-4" style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
                 {/* Search and Filters */}
 
               <div className="bg-white p-3 sm:p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 w-full">
@@ -2779,6 +4398,36 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                       <UserPlus className="h-4 w-4" />
                       <span>کاربر جدید</span>
                     </button>
+                    
+                    {/* Create User Template Button */}
+                    <button
+                      onClick={createUserTemplate}
+                      className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium shadow-sm transition-all"
+                      title="دانلود قالب اکسل کاربران"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      <span className="hidden sm:inline">Create Template</span>
+                    </button>
+                    
+                    {/* Load User Template Button */}
+                    <label
+                      className={`w-full sm:w-auto px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium shadow-sm transition-all cursor-pointer ${loadingTemplate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title="بارگذاری فایل اکسل کاربران"
+                    >
+                      {loadingTemplate ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      <span className="hidden sm:inline">Load Template</span>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={loadUserTemplate}
+                        className="hidden"
+                        disabled={loadingTemplate}
+                      />
+                    </label>
                   </div>
                 </div>
 
@@ -2822,10 +4471,9 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
             {/* Users Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
-              <div className="w-full overflow-x-auto custom-scrollbar-container">
-
-            {/* Mobile Cards View */}
-            <div className="lg:hidden space-y-3 sm:space-y-4 p-2 sm:p-3 overflow-hidden w-full max-w-full">
+              <div className="w-full" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '500px' }}>
+                {/* Mobile Cards View */}
+                <div className="lg:hidden space-y-3 sm:space-y-4 p-2 sm:p-3 overflow-hidden w-full max-w-full">
               {filteredUsers.map((user) => {
                 const userAccess = normalizedUserAccess.find(u => u.userId === user.id);
                 return (
@@ -2848,7 +4496,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                           <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                             <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-500" />
                           </div>
-                          <span className="font-medium text-gray-900 text-sm sm:text-base truncate">{user.fullName}</span>
+                          <span className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                            {user.personnelNumber && <span className="text-blue-600 ml-1">[{user.personnelNumber}]</span>}
+                            {user.fullName}
+                          </span>
                         </div>
                       </div>
                       <span className={`inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full border flex-shrink-0 ${getRoleColorClass(user.role)}`}>
@@ -2914,18 +4565,18 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                 );
               })}
               
-              {filteredUsers.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  هیچ کاربری با فیلترهای انتخابی یافت نشد
+                  {filteredUsers.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      هیچ کاربری با فیلترهای انتخابی یافت نشد
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            
-            {/* Desktop Table */}
-            <div className="hidden lg:block w-full">
-              <div className="w-full border border-gray-200 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto w-full max-w-full">
-                  <table className="w-full min-w-[1200px] max-w-full">
+                
+                {/* Desktop Table */}
+                <div className="hidden lg:block w-full">
+                  <div className="w-full border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="w-full" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '500px' }}>
+                  <table className="w-full min-w-[1200px]">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="w-12 px-3 py-3 text-right">
@@ -2992,7 +4643,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                               </div>
                             </div>
                             <div className="mr-3 min-w-0 flex-1">
-                              <div className="text-sm font-medium text-gray-900 truncate">{user.fullName}</div>
+                              <div className="text-sm font-medium text-gray-900 truncate">
+                                {user.personnelNumber && <span className="text-blue-600 ml-1">[{user.personnelNumber}]</span>}
+                                {user.fullName}
+                              </div>
                               <div className="text-xs text-gray-500 truncate">@{user.username}</div>
                               <div className="text-xs text-gray-500 truncate hidden sm:block">{user.email}</div>
                             </div>
@@ -3072,22 +4726,15 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                   </table>
                 </div>
               </div>
-              
-              {filteredUsers.length === 0 && (
-                <div className="px-6 py-8 text-center text-gray-500">
-                  هیچ کاربری با فیلترهای انتخابی یافت نشد
-                </div>
-              )}
             </div>
           </div>
           </div>
-        </div>
         </div>
       )}
 
       {/* Tab Content */}
       {activeTab === 'groups' && (
-        <div className="space-y-6 w-full max-w-full overflow-x-hidden">
+        <div className="space-y-6 w-full" style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
           {/* Groups Header */}
           <div className="bg-white p-3 md:p-4 lg:p-6 rounded-xl shadow-sm border border-gray-200 w-full max-w-full">
             <div className="flex items-center justify-between">
@@ -3105,6 +4752,46 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
               >
                 <Plus className="h-4 w-4" />
                 گروه جدید
+              </button>
+              
+              {/* Create Group Template Button */}
+              <button
+                onClick={createGroupTemplate}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                title="دانلود قالب اکسل گروه‌ها"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span className="hidden lg:inline">Create Template</span>
+              </button>
+              
+              {/* Load Group Template Button */}
+              <label
+                className={`px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 cursor-pointer ${loadingTemplate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="بارگذاری فایل اکسل گروه‌ها"
+              >
+                {loadingTemplate ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                <span className="hidden lg:inline">Load Template</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={loadGroupTemplate}
+                  className="hidden"
+                  disabled={loadingTemplate}
+                />
+              </label>
+              
+              {/* Delete All Groups Button */}
+              <button
+                onClick={handleDeleteAllGroups}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                title="حذف تمام گروه‌ها"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden lg:inline">حذف همه</span>
               </button>
             </div>
           </div>
@@ -3337,7 +5024,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                               <User className="h-6 w-6 text-gray-500" />
                             </div>
                             <div>
-                              <h4 className="text-md font-semibold text-gray-900">{user.fullName}</h4>
+                              <h4 className="text-md font-semibold text-gray-900">
+                                {user.personnelNumber && <span className="text-blue-600 ml-1">[{user.personnelNumber}]</span>}
+                                {user.fullName}
+                              </h4>
                               <p className="text-sm text-gray-600">@{user.username}</p>
                             </div>
                             <span className={`px-2 py-1 text-xs rounded-full border ${getRoleColorClass(user.role)}`}>
@@ -4158,8 +5848,8 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
       {/* Permission Matrix Tab */}
       {activeTab === 'matrix' && (
-        <div className="space-y-6">
-          <div className="bg-white p-3 md:p-4 lg:p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="space-y-6 w-full p-4" style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
+            <div className="bg-white p-3 md:p-4 lg:p-6 rounded-xl shadow-sm border border-gray-200 w-full">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-blue-500" />
@@ -4291,7 +5981,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
 
       {/* Security Audit Tab */}
       {activeTab === 'audit' && (
-        <div className="space-y-6 w-full max-w-full overflow-x-hidden">
+        <div className="space-y-6 w-full" style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
           <div className="bg-white p-3 md:p-4 lg:p-6 rounded-xl shadow-sm border border-gray-200 w-full max-w-full overflow-hidden">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-6 w-full max-w-full">
               <div>
@@ -4316,7 +6006,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                   onClick={() => {
                     try {
                       const securityEvents = activityLogs.filter(log => 
-                        log.status === 'error' || log.action.includes('ورود ناموفق') || log.action.includes('دسترسی')
+                        log.status === 'error' || (log.action && typeof log.action === 'string' && (log.action.includes('ورود ناموفق') || log.action.includes('دسترسی')))
                       );
                       
                       exportToExcel({
@@ -4640,9 +6330,45 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                                 <div className="flex gap-2 w-full md:w-auto border-t md:border-none pt-3 md:pt-0">
                                   <button 
                                     onClick={() => {
-                                      if (confirm('آیا از پایان دادن به این نشست مطمئن هستید؟')) {
-                                        showNotification('success', 'نشست با موفقیت خاتمه یافت');
-                                        logActivity('پایان نشست تکی', 'امنیت', 'info', { sessionId: session.sessionId });
+                                      if (confirm('آیا از قطع اتصال و خروج کاربر از سیستم مطمئن هستید؟')) {
+                                        // Log the activity
+                                        logActivity('قطع اتصال کاربر', 'امنیت', 'info', { sessionId: session.sessionId, userId: user.id });
+                                        
+                                        // If this is the current user, log them out
+                                        try {
+                                          const authService = (window as any).authService;
+                                          const currentUser = authService?.getCurrentUser?.() || null;
+                                          
+                                          if (currentUser && (currentUser.id === user.id || currentUser.username === user.username)) {
+                                            // Call logout function
+                                            if (typeof (window as any).handleLogout === 'function') {
+                                              (window as any).handleLogout();
+                                            } else if (authService && typeof authService.logout === 'function') {
+                                              authService.logout();
+                                              // Clear all storage
+                                              localStorage.clear();
+                                              sessionStorage.clear();
+                                              // Redirect to login page
+                                              setTimeout(() => {
+                                                window.location.href = '/';
+                                              }, 500);
+                                            } else {
+                                              // Fallback: clear storage and reload
+                                              localStorage.clear();
+                                              sessionStorage.clear();
+                                              window.location.href = '/';
+                                            }
+                                          } else {
+                                            // Just terminate the session for other users
+                                            showNotification('success', 'نشست با موفقیت خاتمه یافت');
+                                          }
+                                        } catch (error) {
+                                          console.error('Error during logout:', error);
+                                          // Fallback: clear storage and reload
+                                          localStorage.clear();
+                                          sessionStorage.clear();
+                                          window.location.href = '/';
+                                        }
                                       }
                                     }}
                                     className="flex-1 md:flex-none px-4 py-2 text-xs font-medium bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
@@ -4692,11 +6418,10 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
         </div>
       )}
 
-          {/* Activities Tab */}
-            {activeTab === 'activities' && (
-              <div className="custom-scrollbar-container p-1">
-                <div className="scroll-content-wrapper space-y-6 w-full">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
+      {/* Activities Tab */}
+      {activeTab === 'activities' && (
+        <div className="space-y-6 w-full p-4" style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
 
                 {/* Activities Header */}
                 <div className="p-4 sm:p-6 border-b border-gray-200">
@@ -4984,44 +6709,44 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                   </div>
 
                 {/* Activities Table with Enhanced Scroll */}
-                <div className="p-4 sm:p-6">
+                <div className="p-4 sm:p-6 w-full max-w-full overflow-hidden">
                   <div className="border border-gray-200 rounded-lg w-full max-w-full overflow-hidden">
-                      <div className="overflow-x-auto w-full custom-scrollbar-container">
+                      <div className="w-full" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '500px' }}>
 
-                      <table className="w-full min-w-[1100px] border-collapse">
+                      <table className="w-full min-w-[1100px] border-collapse" style={{ tableLayout: 'auto' }}>
                         <thead className="bg-gray-50">
                           <tr className="border-b border-gray-200">
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
                               زمان
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                             <div className="flex items-center gap-1">
                               <User className="h-4 w-4" />
                               کاربر
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
                             <div className="flex items-center gap-1">
                               <Activity className="h-4 w-4" />
                               رویداد
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                             <div className="flex items-center gap-1">
                               <Package className="h-4 w-4" />
                               ماژول
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                             <div className="flex items-center gap-1">
                               <Shield className="h-4 w-4" />
                               وضعیت
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
                             <div className="flex items-center gap-1">
                               <MapPin className="h-4 w-4" />
                               آدرس IP
@@ -5070,12 +6795,12 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                               </div>
                             </td>
                             <td className="px-4 py-4 text-sm">
-                              <div className="space-y-2">
-                                <div className="font-medium text-gray-900 max-w-xs truncate" title={log.action}>
-                                  {log.action}
+                              <div className="space-y-2 min-w-0">
+                                <div className="font-medium text-gray-900 truncate" title={log.action || ''}>
+                                  {log.action || '-'}
                                 </div>
-                                <div className="text-xs text-gray-500 max-w-xs line-clamp-2" title={log.description}>
-                                  {log.description}
+                                <div className="text-xs text-gray-500 line-clamp-2 break-words" title={log.description || ''}>
+                                  {log.description || '-'}
                                 </div>
                                 {log.details && Object.keys(log.details).length > 0 && (
                                   <div className="text-xs">
@@ -5290,9 +7015,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
               </div>
             </div>
           </div>
-        </div>
       )}
-      </div>
 
       {/* User Form Modal */}
       {showUserForm && (
@@ -5317,6 +7040,58 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+              {/* Profile Photo Section - Per User */}
+              <div>
+                <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-3 sm:mb-4">عکس پرسنلی</h3>
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                  {/* Avatar Preview - Shows current user's avatar or the preview */}
+                  <div className="relative group">
+                    {(avatarPreview || userForm.avatar) ? (
+                      <div className="relative">
+                        <img
+                          src={avatarPreview || userForm.avatar}
+                          alt="Profile"
+                          className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-white shadow-lg"
+                        />
+                        <button
+                          onClick={removeAvatar}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          title="حذف عکس"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border-4 border-white shadow-lg">
+                        <User className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Upload Button */}
+                  <div className="text-center sm:text-right">
+                    <label
+                      htmlFor={`avatar-upload-${userForm.id || 'new'}`}
+                      className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>انتخاب عکس</span>
+                    </label>
+                    <input
+                      id={`avatar-upload-${userForm.id || 'new'}`}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      فرمت‌های مجاز: JPG، PNG، GIF، WebP<br />
+                      حداکثر حجم: ۵ مگابایت
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Basic Information */}
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-3 sm:mb-4">اطلاعات پایه</h3>
@@ -5355,6 +7130,19 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
                     {formErrors.fullName && (
                       <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>
                     )}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      شماره پرسنلی
+                    </label>
+                    <input
+                      type="text"
+                      value={userForm.personnelNumber || ''}
+                      onChange={(e) => setUserForm({...userForm, personnelNumber: e.target.value})}
+                      className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                      placeholder="مثال: 12345"
+                    />
                   </div>
 
                   <div className="sm:col-span-2">
@@ -5673,6 +7461,7 @@ export const UserManagementSettings: React.FC<UserManagementSettingsProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

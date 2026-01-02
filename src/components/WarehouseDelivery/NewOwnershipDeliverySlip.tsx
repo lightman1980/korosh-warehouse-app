@@ -30,7 +30,9 @@ import {
 import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
 import { logSaveAction, logCreateAction } from "../../hooks/useActivityLogger";
+import { logUserActivity } from "../../utils/logger";
 import PersianDatePicker from '../Common/PersianDatePicker';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // تابع کمکی برای تبدیل ایمن مقادیر به عدد - اصلاح شده
 const safeNumber = (value: any, defaultValue: number = 0): number => {
@@ -235,13 +237,52 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
   
   useEffect(() => {
     const storage = DataStorage.getInstance();
-    const savedSettings = (storage.loadData('settings') || {}) as any;
+    // بارگذاری تنظیمات از appSettings (کلید اصلی) یا settings (برای سازگاری)
+    const appSettings = (storage.loadData('appSettings') || {}) as any;
+    const settingsBackup = (storage.loadData('settings') || {}) as any;
+    const savedSettings = appSettings || settingsBackup;
     const performance = savedSettings.performance || {};
+    const enforceConsignment = performance.requireDeliveryExtraInfo?.consignment || false;
+    const enforceOwned = performance.requireDeliveryExtraInfo?.owned || false;
     setEnforceDeliveryExtraInfo({
-      consignment: performance.requireConsignmentDeliveryExtraInfo || false,
-      owned: performance.requireOwnedDeliveryExtraInfo || false
+      consignment: enforceConsignment,
+      owned: enforceOwned
     });
+    // اگر تنظیم غیرفعال است، چک‌باکس اطلاعات تکمیلی را غیرفعال و غیرچک کن
+    // اگر تنظیم فعال است، چک‌باکس را فعال و چک کن (اجباری)
+    if (!enforceOwned) {
+      setShowDeliveryExtraInfo(false);
+    } else {
+      setShowDeliveryExtraInfo(true);
+    }
   }, []);
+
+  // اضافه کردن Enter برای ذخیره و Esc برای بازگشت
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (selectedReceipt && !isSaving) {
+        const deliveryData = {
+          receiptId: selectedReceipt.id,
+          amount: deliveryAmount,
+          deliveryDate: deliveryDate,
+          siteId: selectedReceipt.siteId,
+          tankId: selectedReceipt.tankId,
+          productId: selectedReceipt.productId,
+          productName: selectedReceipt.productName,
+          siteName: selectedReceipt.siteName,
+          tankName: selectedReceipt.tankName,
+          additionalInfo: (showDeliveryExtraInfo || enforceDeliveryExtraInfo.owned) ? deliveryExtraInfo : undefined
+        };
+        handleSaveDelivery(deliveryData);
+      }
+    },
+    onEscape: () => {
+      if (onBack) {
+        onBack();
+      }
+    },
+    enabled: true
+  });
 
   // همگام‌سازی وزن (مبنا) با مقدار حواله و تاریخ بارنامه با تاریخ حواله
   useEffect(() => {
@@ -2472,6 +2513,49 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
       }
       // نیازی به خطا نیست، چون خودکار کنترل می‌شود
     }
+    
+    // اعتبارسنجی اطلاعات تکمیلی در صورت اجبار
+    // بارگذاری مجدد تنظیمات برای اطمینان از به‌روز بودن
+    const storage = DataStorage.getInstance();
+    const appSettings = (storage.loadData('appSettings') || {}) as any;
+    const settingsBackup = (storage.loadData('settings') || {}) as any;
+    const savedSettings = appSettings || settingsBackup;
+    const performance = savedSettings.performance || {};
+    const currentEnforceOwned = performance.requireDeliveryExtraInfo?.owned || false;
+    
+    // به‌روزرسانی state اگر تغییر کرده باشد
+    if (currentEnforceOwned !== enforceDeliveryExtraInfo.owned) {
+      setEnforceDeliveryExtraInfo(prev => ({
+        ...prev,
+        owned: currentEnforceOwned
+      }));
+    }
+    
+    // اگر تنظیم اجباری فعال است، باید اطلاعات تکمیلی کامل باشد
+    if (currentEnforceOwned) {
+      const requiredFields: (keyof typeof deliveryExtraInfo)[] = [
+        'driverFirstName', 'driverLastName', 'driverNationalId', 'billOfLadingNumber',
+        'plateNumber', 'weight', 'billAmount', 'destination', 'billDate', 'transportCompany',
+        'driverMobile', 'destinationAddress', 'backBillAmount', 'destinationPostalCode'
+      ];
+      const extraErrors: Record<string, string> = {};
+      requiredFields.forEach(f => {
+        const val = deliveryExtraInfo[f];
+        if (val === undefined || val === null || val === '') {
+          extraErrors[f] = 'الزامی';
+        }
+      });
+      setDeliveryExtraInfoErrors(extraErrors);
+      if (Object.keys(extraErrors).length > 0) {
+        console.log('❌ خطا: اطلاعات تکمیلی حواله ناقص است:', extraErrors);
+        Object.assign(newErrors, extraErrors);
+      } else {
+        console.log('✅ اطلاعات تکمیلی حواله کامل است');
+      }
+    } else {
+      console.log('ℹ️ اطلاعات تکمیلی حواله اجباری نیست');
+    }
+    // اگر تنظیم اجباری غیرفعال است، امکان ذخیره بدون اطلاعات تکمیلی وجود دارد
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -2555,26 +2639,43 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
           storage.saveData('ownership-delivery-slips', updatedDeliveries);
 
                   // ثبت در لاگ سیستم
-                  logCreateAction('حواله تملیکی', `شماره ${newDelivery.transactionNumber}`, {
-                    transactionNumber: newDelivery.transactionNumber,
-                    productName: newDelivery.productName,
+                  logUserActivity({
+                    action: `ایجاد حواله تملیکی - شماره ${newDelivery.transactionNumber}`,
+                    category: 'release',
+                    page: 'حواله تملیکی',
+                    status: 'success',
+                    logNature: 'ایجاد',
                     amount: newDelivery.amount,
-                    unit: newDelivery.unit,
-                    site: newDelivery.siteName,
-                    tank: newDelivery.tankName,
-                    receiptNumber: newDelivery.receiptNumber,
-                    shipName: newDelivery.shipName || '---',
-                    driverName: newDelivery.driverName || '---',
-                    cotageNumber: newDelivery.cotageNumber || '---',
-                    indexNumber: newDelivery.indexNumber || '---',
-                    contractNumber: newDelivery.contractNumber || '---',
-                    shipBillOfLadingAmount: newDelivery.shipBillOfLadingAmount,
-                    shipUnloadingAmount: newDelivery.shipUnloadingAmount,
-                    tankShoreAmount: newDelivery.tankShoreAmount,
-                    weightGross: newDelivery.weightGross,
-                    status: newDelivery.status,
-                    destinationAddress: newDelivery.additionalInfo?.destinationAddress || '---',
-                    fullSummary: `حواله ${formatPersianNumber(newDelivery.amount)} ${newDelivery.unit} ${newDelivery.productName} (رسید: ${newDelivery.receiptNumber}) توسط راننده ${newDelivery.driverName || 'نامشخص'} با کشتی ${newDelivery.shipName || 'نامشخص'} در سایت ${newDelivery.siteName}`
+                    product: newDelivery.productName,
+                    details: {
+                      transactionNumber: newDelivery.transactionNumber,
+                      productName: newDelivery.productName,
+                      amount: newDelivery.amount,
+                      unit: newDelivery.unit,
+                      site: newDelivery.siteName,
+                      tank: newDelivery.tankName,
+                      receiptNumber: newDelivery.receiptNumber,
+                      shipName: newDelivery.shipName || '---',
+                      driverName: newDelivery.driverName || '---',
+                      cotageNumber: newDelivery.cotageNumber || '---',
+                      indexNumber: newDelivery.indexNumber || '---',
+                      contractNumber: newDelivery.contractNumber || '---',
+                      shipBillOfLadingAmount: newDelivery.shipBillOfLadingAmount,
+                      shipUnloadingAmount: newDelivery.shipUnloadingAmount,
+                      tankShoreAmount: newDelivery.tankShoreAmount,
+                      weightGross: newDelivery.weightGross,
+                      status: newDelivery.status,
+                      destinationAddress: newDelivery.additionalInfo?.destinationAddress || '---',
+                      fullSummary: `حواله ${formatPersianNumber(newDelivery.amount)} ${newDelivery.unit} ${newDelivery.productName} (رسید: ${newDelivery.receiptNumber}) توسط راننده ${newDelivery.driverName || 'نامشخص'} با کشتی ${newDelivery.shipName || 'نامشخص'} در سایت ${newDelivery.siteName}`
+                    },
+                    newValue: {
+                      transactionNumber: newDelivery.transactionNumber,
+                      productName: newDelivery.productName,
+                      amount: newDelivery.amount,
+                      unit: newDelivery.unit,
+                      site: newDelivery.siteName,
+                      tank: newDelivery.tankName
+                    }
                   });
 
           // به‌روزرسانی state
@@ -2671,8 +2772,19 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
           storage.saveData('ownership-delivery-slips', updatedDeliveries);
           setOwnershipDeliveries(updatedDeliveries);
           
-                  // ثبت در لاگ سیستم
-                  logSaveAction('حواله تملیکی', `شماره ${updatedDelivery.transactionNumber}`, {
+                  // ثبت در لاگ سیستم با مقدار اولیه و مقدار جدید
+                  const oldValue = {
+                    transactionNumber: editingDelivery.transactionNumber,
+                    productName: editingDelivery.productName,
+                    amount: editingDelivery.amount,
+                    unit: editingDelivery.unit,
+                    site: editingDelivery.siteName,
+                    tank: editingDelivery.tankName,
+                    receiptNumber: editingDelivery.receiptNumber,
+                    status: editingDelivery.status
+                  };
+                  
+                  const newValue = {
                     transactionNumber: updatedDelivery.transactionNumber,
                     productName: updatedDelivery.productName,
                     amount: updatedDelivery.amount,
@@ -2680,18 +2792,40 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
                     site: updatedDelivery.siteName,
                     tank: updatedDelivery.tankName,
                     receiptNumber: updatedDelivery.receiptNumber,
-                    shipName: updatedDelivery.shipName || '---',
-                    driverName: updatedDelivery.driverName || '---',
-                    cotageNumber: updatedDelivery.cotageNumber || '---',
-                    indexNumber: updatedDelivery.indexNumber || '---',
-                    contractNumber: updatedDelivery.contractNumber || '---',
-                    shipBillOfLadingAmount: updatedDelivery.shipBillOfLadingAmount,
-                    shipUnloadingAmount: updatedDelivery.shipUnloadingAmount,
-                    tankShoreAmount: updatedDelivery.tankShoreAmount,
-                    weightGross: updatedDelivery.weightGross,
-                    status: updatedDelivery.status,
-                    destinationAddress: updatedDelivery.additionalInfo?.destinationAddress || '---',
-                    fullSummary: `ویرایش حواله ${formatPersianNumber(updatedDelivery.amount)} ${updatedDelivery.unit} ${updatedDelivery.productName} (رسید: ${updatedDelivery.receiptNumber}) توسط راننده ${updatedDelivery.driverName || 'نامشخص'} با کشتی ${updatedDelivery.shipName || 'نامشخص'} در سایت ${updatedDelivery.siteName}`
+                    status: updatedDelivery.status
+                  };
+                  
+                  logUserActivity({
+                    action: `ویرایش حواله تملیکی - شماره ${updatedDelivery.transactionNumber}`,
+                    category: 'release',
+                    page: 'حواله تملیکی',
+                    status: 'success',
+                    logNature: 'ویرایش',
+                    amount: updatedDelivery.amount,
+                    product: updatedDelivery.productName,
+                    oldValue: oldValue,
+                    newValue: newValue,
+                    details: {
+                      transactionNumber: updatedDelivery.transactionNumber,
+                      productName: updatedDelivery.productName,
+                      amount: updatedDelivery.amount,
+                      unit: updatedDelivery.unit,
+                      site: updatedDelivery.siteName,
+                      tank: updatedDelivery.tankName,
+                      receiptNumber: updatedDelivery.receiptNumber,
+                      shipName: updatedDelivery.shipName || '---',
+                      driverName: updatedDelivery.driverName || '---',
+                      cotageNumber: updatedDelivery.cotageNumber || '---',
+                      indexNumber: updatedDelivery.indexNumber || '---',
+                      contractNumber: updatedDelivery.contractNumber || '---',
+                      shipBillOfLadingAmount: updatedDelivery.shipBillOfLadingAmount,
+                      shipUnloadingAmount: updatedDelivery.shipUnloadingAmount,
+                      tankShoreAmount: updatedDelivery.tankShoreAmount,
+                      weightGross: updatedDelivery.weightGross,
+                      status: updatedDelivery.status,
+                      destinationAddress: updatedDelivery.additionalInfo?.destinationAddress || '---',
+                      fullSummary: `ویرایش حواله ${formatPersianNumber(updatedDelivery.amount)} ${updatedDelivery.unit} ${updatedDelivery.productName} (رسید: ${updatedDelivery.receiptNumber}) توسط راننده ${updatedDelivery.driverName || 'نامشخص'} با کشتی ${updatedDelivery.shipName || 'نامشخص'} در سایت ${updatedDelivery.siteName}`
+                    }
                   });
 
           // ریست کردن state ها
@@ -4533,8 +4667,14 @@ const NewOwnershipDeliverySlip: React.FC<Props> = ({
                       <input
                         type="checkbox"
                         className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                        checked={showDeliveryExtraInfo || enforceDeliveryExtraInfo.owned}
-                        onChange={(e) => setShowDeliveryExtraInfo(e.target.checked)}
+                        checked={enforceDeliveryExtraInfo.owned ? true : showDeliveryExtraInfo}
+                        onChange={(e) => {
+                          // فقط اگر تنظیم غیرفعال است، اجازه تغییر بده
+                          // اگر تنظیم فعال است، چک‌باکس اجباری است و نمی‌تواند تغییر کند
+                          if (!enforceDeliveryExtraInfo.owned) {
+                            setShowDeliveryExtraInfo(e.target.checked);
+                          }
+                        }}
                         disabled={enforceDeliveryExtraInfo.owned}
                       />
                       <span>ثبت اطلاعات تکمیلی حواله انبار</span>

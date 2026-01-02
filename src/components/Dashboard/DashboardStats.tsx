@@ -10,47 +10,302 @@ import {
 // Import DataStorage
 import { DataStorage } from '../../utils/dataStorage';
 import PersianDatePicker from '../Common/PersianDatePicker';
+import { formatPersianDate as utilsFormatPersianDate, formatPersianDateTime as utilsFormatPersianDateTime } from '../../utils/persian';
 
 // Create storage instance
 const storage = DataStorage.getInstance();
 
 // ====================== Persian Utilities ======================
-const formatPersianNumber = (num: number): string => {
+const formatPersianNumber = (num: number | string): string => {
   const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  return num.toString().replace(/\d/g, (digit, index) => persianDigits[parseInt(digit)]);
+  return num.toString().replace(/\d/g, (digit) => persianDigits[parseInt(digit)]);
 };
 
 const formatPersianDate = (dateString: string): string => {
   const date = new Date(dateString);
-  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  
-  // Convert to Persian date string
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  
-  const toPersian = (num: number) => num.toString().replace(/\d/g, (digit) => persianDigits[parseInt(digit)]);
-  
-  return `${toPersian(year)}/${toPersian(month).padStart(2, '0')}/${toPersian(day).padStart(2, '0')}`;
+  return utilsFormatPersianDate(date);
 };
 
 const formatPersianDateTime = (dateString: string): string => {
   const date = new Date(dateString);
-  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  
-  // Convert to Persian date and time string
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  
-  const toPersian = (num: number) => num.toString().replace(/\d/g, (digit) => persianDigits[parseInt(digit)]);
-  
-  const timeString = `${toPersian(hours).padStart(2, '0')}:${toPersian(minutes).padStart(2, '0')}`;
-  const formattedDate = `${toPersian(year)}/${toPersian(month).padStart(2, '0')}/${toPersian(day).padStart(2, '0')}`;
-  
-  return `${formattedDate} - ${timeString}`;
+  return utilsFormatPersianDateTime(date);
+};
+
+// ====================== Modern Analog Clock Component ======================
+const AnalogClock: React.FC = () => {
+  const [time, setTime] = useState(new Date());
+  const [logoError, setLogoError] = useState(false);
+
+  // به‌روزرسانی زمان هر ثانیه
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const hours = time.getHours();
+  const minutes = time.getMinutes();
+  const seconds = time.getSeconds();
+  const milliseconds = time.getMilliseconds();
+
+  // محاسبه زاویه عقربه‌ها با دقت بالا
+  const secondDeg = (seconds + milliseconds / 1000) * 6;
+  const minuteDeg = (minutes + seconds / 60) * 6;
+  const hourDeg = (hours % 12 + minutes / 60) * 30;
+
+  // آرایه ماه‌ها و روزهای شمسی
+  const persianMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+  const persianDays = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'];
+
+  // تبدیل تاریخ میلادی به شمسی
+  const persianDate = toPersianDate(time);
+  const dayName = persianDays[persianDate.dayOfWeek];
+  const monthName = persianMonths[persianDate.month - 1];
+  const day = persianDate.day;
+  const year = persianDate.year;
+
+  // تولید اعداد ساعت با موقعیت دایره‌ای
+  const hourNumbers = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+  // فرمت زمان دیجیتال
+  const formatTime = () => {
+    const h = hours.toString().padStart(2, '0');
+    const m = minutes.toString().padStart(2, '0');
+    const s = seconds.toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  };
+
+  return (
+    <div className="relative group">
+      {/* کارت اصلی با افکت گلس‌مورفیسم */}
+      <div className="relative bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-slate-200/50 border border-white/60 overflow-hidden transition-all duration-500 group-hover:shadow-3xl group-hover:shadow-slate-300/60 group-hover:-translate-y-1">
+        
+        {/* پس‌زمینه گرادیان ظریف */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/50"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent"></div>
+        
+        {/* دایره‌های نوری متحرک */}
+        <div className="absolute -top-20 -left-20 w-40 h-40 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-16 -right-16 w-32 h-32 bg-gradient-to-tl from-indigo-400/10 to-pink-400/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        {/* محتوای اصلی */}
+        <div className="relative z-10 py-3">
+          
+          {/* ساعت آنالوگ */}
+          <div className="relative w-36 h-36 mx-auto">
+            
+            {/* دایره خارجی با گرادیان */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-slate-100 via-white to-slate-200 shadow-inner border border-slate-300/30"></div>
+            
+            {/* حلقه بیرونی */}
+            <div className="absolute inset-0 rounded-full border-2 border-slate-200/50"></div>
+            
+            {/* نقطه‌های دقیقه */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              {[...Array(60)].map((_, i) => {
+                const angle = i * 6;
+                const rad = (angle - 90) * (Math.PI / 180);
+                const isHour = i % 5 === 0;
+                const radius = isHour ? 58 : 62;
+                const x = Math.cos(rad) * radius;
+                const y = Math.sin(rad) * radius;
+                return (
+                  <div
+                    key={i}
+                    className={`absolute ${isHour ? 'w-1.5 h-1.5 bg-slate-400' : 'w-0.5 h-0.5 bg-slate-300'} rounded-full`}
+                    style={{
+                      transform: `translate(${x}px, ${y}px)`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+            
+            {/* اعداد ساعت */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              {hourNumbers.map((num) => {
+                const angle = num * 30;
+                const rad = (angle - 90) * (Math.PI / 180);
+                const x = Math.cos(rad) * 45;
+                const y = Math.sin(rad) * 45;
+                return (
+                  <div
+                    key={num}
+                    className="absolute text-xs font-bold text-slate-600 select-none"
+                    style={{
+                      transform: `translate(${x}px, ${y}px)`,
+                    }}
+                  >
+                    {formatPersianNumber(num)}
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* لوگوی کورش در مرکز با افکت واترمارک و رنگ‌آمیزی شده */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100/60 via-white/80 to-indigo-100/60 backdrop-blur-sm flex items-center justify-center shadow-inner border border-blue-200/30">
+                <img 
+                  src="/images/koorosh-logo.png" 
+                  alt="لوگو کورش" 
+                  className="w-12 h-12 object-contain opacity-25 drop-shadow-sm"
+                  onError={(e) => {
+                    // اگر لوگو پیدا نشد، یک لوگوی جایگزین نمایش بده
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.parentElement!.innerHTML = `
+                      <svg viewBox="0 0 100 100" class="w-10 h-10 opacity-75">
+                        <defs>
+                          <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#6366F1"/>
+                          </linearGradient>
+                        </defs>
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="url(#logoGrad)" stroke-width="2"/>
+                        <path d="M50 20 L50 80 M25 50 L75 50" stroke="url(#logoGrad)" stroke-width="1.5"/>
+                        <path d="M35 65 L50 30 L65 65 Z" fill="url(#logoGrad)"/>
+                      </svg>
+                    `;
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* عقربه ساعت با افکت سایه */}
+            <div
+              className="absolute top-1/2 left-1/2 w-1 h-6 bg-gradient-to-t from-slate-700 to-slate-600 rounded-full origin-bottom shadow-lg z-20"
+              style={{
+                transform: `translate(-50%, -100%) rotate(${hourDeg}deg)`,
+                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.2))'
+              }}
+            >
+              <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-700 rounded-full -translate-y-1/2"></div>
+            </div>
+            
+            {/* عقربه دقیقه */}
+            <div
+              className="absolute top-1/2 left-1/2 w-0.5 h-9 bg-gradient-to-t from-slate-600 to-slate-500 rounded-full origin-bottom shadow-md z-20"
+              style={{
+                transform: `translate(-50%, -100%) rotate(${minuteDeg}deg)`,
+                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.15))'
+              }}
+            >
+              <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-slate-600 rounded-full -translate-y-1/2"></div>
+            </div>
+            
+            {/* عقربه ثانیه با رنگ قرمز */}
+            <div
+              className="absolute top-1/2 left-1/2 w-0.5 h-10 bg-gradient-to-t from-red-500 to-red-400 rounded-full origin-bottom shadow-md z-30"
+              style={{
+                transform: `translate(-50%, -100%) rotate(${secondDeg}deg)`,
+                transition: 'transform 0.1s linear',
+                filter: 'drop-shadow(0 0 4px rgba(239,68,68,0.4))'
+              }}
+            >
+              <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-red-500 rounded-full -translate-y-1/2 shadow-sm"></div>
+            </div>
+            
+            {/* مرکز ساعت */}
+            <div className="absolute top-1/2 left-1/2 w-2.5 h-2.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-full transform -translate-x-1/2 -translate-y-1/2 shadow-lg z-40 border border-slate-600">
+              <div className="absolute inset-0.5 bg-gradient-to-br from-red-500 to-red-600 rounded-full shadow-inner"></div>
+            </div>
+          </div>
+          
+          {/* تقویم شمسی و ساعت دیجیتال - طراحی فشرده */}
+          <div className="mt-3 text-center space-y-2">
+            {/* زمان دیجیتال - رنگ پررنگ و خوانا */}
+            <div className="flex items-center justify-center gap-1">
+              <span className="font-mono text-xl font-bold text-slate-800 tracking-wider">
+                {formatPersianNumber(formatTime())}
+              </span>
+            </div>
+            
+            {/* تاریخ کامل با سال */}
+            <div className="flex items-center justify-center gap-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${dayName === 'جمعه' ? 'bg-red-600' : 'bg-slate-800'} shadow-sm`}></div>
+              <span className="text-xs text-slate-600 font-medium">{dayName}</span>
+            </div>
+            
+            <div className="bg-gradient-to-r from-slate-100/80 to-white/80 backdrop-blur-sm rounded-xl py-2 px-4 border border-slate-200/50 shadow-inner mx-4">
+              <span className="text-lg font-bold text-slate-800">
+                {formatPersianNumber(day)} {monthName}
+              </span>
+              <span className="text-lg font-bold text-slate-800 mr-1">
+                {formatPersianNumber(year)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* افکت هاور - خط نورانی پایین */}
+      <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent transition-all duration-500 group-hover:w-3/4"></div>
+    </div>
+  );
+};
+
+// تابع کمکی برای تبدیل تاریخ میلادی به شمسی
+const toPersianDate = (date: Date): { year: number; month: number; day: number; dayOfWeek: number } => {
+  const gy = date.getFullYear();
+  const gm = date.getMonth();
+  const gd = date.getDate();
+
+  // روز julian
+  let jy = gy - 621;
+  let jm;
+  let jd;
+
+  // روز سال میلادی
+  const daysInMonth = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  const isLeapG = (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0;
+  let dayOfYear = gd + daysInMonth[gm] + (gm > 2 && isLeapG ? 1 : 0);
+
+  // تنظیم روز سال
+  let dayOfPersianYear;
+  if (dayOfYear <= 79) {
+    // 20 قوس تا 10 فروردین (روزهای 1 تا 79 سال شمسی)
+    dayOfPersianYear = dayOfYear + 286;
+    jy -= 1;
+  } else {
+    dayOfPersianYear = dayOfYear - 79;
+  }
+
+  // سال کبیسه شمسی
+  const isLeapP = isLeapPersian(jy);
+
+  // ماه شمسی
+  const monthLengths = [31, isLeapP ? 30 : 29, 31, 30, 31, 30, 31, 30, 31, 30, 31, 30];
+  jm = 1;
+  jd = dayOfPersianYear;
+
+  for (let i = 0; i < monthLengths.length; i++) {
+    if (jd <= monthLengths[i]) {
+      jm = i + 1;
+      break;
+    }
+    jd -= monthLengths[i];
+  }
+
+  // روز هفته (یکشنبه = 0 در جاوااسکریپت، تبدیل به شنبه = 0)
+  const dayOfWeek = date.getDay();
+  const persianDayOfWeek = (dayOfWeek + 1) % 7;
+
+  return {
+    year: jy,
+    month: jm,
+    day: jd,
+    dayOfWeek: persianDayOfWeek
+  };
+};
+
+// بررسی سال کبیسه شمسی - الگوریتم 33 ساله
+const isLeapPersian = (year: number): boolean => {
+  const mod33 = year % 33;
+  return mod33 === 1 || mod33 === 5 || mod33 === 9 || mod33 === 13 || mod33 === 17 || mod33 === 22 || mod33 === 26 || mod33 === 30;
 };
 
 // ====================== Enhanced Date Range Utilities ======================
@@ -96,6 +351,13 @@ const getDateRange = (range: string): { start: Date; end: Date } => {
     case 'year': {
       // این سال جاری
       const start = new Date(now.getFullYear(), 0, 1);
+      start.setHours(0, 0, 0, 0);
+      return { start, end: endOfDay };
+    }
+    
+    case 'allYears': {
+      // کل سال ها - از ابتدای تاریخ تا امروز
+      const start = new Date(1970, 0, 1);
       start.setHours(0, 0, 0, 0);
       return { start, end: endOfDay };
     }
@@ -579,7 +841,8 @@ const DateRangeFilter: React.FC<{
     { value: 'week', label: 'این هفته', icon: CalendarRange },
     { value: 'month', label: 'این ماه', icon: CalendarCheck },
     { value: 'quarter', label: 'این فصل', icon: CalendarPlus },
-    { value: 'year', label: 'این سال', icon: CalendarX }
+    { value: 'year', label: 'این سال', icon: CalendarX },
+    { value: 'allYears', label: 'کل سال ها', icon: Globe }
   ];
 
   return (
@@ -671,7 +934,7 @@ interface DashboardStatsProps {
 }
 
 const DashboardStatsComponent: React.FC<DashboardStatsProps> = ({ onLogout }) => {
-  const [dateRange, setDateRange] = useState('today');
+  const [dateRange, setDateRange] = useState('allYears');
   const [customFromDate, setCustomFromDate] = useState<Date | null>(null);
   const [customToDate, setCustomToDate] = useState<Date | null>(null);
   const [useCustomRange, setUseCustomRange] = useState(false);
@@ -1620,7 +1883,7 @@ const DashboardStatsComponent: React.FC<DashboardStatsProps> = ({ onLogout }) =>
         today.setHours(0, 0, 0, 0);
         const endDate = new Date(c.endDate);
         endDate.setHours(0, 0, 0, 0);
-        return endDate > today; // تاریخ پایان باید بزرگتر از امروز باشد
+        return endDate >= today; // تاریخ پایان باید بزرگتر یا مساوی امروز باشد (شامل قراردادهایی که امروز تمام می‌شوند)
       }
       return false; // اگر تاریخ پایان نداشته باشد، فعال محسوب نمی‌شود
     });
@@ -1958,8 +2221,14 @@ const DashboardStatsComponent: React.FC<DashboardStatsProps> = ({ onLogout }) =>
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
+        <div className="flex items-start justify-between flex-wrap gap-6">
+          {/* ساعت آنالوگ و تقویم شمسی - وسط بخش بالایی */}
+          <div className="flex-shrink-0">
+            <AnalogClock />
+          </div>
+          
+          {/* عنوان و توضیحات */}
+          <div className="flex-1 min-w-[200px]">
             <h1 className="text-4xl font-bold text-gray-800 mb-2">داشبورد مدیریت انبار</h1>
             <p className="text-gray-600">نمای کلی از وضعیت سیستم و آمار مهم - به‌روزرسانی سریع</p>
             {lastUpdate && (
@@ -1973,6 +2242,7 @@ const DashboardStatsComponent: React.FC<DashboardStatsProps> = ({ onLogout }) =>
             )}
           </div>
           
+          {/* فیلترها و دکمه‌ها */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Date Range Filter */}

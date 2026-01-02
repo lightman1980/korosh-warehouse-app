@@ -12,7 +12,6 @@ import AccountingManager from './components/accounting/AccountingManager';
 import { ReportsManager } from './components/Reports/ReportsManager';
 import { InventoryLedgerManager } from './components/InventoryLedger/InventoryLedgerManager';
 import { AnalyticsManager } from './components/Analytics/AnalyticsManager';
-import { UserManagementManager } from './components/UserManagement/UserManagementManager';
 import MessagingManager from './components/Messaging/MessagingManager';
 import PersianDatePicker from './components/Common/PersianDatePicker';
 import { DateSelectionWrapper } from './components/DateSelectionWrapper';
@@ -56,7 +55,6 @@ const moduleNames: Record<string, string> = {
   'oil-converter': 'مبدل روغن خوراکی',
   'product-development': 'ساخت محصول جدید',
   'messaging': 'مکاتبات',
-  'users': 'مدیریت کاربران',
   'settings': 'تنظیمات'
 };
 
@@ -94,9 +92,73 @@ const AppContent: React.FC = () => {
     return 'dashboard';
   };
 
-  const [activeModule, setActiveModule] = useState<string>(getInitialModule);
+  const [activeModule, setActiveModuleState] = useState<string>(getInitialModule);
+  const [moduleHistory, setModuleHistory] = useState<string[]>(['dashboard']); // Track navigation history
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Wrapper for setActiveModule to track navigation history
+  const setActiveModule = useCallback((module: string) => {
+    setActiveModuleState((prevModule) => {
+      // Only add to history if it's a different module
+      if (prevModule !== module) {
+        setModuleHistory((history) => {
+          // Remove the module if it already exists in history (to avoid duplicates)
+          const filtered = history.filter(m => m !== module);
+          // Add previous module to history and new module at the end
+          return [...filtered, prevModule, module];
+        });
+      }
+      return module;
+    });
+    localStorage.setItem('activeModule', module);
+  }, []);
+
+  // Handle Esc key to navigate back
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't handle Esc if user is typing in an input
+      const target = event.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      const isInput = tagName === 'input' || tagName === 'textarea';
+      const isContentEditable = target.getAttribute('contenteditable') === 'true';
+      
+      if (isInput || isContentEditable) {
+        return; // Let the input handle Esc normally
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        // Go back to previous module in history, or dashboard if at dashboard
+        setModuleHistory((history) => {
+          if (history.length > 1 && activeModule !== 'dashboard') {
+            // Find current module index
+            const currentIndex = history.lastIndexOf(activeModule);
+            if (currentIndex > 0) {
+              // Go to previous module
+              const previousModule = history[currentIndex - 1];
+              setActiveModuleState(previousModule);
+              localStorage.setItem('activeModule', previousModule);
+              // Remove current module from history
+              return history.slice(0, currentIndex);
+            }
+          }
+          // If at dashboard or no history, stay at dashboard
+          if (activeModule !== 'dashboard') {
+            setActiveModuleState('dashboard');
+            localStorage.setItem('activeModule', 'dashboard');
+            return ['dashboard'];
+          }
+          return history;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLoggedIn, activeModule]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isFloatingCalendarOpen, setIsFloatingCalendarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -228,9 +290,22 @@ const AppContent: React.FC = () => {
       authService.logout();
       setIsLoggedIn(false);
       setCurrentUser(null);
-      setActiveModule('dashboard');
+      setActiveModuleState('dashboard');
+      setModuleHistory(['dashboard']);
       localStorage.removeItem('activeModule');
     }, [currentUser]);
+
+    // Expose handleLogout globally for use in other components
+    useEffect(() => {
+      (window as any).handleLogout = handleLogout;
+      (window as any).authService = authService;
+      (window as any).currentUser = currentUser;
+      return () => {
+        delete (window as any).handleLogout;
+        delete (window as any).authService;
+        delete (window as any).currentUser;
+      };
+    }, [handleLogout, currentUser]);
 
     const getSessionTimeout = useCallback(() => {
       try {
@@ -297,7 +372,6 @@ const AppContent: React.FC = () => {
       'speech-demo': 'speech-to-text',
       'oil-converter': 'speech-to-text',
       'messaging': 'correspondence',
-      'users': 'user_management',
       'settings': 'settings',
       'workflow': 'workflow',
       'server': 'settings',
@@ -407,12 +481,6 @@ const AppContent: React.FC = () => {
         return (
           <PermissionGuard moduleId={permissionModuleId} action="view">
             <MessagingManager />
-          </PermissionGuard>
-        );
-      case 'users':
-        return (
-          <PermissionGuard moduleId={permissionModuleId} action="view">
-            <UserManagementManager />
           </PermissionGuard>
         );
       case 'settings':

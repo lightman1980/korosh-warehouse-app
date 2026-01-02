@@ -4,6 +4,7 @@ import { WarehouseDelivery } from '../../types/WarehouseDeliveryTypes';
 import { formatPersianNumber, formatPersianDate } from "../../utils/persian";
 import { DataStorage } from '../../utils/dataStorage';
 import { usePermissions } from '../../hooks/usePermissions';
+import { logUserActivity } from '../../utils/logger';
 // Removed unused imports: DeliveryTypeSelector, CompanySelector, ContractSelector, PermitSelector, DeliveryForm, DeliveriesTable
 import DeliverySlipTypeSelector from './DeliverySlipTypeSelector';
 import ConsignmentDeliverySlip from './ConsignmentDeliverySlip';
@@ -2294,28 +2295,88 @@ const handleCreateDeliveryFromPermit = useCallback((permit: any) => {
     }
       saveDataWithNotification(slipType, updatedSlips);
 
-          // ثبت در لاگ سیستم
-          logUserActivity({
-            action: `${isEditMode ? 'ویرایش' : 'ثبت'} حواله انبار - شماره ${newDelivery.transactionNumber}`,
-            category: 'release',
-            status: 'success',
-            page: 'مدیریت حواله انبار',
-            amount: newDelivery.amount,
-            product: newDelivery.productName,
-            receiptDate: formatPersianDate(deliveryDate),
-            documentType: 'سیستمی',
-            counterparty: newDelivery.counterpartyName,
-            logNature: (newDelivery.contractNumber || newDelivery.permitId) ? 
-              `حواله امانی - ${isEditMode ? 'ویرایش' : 'ایجاد'}` : 
-              `حواله تملیکی - ${isEditMode ? 'ویرایش' : 'ایجاد'}`,
-            details: {
+          // ثبت در لاگ سیستم با مقدار اولیه و مقدار جدید
+          if (isEditMode) {
+            // در حالت ویرایش: مقدار قدیمی و جدید را ثبت کن
+            const oldValue = {
+              transactionNumber: currentDelivery.transactionNumber,
+              productName: currentDelivery.productName,
+              amount: currentDelivery.amount,
+              unit: currentDelivery.unit,
+              site: currentDelivery.siteName,
+              tank: currentDelivery.tankName,
+              counterparty: currentDelivery.counterpartyName,
+              status: currentDelivery.status
+            };
+            
+            const newValue = {
               transactionNumber: newDelivery.transactionNumber,
               productName: newDelivery.productName,
               amount: newDelivery.amount,
+              unit: newDelivery.unit,
               site: newDelivery.siteName,
-              tank: newDelivery.tankName
-            }
-          });
+              tank: newDelivery.tankName,
+              counterparty: newDelivery.counterpartyName,
+              status: newDelivery.status
+            };
+            
+            logUserActivity({
+              action: `ویرایش حواله انبار - شماره ${newDelivery.transactionNumber}`,
+              category: 'release',
+              status: 'success',
+              page: 'مدیریت حواله انبار',
+              logNature: (newDelivery.contractNumber || newDelivery.permitId) ? 
+                'حواله امانی - ویرایش' : 
+                'حواله تملیکی - ویرایش',
+              amount: newDelivery.amount,
+              product: newDelivery.productName,
+              receiptDate: formatPersianDate(deliveryDate),
+              documentType: 'سیستمی',
+              counterparty: newDelivery.counterpartyName,
+              oldValue: oldValue,
+              newValue: newValue,
+              details: {
+                transactionNumber: newDelivery.transactionNumber,
+                productName: newDelivery.productName,
+                amount: newDelivery.amount,
+                site: newDelivery.siteName,
+                tank: newDelivery.tankName
+              }
+            });
+          } else {
+            // در حالت ایجاد: فقط مقدار جدید را ثبت کن
+            logUserActivity({
+              action: `ثبت حواله انبار - شماره ${newDelivery.transactionNumber}`,
+              category: 'release',
+              status: 'success',
+              page: 'مدیریت حواله انبار',
+              logNature: (newDelivery.contractNumber || newDelivery.permitId) ? 
+                'حواله امانی - ایجاد' : 
+                'حواله تملیکی - ایجاد',
+              amount: newDelivery.amount,
+              product: newDelivery.productName,
+              receiptDate: formatPersianDate(deliveryDate),
+              documentType: 'سیستمی',
+              counterparty: newDelivery.counterpartyName,
+              newValue: {
+                transactionNumber: newDelivery.transactionNumber,
+                productName: newDelivery.productName,
+                amount: newDelivery.amount,
+                unit: newDelivery.unit,
+                site: newDelivery.siteName,
+                tank: newDelivery.tankName,
+                counterparty: newDelivery.counterpartyName,
+                status: newDelivery.status
+              },
+              details: {
+                transactionNumber: newDelivery.transactionNumber,
+                productName: newDelivery.productName,
+                amount: newDelivery.amount,
+                site: newDelivery.siteName,
+                tank: newDelivery.tankName
+              }
+            });
+          }
 
       // 3. به‌روزرساني موجودي مجوز (فقط براي مجوزهاي اماني) - بهبود یافته
     if (newDelivery.permitId) {

@@ -4,6 +4,7 @@ import { formatPersianDate, formatPersianNumber } from '../../utils/persian';
 import { DataStorage } from '../../utils/dataStorage';
 import PersianDatePicker from '../Common/PersianDatePicker';
 import { Tooltip } from '../Common/Tooltip';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // تعريف تايپ‌ها براي اطلاعات حواله
 interface ConsignmentSlipInfo {
@@ -175,13 +176,40 @@ const ConsignmentDeliverySlip: React.FC<Props> = ({
   const storage = DataStorage.getInstance();
   
   useEffect(() => {
-    const savedSettings = (storage.loadData('settings') || {}) as any;
+    // بارگذاری تنظیمات از appSettings (کلید اصلی) یا settings (برای سازگاری)
+    const appSettings = (storage.loadData('appSettings') || {}) as any;
+    const settingsBackup = (storage.loadData('settings') || {}) as any;
+    const savedSettings = appSettings || settingsBackup;
     const performance = savedSettings.performance || {};
+    const enforceConsignment = performance.requireDeliveryExtraInfo?.consignment || false;
+    const enforceOwned = performance.requireDeliveryExtraInfo?.owned || false;
     setEnforceDeliveryExtraInfo({
-      consignment: performance.requireConsignmentDeliveryExtraInfo || false,
-      owned: performance.requireOwnedDeliveryExtraInfo || false
+      consignment: enforceConsignment,
+      owned: enforceOwned
     });
+    // اگر تنظیم غیرفعال است، چک‌باکس اطلاعات تکمیلی را غیرفعال و غیرچک کن
+    // اگر تنظیم فعال است، چک‌باکس را فعال و چک کن (اجباری)
+    if (!enforceConsignment) {
+      setShowDeliveryExtraInfo(false);
+    } else {
+      setShowDeliveryExtraInfo(true);
+    }
   }, [storage]);
+
+  // اضافه کردن Enter برای ذخیره و Esc برای بازگشت
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (!isSaving && selectedSlipInfo) {
+        handleSaveSlip();
+      }
+    },
+    onEscape: () => {
+      if (onBack) {
+        onBack();
+      }
+    },
+    enabled: true
+  });
 
   // همگام‌سازی وزن (مبنا) با مقدار حواله و تاریخ بارنامه با تاریخ حواله
   useEffect(() => {
@@ -2345,6 +2373,49 @@ const handleSaveSlip = async () => {
       alert('لطفاً ابتدا یک مجوز را انتخاب کنید.');
       return;
     }
+    
+    // ✅ اعتبارسنجی اطلاعات تکمیلی در صورت اجبار
+    // بارگذاری مجدد تنظیمات برای اطمینان از به‌روز بودن
+    const appSettings = (storage.loadData('appSettings') || {}) as any;
+    const settingsBackup = (storage.loadData('settings') || {}) as any;
+    const savedSettings = appSettings || settingsBackup;
+    const performance = savedSettings.performance || {};
+    const currentEnforceConsignment = performance.requireDeliveryExtraInfo?.consignment || false;
+    
+    // به‌روزرسانی state اگر تغییر کرده باشد
+    if (currentEnforceConsignment !== enforceDeliveryExtraInfo.consignment) {
+      setEnforceDeliveryExtraInfo(prev => ({
+        ...prev,
+        consignment: currentEnforceConsignment
+      }));
+    }
+    
+    // اگر تنظیم اجباری فعال است، باید اطلاعات تکمیلی کامل باشد
+    if (currentEnforceConsignment) {
+      const requiredFields: (keyof typeof deliveryExtraInfo)[] = [
+        'driverFirstName', 'driverLastName', 'driverNationalId', 'billOfLadingNumber',
+        'plateNumber', 'weight', 'billAmount', 'destination', 'billDate', 'transportCompany',
+        'driverMobile', 'destinationAddress', 'backBillAmount', 'destinationPostalCode'
+      ];
+      const extraErrors: Record<string, string> = {};
+      requiredFields.forEach(f => {
+        const val = deliveryExtraInfo[f];
+        if (val === undefined || val === null || val === '') {
+          extraErrors[f] = 'الزامی';
+        }
+      });
+      setDeliveryExtraInfoErrors(extraErrors);
+      if (Object.keys(extraErrors).length > 0) {
+        console.log('❌ خطا: اطلاعات تکمیلی حواله امانی ناقص است:', extraErrors);
+        alert('لطفاً اطلاعات تکمیلی حواله را کامل کنید');
+        setIsSaving(false);
+        return;
+      }
+      console.log('✅ اطلاعات تکمیلی حواله امانی کامل است');
+    } else {
+      console.log('ℹ️ اطلاعات تکمیلی حواله امانی اجباری نیست');
+    }
+    // اگر تنظیم اجباری غیرفعال است، امکان ذخیره بدون اطلاعات تکمیلی وجود دارد
       
     // --- 2. اعتبارسنجی فیلدهای الزامی بر اساس نوع گیرنده ---
     const recipientType = selectedSlipInfo.recipientType;
@@ -4429,8 +4500,14 @@ const handleSaveSlip = async () => {
                 <input
                   type="checkbox"
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                  checked={showDeliveryExtraInfo || enforceDeliveryExtraInfo.consignment}
-                  onChange={(e) => setShowDeliveryExtraInfo(e.target.checked)}
+                  checked={enforceDeliveryExtraInfo.consignment ? true : showDeliveryExtraInfo}
+                  onChange={(e) => {
+                    // فقط اگر تنظیم غیرفعال است، اجازه تغییر بده
+                    // اگر تنظیم فعال است، چک‌باکس اجباری است و نمی‌تواند تغییر کند
+                    if (!enforceDeliveryExtraInfo.consignment) {
+                      setShowDeliveryExtraInfo(e.target.checked);
+                    }
+                  }}
                   disabled={enforceDeliveryExtraInfo.consignment}
                 />
                 <span>ثبت اطلاعات تکمیلی حواله انبار</span>

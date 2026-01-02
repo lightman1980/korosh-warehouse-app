@@ -402,6 +402,33 @@ const OwnershipDeliverySlip: React.FC<Props> = ({ onBack, baseData: propBaseData
       const updatedDeliveries = [...existingDeliveries, newDelivery];
       storage.saveData('ownership-delivery-slips', updatedDeliveries);
 
+      // ثبت در لاگ سیستم
+      logUserActivity({
+        action: `ایجاد حواله تملیکی - شماره ${newDelivery.transactionNumber}`,
+        category: 'release',
+        page: 'حواله تملیکی',
+        status: 'success',
+        logNature: 'ایجاد',
+        amount: newDelivery.amount,
+        product: newDelivery.productName,
+        newValue: {
+          transactionNumber: newDelivery.transactionNumber,
+          productName: newDelivery.productName,
+          amount: newDelivery.amount,
+          unit: newDelivery.unit,
+          site: newDelivery.siteName,
+          tank: newDelivery.tankName
+        },
+        details: {
+          transactionNumber: newDelivery.transactionNumber,
+          productName: newDelivery.productName,
+          amount: newDelivery.amount,
+          unit: newDelivery.unit,
+          site: newDelivery.siteName,
+          tank: newDelivery.tankName
+        }
+      });
+
       // به‌روزرسانی state
       setOwnershipDeliverySlips(prev => [...prev, newDelivery]);
       setIsAddingNew(false);

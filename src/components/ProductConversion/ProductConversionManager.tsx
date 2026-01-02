@@ -9,6 +9,7 @@ import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
 import { usePermissions } from '../../hooks/usePermissions';
 import { logSaveAction, logCreateAction } from "../../hooks/useActivityLogger";
+import { logUserActivity } from "../../utils/logger";
 import jalaali from 'jalaali-js';
 
 interface ProductConversion {
@@ -955,9 +956,59 @@ export const ProductConversionManager: React.FC = () => {
       };
 
       if (editingId) {
-        logSaveAction('تبدیل کالا', `شماره ${conversion.transactionNumber}`, details);
+        // هنگام ویرایش، مقدار قدیمی را از editForm بگیر
+        const oldConversion = conversions.find(c => c.id === editingId);
+        const oldValue = oldConversion ? {
+          transactionNumber: oldConversion.transactionNumber,
+          consumedProduct: oldConversion.consumedProductName,
+          consumedQuantity: oldConversion.consumedQuantity,
+          consumedUnit: oldConversion.consumedUnit,
+          producedProduct: oldConversion.producedProductName,
+          producedQuantity: oldConversion.producedQuantity,
+          producedUnit: oldConversion.producedUnit,
+          site: oldConversion.siteName,
+          tank: oldConversion.tankName,
+          contractNumber: oldConversion.contractNumber || '---',
+          status: oldConversion.status
+        } : null;
+        
+        const newValue = {
+          transactionNumber: conversion.transactionNumber,
+          consumedProduct: conversion.consumedProductName,
+          consumedQuantity: conversion.consumedQuantity,
+          consumedUnit: conversion.consumedUnit,
+          producedProduct: conversion.producedProductName,
+          producedQuantity: conversion.producedQuantity,
+          producedUnit: conversion.producedUnit,
+          site: conversion.siteName,
+          tank: conversion.tankName,
+          contractNumber: conversion.contractNumber || '---',
+          status: conversion.status
+        };
+        
+        logUserActivity({
+          action: `ویرایش تبدیل کالا - شماره ${conversion.transactionNumber}`,
+          category: 'conversion',
+          page: 'تبدیل کالا',
+          status: 'success',
+          logNature: 'ویرایش',
+          oldValue: oldValue,
+          newValue: newValue,
+          details: details,
+          amount: `${conversion.consumedQuantity} ${conversion.consumedUnit} → ${conversion.producedQuantity} ${conversion.producedUnit}`,
+          product: `${conversion.consumedProductName} → ${conversion.producedProductName}`
+        });
       } else {
-        logCreateAction('تبدیل کالا', `شماره ${conversion.transactionNumber}`, details);
+        logUserActivity({
+          action: `ایجاد تبدیل کالا - شماره ${conversion.transactionNumber}`,
+          category: 'conversion',
+          page: 'تبدیل کالا',
+          status: 'success',
+          logNature: 'ایجاد',
+          details: details,
+          amount: `${conversion.consumedQuantity} ${conversion.consumedUnit} → ${conversion.producedQuantity} ${conversion.producedUnit}`,
+          product: `${conversion.consumedProductName} → ${conversion.producedProductName}`
+        });
       }
 
       // ارسال رویداد برای به‌روزرسانی موجودی

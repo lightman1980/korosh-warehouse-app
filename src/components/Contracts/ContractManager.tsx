@@ -6,6 +6,7 @@ import moment from 'moment-jalaali';
 import { PersianDatePicker } from '../Common/PersianDatePicker';
 import { DataStorage } from '../../utils/dataStorage';
 import { exportToExcel } from '../../utils/excelExport';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // Helper function to convert Gregorian date to Persian year and month
 const getPersianYearMonth = (date: Date): { year: number, month: number } => {
@@ -2190,6 +2191,24 @@ export const ContractManager: React.FC = () => {
       }
     }
   }, [newContract.rentalTypeId, newContract.siteId, newContract.tankId, newContract.contractWeight, baseData, calculateEmptyTankCapacity, isAddingNew, editingContract, isWeightLocked]);
+
+  // اضافه کردن Enter برای ذخیره و Esc برای انصراف
+  useKeyboardShortcuts({
+    onEnter: () => {
+      if (isAddingNew || editingContract) {
+        handleSave();
+      }
+    },
+    onEscape: () => {
+      if (isAddingNew || editingContract) {
+        setIsAddingNew(false);
+        setEditingContract(null);
+        setNewContract({});
+        setValidationErrors([]);
+      }
+    },
+    enabled: isAddingNew || !!editingContract
+  });
   
   const handleSave = () => {
     if (!newContract.contractNumber || !newContract.companyId || !newContract.startDate || 
