@@ -1,0 +1,15 @@
+# Simple .htaccess - Minimum required for SPA
+RewriteEngine On
+RewriteBase /
+
+# Redirect all requests to index.html for SPA routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Set default file
+DirectoryIndex index.html
+
+# Prevent directory listing
+Options -Indexes
+
